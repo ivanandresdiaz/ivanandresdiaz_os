@@ -225,7 +225,7 @@ function SlotView({
         <span className={`flex-1 font-medium leading-tight ${work.done ? "line-through" : ""}`}>
           {work.title}
         </span>
-        {!work.done && <StartCycleButton slotId={slot.id} className="text-[10px]" />}
+        {!work.done && work.kind !== "secondary" && <StartCycleButton slotId={slot.id} className="text-[10px]" />}
         <button
           type="button"
           className="hidden text-muted hover:text-red-600 group-hover:block"
@@ -239,6 +239,7 @@ function SlotView({
       {!compact || endMin - startMin >= 45 ? (
         <div className="truncate text-[10px] text-muted">
           {formatMinutes(startMin)}–{formatMinutes(endMin)}
+          {work.kind === "secondary" ? " · Secondary" : ""}
           {work.campaignTitle ? ` · ${work.campaignTitle}` : ""}
           {work.stepsTotal > 0 ? ` · ${work.stepsDone}/${work.stepsTotal}` : ""}
         </div>

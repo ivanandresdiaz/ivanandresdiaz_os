@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar } from "@/components/calendar";
 import { CycleStartForm } from "@/components/cycle-start-form";
+import { NoiseItems } from "@/components/noise-items";
+import { SecondaryTasks } from "@/components/secondary-tasks";
 import { Stack } from "@/components/stack";
 import { Hidden } from "@/components/ui";
 import {
@@ -23,7 +25,6 @@ import {
   completeCheckIn,
   deleteException,
   deleteHighlight,
-  saveEliminate,
   setExceptionForm,
   toggleHighlight,
 } from "@/server/actions";
@@ -193,16 +194,9 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
             )}
           </section>
 
-          <section className="card">
-            <form action={saveEliminate} className="flex flex-col gap-2">
-              <Hidden date={date} />
-              <label htmlFor="eliminate" className="font-semibold">
-                Eliminate <span className="text-sm font-normal text-muted">(the noise for today)</span>
-              </label>
-              <textarea id="eliminate" name="eliminate" rows={3} defaultValue={note.eliminate} className="input" />
-              <button className="btn self-start">Save</button>
-            </form>
-          </section>
+          <SecondaryTasks date={date} tasks={note.secondaryTasks} />
+
+          <NoiseItems date={date} items={note.noiseItems} />
 
           <section className="card flex flex-col gap-2">
             <div className="flex items-baseline justify-between">

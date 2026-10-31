@@ -51,7 +51,7 @@ _Evitar_: Movimiento, Meta.
 
 **Block type** (Tipo de bloque): la clase de un Block (Gym, Reading, Deep work for the company…). Es Habit o Container, tiene un color y sus Infinite Games. Una Campaign declara en qué Block type de tipo Container se juega.
 
-**Slot**: una Task (o un Move sin Tasks) puesta en el calendario en una fecha y un horario. Una Task puede tener varios Slots en días distintos. Si quedan Slots en días pasados y la Task no está hecha, vuelve como carried over ×N (N = días en que se agendó).
+**Slot**: una Task (o un Move sin Tasks) o una Secondary Task puesta en el calendario en una fecha y un horario. Una Task puede tener varios Slots en días distintos. Si quedan Slots en días pasados y el trabajo no está hecho, vuelve como carried over ×N. Una Secondary Task agendada que queda pendiente conserva su Slot pasado como historial y vuelve al día siguiente sin horario; puede completarse desde el checklist sin volver a agendarla.
 
 **Exception** (Excepción): un cambio a la Structure en una sola fecha; no toca la plantilla.
 
@@ -73,7 +73,7 @@ _Evitar_: Movimiento, Meta.
 
 **Daily Note** (Nota del día): el registro de un día, en tres momentos: el Check-in por la mañana, el Learning Log durante el día y el Journal por la noche. Se puede navegar de un día a otro (ayer, los journals anteriores).
 
-**Check-in**: el ritual de la mañana. Miro mis Season Goals, mis Campaigns y la semana, elijo los Highlights, anoto lo que elimino (el ruido) y acomodo el trabajo en los Blocks.
+**Check-in**: el ritual de la mañana. Miro mis Season Goals, mis Campaigns y la semana, elijo los Highlights, capturo y reviso mis Secondary Tasks, anoto los Noise items del día y acomodo el trabajo en los Blocks.
 
 **Highlight**: lo que es crítico que quede hecho hoy porque mueve la aguja del progreso. Hay de 1 a 3 por día, y cada uno lleva escrito por qué es crítico. Viene de *Make Time*.
 _Evitar_: 9/10.
@@ -82,9 +82,9 @@ _Evitar_: 9/10.
 
 **Ambitious Mode** (Modo ambicioso): seguir en la misma Campaign después de un Day Won. Pide confirmación y muestra qué Infinite Games van en 0 h esa semana. No da XP extra, para no premiar la carrera de la rata de productividad.
 
-**Carried over** (Arrastrada): una Task o un Move agendado que no quedó hecho y vuelve al stack a la mañana siguiente, marcado con cuántas veces ha pasado (×N).
+**Carried over** (Arrastrada): una Task, un Move agendado o una Secondary Task que no quedó hecho y vuelve a la mañana siguiente, marcado con cuántas veces ha pasado (×N). Las Tasks y Moves vuelven al Stack; las Secondary Tasks vuelven a su sección del Check-in hasta completarlas o eliminarlas.
 
-**Secondary Task** (Tarea secundaria): algo del día que conviene hacer, pero si no se logra no pasa mucho.
+**Secondary Task** (Tarea secundaria): una acción única y válida que quiero hacer, pero que no tiene jerarquía estratégica: no aporta Alignment ni XP, no cuenta para Day Won, no necesita un por qué y no puede ser Highlight. No tiene recurrencia, Steps, Infinite Games, Backlog ni relación con Campaigns o Moves. Tampoco es Noise, porque no es algo que quiera eliminar. Puede agendarse o no y se marca como hecha; si queda pendiente, vuelve al día siguiente como carried over hasta completarla o eliminarla.
 
 **Learning Log** (¿Qué estoy aprendiendo?): la captura rápida durante el día de ideas, reflexiones y aprendizajes.
 
@@ -94,7 +94,10 @@ _Evitar_: 9/10.
 
 **Alignment** (Alineamiento): qué tanto de mi tiempo va a lo que persigo. Se calcula como la parte del tiempo de los Container Blocks de la semana que fue a Campaigns activas, y se contrasta con un puntaje sentido del 1 al 10 en la Weekly Review. Se mide sobre lo planeado y lo logrado; el tiempo real de los Cycles es una métrica adicional, no la base.
 
-**Signal / Noise** (Señal / Ruido): el filtro maestro. Signal es lo que me acerca a lo que persigo y me mantiene alineado; Noise es todo lo demás.
+**Signal / Noise** (Señal / Ruido): el filtro maestro. Signal es lo que me acerca a lo que persigo y me mantiene alineado; Noise es lo que decido eliminar porque tiene bajo ROI, no mueve la aguja, me aleja de mis metas o es irrelevante. Una Secondary Task puede quedar fuera de Signal sin ser Noise.
+
+**Noise item** (Ruido del día): algo concreto que decido ignorar hoy, escrito en el Check-in en el momento en que lo identifico (p. ej. "AI news"). Es solo un nudge para mí: pertenece a un único día, no se arrastra, no se agenda, no se marca como hecho y no da XP.
+_Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Juego (gamificación)
 

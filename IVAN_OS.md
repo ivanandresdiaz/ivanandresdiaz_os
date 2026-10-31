@@ -1,7 +1,7 @@
 ---
-status: rebanadas 1 y 2 construidas y desplegadas (2026-10-30) — siguiente: aportes de UX de Ivan y rebanada 3
-updated: 2026-10-30
-resume: "Rebanadas 1 y 2 desplegadas en Vercel con Postgres en Neon y login de Google. Siguiente: los aportes de UX de Ivan y luego la rebanada 3 (Daily Note completa + Weekly Review)."
+status: rebanadas 1 y 2 desplegadas; correcciones del Check-in construidas en local (2026-10-31) — siguiente: validar UX, desplegar y rebanada 3
+updated: 2026-10-31
+resume: "Rebanadas 1 y 2 desplegadas. Correcciones del Check-in construidas en local: Secondary Tasks con carry over y agenda opcional, y Eliminate como Noise items del día. Siguiente: validar UX, aplicar migraciones 0002–0004 en Neon y desplegar; luego rebanada 3."
 fuentes:
   - strategian/ivan/Manifesto_with_ai/Manifesto_with_ai.md (v1.0)
   - strategian/ivan/principles/From the inside out & own yourself.md
@@ -136,6 +136,47 @@ Todo aceptado: Q41 (carried over ×N), Q42 (Cycle opcional, presets, pantalla de
 
 Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), Q53 (día + semana), Q54 (8 Infinite Games fijos + seed), Q55 (esta carpeta = repo), Q56 (Vitest en el dominio). ADR escrito: [0001](docs/adr/0001-alignment-sobre-lo-planeado.md).
 
+## Ronda 8 — correcciones del Check-in (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q57 | Descripción de Eliminate | ✅ Texto en inglés como placeholder, un recordatorio suave que desaparece al escribir: “Low ROI. Doesn’t move the needle. Pulls me away from my goals. Irrelevant.” |
+| Q58 | Secondary Goals | ✅ Nombre canónico: **Secondary Task**; sección **Secondary Tasks**. No se introduce Secondary Goal. |
+| Q59 | Secondary Task, Alignment y Noise | ✅ Es válida pero no estratégica: no aporta Alignment ni XP, no cuenta para Day Won, no necesita why y no es Highlight. Tampoco es Noise; se ajusta la definición de Signal / Noise. |
+
+## Ronda 9 — Secondary Tasks (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q60 | Carry over | ✅ Una Secondary Task pendiente vuelve automáticamente al día siguiente hasta completarla o eliminarla. Ivan prefiere verla y decidir; no estratégica no significa que pueda olvidarse. |
+| Q61 | Captura y calendario | ✅ Sección entre Highlights y Eliminate. Quick-add solo con título, checkbox y drag al calendario del día. Al soltarla: 30 min por defecto, redimensionable; checklist y calendario sincronizan el estado hecho. |
+| Q62 | Alcance | ✅ Acciones únicas, sin recurrencia, Steps, Infinite Games, Backlog ni relación con Campaigns o Moves. |
+
+## Ronda 10 — Carry over y cierre de Secondary Tasks (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q63 | Sin duplicados | ✅ El carry over muestra la misma Secondary Task, no copias diarias. Las pendientes arrastradas aparecen primero, con insignia ×N. |
+| Q64 | Secondary Task agendada y pendiente | ✅ El Slot pasado queda como historial; vuelve al día siguiente sin horario. Puede completarse directamente desde el checklist, sin volver a agendarla. |
+| Q65 | Completar y eliminar | ✅ Completarla detiene el carry over y queda chequeada ese día. Eliminarla la quita definitivamente y detiene el carry over; sin papelera. |
+| Q66 | Cantidad y orden | ✅ Sin límite ni prioridad manual: carried over pendientes → nuevas pendientes → completadas. El límite de 1–3 es solo para Highlights. |
+
+## Ronda 11 — Eliminate como ítems (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q67 | De dónde salen | ✅ Cada mañana me pregunto qué debo ignorar hoy; los ítems salen del momento (p. ej. "AI news"). Se escriben ese día; no hay lista reutilizable ni lista fija. |
+| Q68 | Nombre | ✅ **Noise item**. La sección sigue siendo **Eliminate (the noise for today)**. |
+| Q69 | Texto libre | ✅ El textarea desaparece; no queda nota opcional. |
+| Q70 | Sin mecánicas | ✅ Es solo un nudge para ignorar cosas: sin XP, Streak, calendario, carry over ni revisión nocturna. |
+| Q71 | Forma del ítem | ✅ Solo el texto y una × para borrarlo; sin checkbox, sin drag, sin edición. Por defecto no hay ruido: solo existe el que identifico y agrego. |
+| Q72 | Cada día empieza vacío | ✅ Los Noise items de ayer no aparecen hoy; los días pasados conservan los suyos como historial. |
+| Q73 | Texto existente | ✅ Cada línea no vacía del Eliminate guardado se convierte en un Noise item de esa fecha; luego se elimina la columna de texto. |
+| Q74 | Recordatorio | ✅ Los cuatro criterios pasan a una línea tenue bajo el título "Eliminate"; el input lleva un placeholder propio (texto exacto en Q77). |
+| Q75 | No es requisito | ✅ "Complete check-in" funciona con cero Noise items. |
+| Q76 | Día vacío | ✅ La sección muestra solo el título, los criterios y un botón "+ Add noise"; el input aparece al hacer clic. Si no hago clic, ese día no hay ruido. |
+| Q77 | Placeholder | ✅ "What noise do I eliminate today?", con el mismo verbo del título. |
+
 ## Resumen del diseño (v1) — ✅ confirmado 2026-10-30
 
 **Qué es.** ivanandresdiaz.com: un solo usuario, interfaz toda en inglés. Ivan OS ejecuta; Obsidian sabe.
@@ -149,7 +190,7 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 
 **Calendario.** Structure semanal de Blocks (Habit / Container) + Exceptions por fecha. Drag y resize. Vistas día y semana (mes después). Warnings no bloqueantes. Lo no hecho vuelve al stack como carried over ×N.
 
-**Rituales.** Daily Note = Check-in (Principles, objetivos, 1–3 Highlights con why, eliminar, agendar) + Learning Log + Journal (plantilla de preguntas versionada; navegación entre días). Weekly Review el domingo o el lunes: Learning Log, lo que pasó, elegir Moves.
+**Rituales.** Daily Note = Check-in (Principles, objetivos, 1–3 Highlights con why, Secondary Tasks con carry over y agenda opcional, eliminar, agendar) + Learning Log + Journal (plantilla de preguntas versionada; navegación entre días). Weekly Review el domingo o el lunes: Learning Log, lo que pasó, elegir Moves.
 
 **Juego.** XP y nivel por Infinite Game, solo por inputs que son señal. Streaks con "never miss twice"; la principal es elegir el Highlight. Day Won → premio + sugerencias de los juegos con menos tiempo. Ambitious Mode sin XP extra. Cycles opcionales con presets y pantalla de foco.
 
@@ -197,6 +238,22 @@ Decisiones tomadas al construir (revisables):
 - Solo un Cycle a la vez: empezar otro cierra el anterior.
 - Las notificaciones salen de la página abierta (no hay servidor de push). Con la pestaña en segundo plano el navegador puede retrasarlas hasta ~1 min.
 - Un Cycle sin Task/Move es "libre" con etiqueta; la XP (rebanada 4) decidirá si cuenta.
+
+## Correcciones del Check-in — construidas en local (2026-10-31)
+
+- **Eliminate:** placeholder en inglés: “Low ROI. Doesn’t move the needle. Pulls me away from my goals. Irrelevant.”
+- **Secondary Tasks:** sección entre Highlights y Eliminate, quick-add por título, checkbox sin agenda obligatoria, delete y drag al calendario con 30 min iniciales y resize.
+- **Carry over:** la misma Secondary Task vuelve cada día con ×N, sin copias, hasta completarla o eliminarla. Si estaba agendada, su Slot pasado queda como historial y vuelve al Check-in sin horario.
+- Completada queda visible el día en que se completó. Orden: carried over pendientes → nuevas pendientes → completadas.
+- Sin Cycles, XP, Alignment, Day Won, Highlights, Infinite Games, Backlog ni jerarquía estratégica. Noise quedó redefinido como lo que se decide eliminar, no simplemente lo no alineado.
+- Migraciones `0002` y `0003` aplicadas en Postgres local. Verificación: 39 tests, typecheck, lint y build de producción. Pendiente aplicar migraciones en Neon y desplegar.
+
+## Eliminate como Noise items — construido en local (2026-10-31)
+
+- Tabla `noise_items` (fecha + texto). El textarea y la columna `daily_notes.eliminate` desaparecen.
+- Sección **Eliminate (the noise for today)**: los cuatro criterios en una línea tenue, los Noise items del día con × para borrar, y "+ Add noise", que abre el input ("What noise do I eliminate today?"). El input queda abierto para agregar varios; Escape o "Done" lo cierran.
+- Migración `0004_noise_items`: cada línea no vacía del Eliminate guardado pasa a ser un Noise item de su fecha, en el mismo orden y sin viñetas (`-`, `*`, `•`); luego se elimina la columna. Probada en local ("facebook" del 2026-10-31 quedó como Noise item).
+- Verificación: 39 tests, typecheck, lint, build de producción y prueba en el navegador (agregar, borrar, el día siguiente vacío). Pendiente aplicar `0002`–`0004` en Neon y desplegar.
 
 ## Despliegue (2026-10-30)
 

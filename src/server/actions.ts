@@ -324,16 +324,14 @@ export async function deleteStep(fd: FormData) {
   await done();
 }
 
-const workRef = z.object({ kind: z.enum(["task", "move"]), id: z.uuid() });
+const workRef = z.object({ kind: z.enum(["task", "move", "secondary"]), id: z.uuid() });
+const strategicWorkRef = z.object({ kind: z.enum(["task", "move"]), id: z.uuid() });
 
-/**
- * Marks a Task or Move done (or undone). Highlights that point to it follow,
- * so the Day Won check stays in sync.
- */
-export async function toggleWorkDone(input: { kind: "task" | "move"; id: string }) {
+/** Marks calendar work done. Strategic work also synchronizes its linked Highlights. */
+export async function toggleWorkDone(input: { kind: "task" | "move" | "secondary"; id: string }) {
   await requireIvan();
   const { kind, id } = workRef.parse(input);
-  const table = kind === "task" ? s.tasks : s.moves;
+  const table = kind === "task" ? s.tasks : kind === "move" ? s.moves : s.secondaryTasks;
   const [row] = await db.select({ doneAt: table.doneAt }).from(table).where(eq(table.id, id));
   if (!row) return;
   const nowDone = row.doneAt === null;
@@ -342,10 +340,12 @@ export async function toggleWorkDone(input: { kind: "task" | "move"; id: string 
       .update(table)
       .set({ doneAt: nowDone ? new Date() : null })
       .where(eq(table.id, id));
-    await tx
-      .update(s.highlights)
-      .set({ done: nowDone })
-      .where(kind === "task" ? eq(s.highlights.taskId, id) : eq(s.highlights.moveId, id));
+    if (kind !== "secondary") {
+      await tx
+        .update(s.highlights)
+        .set({ done: nowDone })
+        .where(kind === "task" ? eq(s.highlights.taskId, id) : eq(s.highlights.moveId, id));
+    }
   });
   await done();
 }
@@ -556,7 +556,7 @@ export async function deleteException(fd: FormData) {
 // ─── Slots (calendar) ────────────────────────────────────────────────────────
 
 export async function scheduleWork(input: {
-  kind: "task" | "move";
+  kind: "task" | "move" | "secondary";
   id: string;
   date: string;
   startMin: number;
@@ -574,6 +574,7 @@ export async function scheduleWork(input: {
     workKind: v.kind,
     taskId: v.kind === "task" ? v.id : null,
     moveId: v.kind === "move" ? v.id : null,
+    secondaryTaskId: v.kind === "secondary" ? v.id : null,
   });
   await done();
 }
@@ -606,11 +607,33 @@ async function ensureDailyNote(date: string) {
   await db.insert(s.dailyNotes).values({ date }).onConflictDoNothing();
 }
 
-export async function saveEliminate(fd: FormData) {
+export async function addSecondaryTask(fd: FormData) {
   await requireIvan();
-  const { date, eliminate } = z.object({ date: isoDate, eliminate: text }).parse(fields(fd));
+  const { date, title } = z.object({ date: isoDate, title: required }).parse(fields(fd));
   await ensureDailyNote(date);
-  await db.update(s.dailyNotes).set({ eliminate }).where(eq(s.dailyNotes.date, date));
+  await db.insert(s.secondaryTasks).values({ title, createdOn: date });
+  await done();
+}
+
+export async function deleteSecondaryTask(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  await db.delete(s.secondaryTasks).where(eq(s.secondaryTasks.id, id));
+  await done();
+}
+
+export async function addNoiseItem(fd: FormData) {
+  await requireIvan();
+  const { date, title } = z.object({ date: isoDate, title: required }).parse(fields(fd));
+  await ensureDailyNote(date);
+  await db.insert(s.noiseItems).values({ date, title });
+  await done();
+}
+
+export async function deleteNoiseItem(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  await db.delete(s.noiseItems).where(eq(s.noiseItems.id, id));
   await done();
 }
 
@@ -725,7 +748,7 @@ export async function startCycle(input: {
   const v = z
     .object({
       presetId: z.uuid().optional(),
-      work: workRef.nullable().optional(),
+      work: strategicWorkRef.nullable().optional(),
       slotId: z.uuid().nullable().optional(),
       label: text.optional(),
     })
@@ -741,6 +764,7 @@ export async function startCycle(input: {
   let work = v.work ?? null;
   if (v.slotId) {
     const [slot] = await db.select().from(s.slots).where(eq(s.slots.id, v.slotId));
+    if (slot?.workKind === "secondary") throw new Error("Secondary Tasks do not have Cycles");
     if (slot) work = { kind: slot.workKind, id: (slot.workKind === "task" ? slot.taskId : slot.moveId)! };
   }
 

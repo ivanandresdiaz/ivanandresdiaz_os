@@ -14,6 +14,7 @@ import {
   type StructureException,
 } from "@/domain/structure";
 import { isDayWon } from "@/domain/highlights";
+import { secondaryTasksForDate } from "@/domain/secondary-tasks";
 import { APP_TIMEZONE, today } from "@/lib/today";
 
 export type BlockType = {
@@ -149,23 +150,34 @@ export type WorkItem = {
   stepsTotal: number;
 };
 
+export type CalendarWorkItem = WorkItem | (Omit<WorkItem, "kind"> & { kind: "secondary" });
+
 const LOOSE_COLOR = "#71717a";
 
-export const workKey = (kind: WorkKind, id: string) => `${kind}:${id}`;
+export const workKey = (kind: WorkKind | "secondary", id: string) => `${kind}:${id}`;
 
-async function getWorkIndex(): Promise<Map<string, WorkItem>> {
-  const [campaigns, types, moves, tasks, steps] = await Promise.all([
+function slotWorkId(slot: typeof s.slots.$inferSelect): string {
+  return (slot.workKind === "task"
+    ? slot.taskId
+    : slot.workKind === "move"
+      ? slot.moveId
+      : slot.secondaryTaskId)!;
+}
+
+async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
+  const [campaigns, types, moves, tasks, secondary, steps] = await Promise.all([
     db.select().from(s.campaigns),
     db.select().from(s.blockTypes),
     db.select().from(s.moves),
     db.select().from(s.tasks),
+    db.select().from(s.secondaryTasks),
     db.select({ taskId: s.steps.taskId, done: s.steps.done }).from(s.steps),
   ]);
   const color = (campaignId: string | null) => {
     const campaign = campaigns.find((c) => c.id === campaignId);
     return types.find((t) => t.id === campaign?.blockTypeId)?.color ?? LOOSE_COLOR;
   };
-  const index = new Map<string, WorkItem>();
+  const index = new Map<string, CalendarWorkItem>();
 
   for (const move of moves) {
     const campaign = campaigns.find((c) => c.id === move.campaignId)!;
@@ -207,12 +219,32 @@ async function getWorkIndex(): Promise<Map<string, WorkItem>> {
       stepsTotal: own.length,
     });
   }
+  for (const task of secondary) {
+    index.set(workKey("secondary", task.id), {
+      kind: "secondary",
+      id: task.id,
+      title: task.title,
+      done: task.doneAt !== null,
+      durationMin: 30,
+      moveId: null,
+      parentTitle: null,
+      hasTasks: false,
+      campaignId: null,
+      campaignTitle: null,
+      color: LOOSE_COLOR,
+      weekOf: null,
+      stepsDone: 0,
+      stepsTotal: 0,
+    });
+  }
   return index;
 }
 
-/** Moves with Tasks are worked through their Tasks; only Moves without Tasks go on the calendar. */
-function schedulableWork(index: Map<string, WorkItem>): WorkItem[] {
-  return [...index.values()].filter((item) => item.kind === "task" || !item.hasTasks);
+/** Moves with Tasks are worked through their Tasks; Secondary Tasks live in their own Check-in list. */
+function schedulableWork(index: Map<string, CalendarWorkItem>): WorkItem[] {
+  return [...index.values()].filter(
+    (item): item is WorkItem => item.kind === "task" || (item.kind === "move" && !item.hasTasks),
+  );
 }
 
 export type CalendarSlot = {
@@ -220,7 +252,7 @@ export type CalendarSlot = {
   date: IsoDate;
   startMin: number;
   endMin: number;
-  work: WorkItem;
+  work: CalendarWorkItem;
 };
 
 export type CalendarBlock = DayBlock & { type: BlockType };
@@ -286,9 +318,7 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
     slots: slotRows
       .filter((slot) => slot.date === date)
       .flatMap((slot) => {
-        const work = index.get(
-          workKey(slot.workKind, (slot.workKind === "task" ? slot.taskId : slot.moveId)!),
-        );
+        const work = index.get(workKey(slot.workKind, slotWorkId(slot)));
         return work
           ? [{ id: slot.id, date, startMin: slot.startMin, endMin: slot.endMin, work }]
           : [];
@@ -325,10 +355,13 @@ async function cyclesAround(start: IsoDate, end: IsoDate) {
     .orderBy(asc(s.cycles.startedAt));
 }
 
-function workOf(index: Map<string, WorkItem>, cycle: typeof s.cycles.$inferSelect) {
-  if (cycle.workKind === "task" && cycle.taskId) return index.get(workKey("task", cycle.taskId)) ?? null;
-  if (cycle.workKind === "move" && cycle.moveId) return index.get(workKey("move", cycle.moveId)) ?? null;
-  return null;
+function workOf(index: Map<string, CalendarWorkItem>, cycle: typeof s.cycles.$inferSelect): WorkItem | null {
+  const work = cycle.workKind === "task" && cycle.taskId
+    ? index.get(workKey("task", cycle.taskId))
+    : cycle.workKind === "move" && cycle.moveId
+      ? index.get(workKey("move", cycle.moveId))
+      : null;
+  return work && work.kind !== "secondary" ? work : null;
 }
 
 export type StackItem = WorkItem & {
@@ -348,13 +381,17 @@ export async function getStack(date: IsoDate) {
     getWorkIndex(),
     db.select().from(s.slots).orderBy(asc(s.slots.date), asc(s.slots.startMin)),
   ]);
-  const slots = slotRows.map((row) => ({
-    id: row.id,
-    date: row.date,
-    startMin: row.startMin,
-    endMin: row.endMin,
-    work: { kind: row.workKind, id: (row.workKind === "task" ? row.taskId : row.moveId)! },
-  }));
+  const slots = slotRows.flatMap((row) =>
+    row.workKind === "secondary"
+      ? []
+      : [{
+          id: row.id,
+          date: row.date,
+          startMin: row.startMin,
+          endMin: row.endMin,
+          work: { kind: row.workKind, id: slotWorkId(row) },
+        }],
+  );
   const work = schedulableWork(index);
   const carried = carriedOver(work, slots, now);
 
@@ -375,7 +412,7 @@ export async function getStack(date: IsoDate) {
       .filter((item) => item.weekOf === week && item.campaignId !== null)
       .map(toStackItem),
     carriedOver: carried.flatMap((c) => {
-      const item = index.get(workKey(c.kind, c.id));
+      const item = work.find((w) => w.kind === c.kind && w.id === c.id);
       return item && item.weekOf !== week ? [toStackItem(item)] : [];
     }),
     loose: work.filter((item) => item.campaignId === null && !item.done).map(toStackItem),
@@ -383,19 +420,34 @@ export async function getStack(date: IsoDate) {
 }
 
 export async function getDailyNote(date: IsoDate) {
-  const [[note], highlights] = await Promise.all([
+  const [[note], highlights, secondary, noiseItems] = await Promise.all([
     db.select().from(s.dailyNotes).where(eq(s.dailyNotes.date, date)),
     db
       .select()
       .from(s.highlights)
       .where(eq(s.highlights.date, date))
       .orderBy(asc(s.highlights.position)),
+    db.select().from(s.secondaryTasks).orderBy(asc(s.secondaryTasks.createdAt)),
+    db
+      .select({ id: s.noiseItems.id, title: s.noiseItems.title })
+      .from(s.noiseItems)
+      .where(eq(s.noiseItems.date, date))
+      .orderBy(asc(s.noiseItems.createdAt)),
   ]);
   return {
     date,
-    eliminate: note?.eliminate ?? "",
+    noiseItems,
     checkInDoneAt: note?.checkInDoneAt ?? null,
     highlights,
+    secondaryTasks: secondaryTasksForDate(
+      secondary.map((task) => ({
+        id: task.id,
+        title: task.title,
+        createdOn: task.createdOn,
+        doneOn: task.doneAt ? localMoment(task.doneAt, APP_TIMEZONE).date : null,
+      })),
+      date,
+    ),
     dayWon: isDayWon(highlights),
   };
 }

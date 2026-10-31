@@ -15,6 +15,27 @@
       "when": 1793407203301,
       "tag": "0001_cycles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793455252369,
+      "tag": "0002_nebulous_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793455282445,
+      "tag": "0003_flimsy_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793464669115,
+      "tag": "0004_noise_items",
+      "breakpoints": true
     }
   ]
 }

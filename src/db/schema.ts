@@ -169,9 +169,17 @@ export const structureExceptions = pgTable(
   (t) => [unique().on(t.date, t.structureBlockId)],
 );
 
-export const workKind = pgEnum("work_kind", ["task", "move"]);
+export const secondaryTasks = pgTable("secondary_tasks", {
+  id: id(),
+  title: text("title").notNull(),
+  createdOn: isoDate("created_on").notNull(),
+  doneAt: timestamp("done_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
 
-/** A Task (or a Move without Tasks) placed on the calendar on one date. */
+export const workKind = pgEnum("work_kind", ["task", "move", "secondary"]);
+
+/** A Task, Move or Secondary Task placed on the calendar on one date. */
 export const slots = pgTable(
   "slots",
   {
@@ -182,12 +190,13 @@ export const slots = pgTable(
     workKind: workKind("work_kind").notNull(),
     taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
     moveId: uuid("move_id").references(() => moves.id, { onDelete: "cascade" }),
+    secondaryTaskId: uuid("secondary_task_id").references(() => secondaryTasks.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
   (t) => [
     check(
       "slot_work",
-      sql`(${t.workKind} = 'task' and ${t.taskId} is not null and ${t.moveId} is null) or (${t.workKind} = 'move' and ${t.moveId} is not null and ${t.taskId} is null)`,
+      sql`(${t.workKind} = 'task' and ${t.taskId} is not null and ${t.moveId} is null and ${t.secondaryTaskId} is null) or (${t.workKind} = 'move' and ${t.moveId} is not null and ${t.taskId} is null and ${t.secondaryTaskId} is null) or (${t.workKind} = 'secondary' and ${t.secondaryTaskId} is not null and ${t.taskId} is null and ${t.moveId} is null)`,
     ),
     check("slot_time", sql`${t.startMin} >= 0 and ${t.endMin} <= 1440 and ${t.startMin} < ${t.endMin}`),
   ],
@@ -196,9 +205,15 @@ export const slots = pgTable(
 /** The Daily Note. Slice 1 covers the Check-in part. */
 export const dailyNotes = pgTable("daily_notes", {
   date: isoDate("date").primaryKey(),
-  /** What I eliminate today: the noise. */
-  eliminate: text("eliminate").notNull().default(""),
   checkInDoneAt: timestamp("check_in_done_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+/** Something I decide to ignore on one date. It never carries over. */
+export const noiseItems = pgTable("noise_items", {
+  id: id(),
+  date: isoDate("date").notNull(),
+  title: text("title").notNull(),
   createdAt: createdAt(),
 });
 

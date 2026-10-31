@@ -1,6 +1,6 @@
 import type { IsoDate, Minutes } from "./dates";
 
-/** What can be dragged onto the calendar: a Task, or a Move without Tasks. */
+/** Strategic work that can be dragged onto the calendar or into a Cycle. */
 export type WorkKind = "task" | "move";
 export type WorkRef = { kind: WorkKind; id: string };
 

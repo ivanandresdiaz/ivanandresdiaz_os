@@ -29,7 +29,7 @@ const LAYER_ORDER: Record<GridItem["layer"], number> = { block: 0, focus: 1, wor
 
 export type GridPosition = { column: string; startMin: number; endMin: number };
 
-export type WorkDrop = { kind: "task" | "move"; id: string; durationMin: number };
+export type WorkDrop = { kind: "task" | "move" | "secondary"; id: string; durationMin: number };
 
 export const WORK_MIME = "application/x-ivan-work";
 

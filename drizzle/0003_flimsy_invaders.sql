@@ -1,0 +1,2 @@
+ALTER TABLE "slots" DROP CONSTRAINT "slot_work";--> statement-breakpoint
+ALTER TABLE "slots" ADD CONSTRAINT "slot_work" CHECK (("slots"."work_kind" = 'task' and "slots"."task_id" is not null and "slots"."move_id" is null and "slots"."secondary_task_id" is null) or ("slots"."work_kind" = 'move' and "slots"."move_id" is not null and "slots"."task_id" is null and "slots"."secondary_task_id" is null) or ("slots"."work_kind" = 'secondary' and "slots"."secondary_task_id" is not null and "slots"."task_id" is null and "slots"."move_id" is null));
