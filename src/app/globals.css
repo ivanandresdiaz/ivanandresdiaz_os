@@ -36,6 +36,11 @@ body {
   color: var(--foreground);
 }
 
+/* The page behind a drawer or the story viewer stays still. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
 @layer components {
   .card {
     @apply rounded-xl border border-line bg-surface p-4;

@@ -9,7 +9,13 @@ _Evitar_: segundo cerebro (eso es Obsidian).
 
 **Obsidian**: el lugar del conocimiento (modelos mentales, notas, el manifiesto). Ivan OS ejecuta; Obsidian sabe.
 
-**Principle** (Principio): un recordatorio de por qué hago lo que hago; sirve para alinear la mente, no es una regla fija. Ivan los escribe y los ordena como quiera, y cada uno puede expandirse en un texto propio. Ejemplos: From the inside out, Flow, Play for position, Play for inputs.
+**Principle** (Principio): un recordatorio de por qué hago lo que hago; sirve para alinear la mente, no es una regla fija. Ivan los escribe y los ordena como quiera, y cada uno puede tener su Expansion. Ejemplos: From the inside out, Flow, Play for position, Play for inputs.
+
+**Expansion** (Expansión): el texto opcional de un Principle que lo desarrolla con explicación, ejemplos y referencias (como videos). Se lee a demanda; el título del Principle es el recordatorio.
+_Evitar_: Description, body.
+
+**Reference** (Referencia): una imagen o un video que Ivan sube a un Principle porque lo encarna para él (p. ej. un reel que le cambió la forma de ver algo). Un Principle puede tener cualquier cantidad, en el orden que Ivan elija.
+_Evitar_: Story, Reel, Media.
 
 **Input**: lo que hago en el presente (un hábito cumplido, un bloque de trabajo). Se juega por inputs; solo los inputs suman puntos y rachas.
 **Output**: el resultado que llega después (ingresos, kilos, features en producción). No se persigue directamente, porque trae ansiedad y saca del presente. Puede ser el objetivo declarado, pero nunca da puntos.

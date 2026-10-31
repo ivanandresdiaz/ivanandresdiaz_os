@@ -14,7 +14,9 @@ import {
   type StructureException,
 } from "@/domain/structure";
 import { isDayWon } from "@/domain/highlights";
+import { referenceKindOf, type ReferenceKind } from "@/domain/references";
 import { secondaryTasksForDate } from "@/domain/secondary-tasks";
+import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
 
 export type BlockType = {
@@ -36,6 +38,37 @@ function toStructureBlock(row: typeof s.structureBlocks.$inferSelect): Structure
 
 export async function getPrinciples() {
   return db.select().from(s.principles).orderBy(asc(s.principles.position));
+}
+
+export type ReferenceView = { id: string; kind: ReferenceKind; contentType: string; url: string };
+export type PrincipleView = { id: string; title: string; body: string; references: ReferenceView[] };
+
+/** Principles with their References, each signed for viewing. */
+export async function getPrincipleViews(): Promise<PrincipleView[]> {
+  const [principles, references] = await Promise.all([
+    getPrinciples(),
+    db
+      .select()
+      .from(s.principleReferences)
+      .orderBy(asc(s.principleReferences.position), asc(s.principleReferences.createdAt)),
+  ]);
+  const signed = await Promise.all(
+    references.map(async (r) => ({
+      principleId: r.principleId,
+      view: {
+        id: r.id,
+        kind: referenceKindOf(r.contentType) ?? "image",
+        contentType: r.contentType,
+        url: await presignView(r.key),
+      },
+    })),
+  );
+  return principles.map((p) => ({
+    id: p.id,
+    title: p.title,
+    body: p.body,
+    references: signed.filter((r) => r.principleId === p.id).map((r) => r.view),
+  }));
 }
 
 export async function getActiveSeason() {
@@ -456,7 +489,7 @@ export async function getDailyNote(date: IsoDate) {
 export async function getCheckInContext(date: IsoDate) {
   const ref = quarterOf(date);
   const [principles, season, quarter] = await Promise.all([
-    getPrinciples(),
+    getPrincipleViews(),
     getActiveSeason(),
     getQuarter(ref),
   ]);

@@ -10,8 +10,10 @@ import { closeAt } from "@/domain/cycles";
 import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
+import { referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import { planStructureEdit, planStructureRemoval, type StructureBlock } from "@/domain/structure";
+import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
 
@@ -67,7 +69,90 @@ export async function updatePrinciple(fd: FormData) {
 export async function deletePrinciple(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
+  const references = await db
+    .select({ key: s.principleReferences.key })
+    .from(s.principleReferences)
+    .where(eq(s.principleReferences.principleId, id));
+  await Promise.all(references.map((r) => deleteObject(r.key)));
   await db.delete(s.principles).where(eq(s.principles.id, id));
+  await done();
+}
+
+// ─── Principle References ────────────────────────────────────────────────────
+
+const referenceFile = z.object({
+  principleId: z.uuid(),
+  contentType: z.string(),
+  size: z.number().int(),
+});
+
+/** Signs a one-off upload URL; the browser sends the file straight to R2. */
+export async function createReferenceUpload(input: { principleId: string; contentType: string; size: number }) {
+  await requireIvan();
+  const v = referenceFile.parse(input);
+  const problem = validateReferenceFile(v);
+  if (problem) throw new Error(`Cannot add Reference: ${problem}`);
+  const [principle] = await db
+    .select({ id: s.principles.id })
+    .from(s.principles)
+    .where(eq(s.principles.id, v.principleId));
+  if (!principle) throw new Error("Principle not found");
+  const key = referenceKey(v.principleId, crypto.randomUUID(), v.contentType);
+  return { key, uploadUrl: await presignUpload(key) };
+}
+
+/** Records a Reference once its file is in R2. */
+export async function confirmReferenceUpload(input: { principleId: string; key: string; contentType: string }) {
+  await requireIvan();
+  const v = z
+    .object({ principleId: z.uuid(), key: z.string().regex(/^[\w/.-]+$/), contentType: z.string() })
+    .parse(input);
+  if (!v.key.startsWith(referencePrefix(v.principleId))) throw new Error("Key outside the Principle");
+  const size = await objectSize(v.key);
+  if (size === null) throw new Error("The upload did not reach storage");
+  const problem = validateReferenceFile({ contentType: v.contentType, size });
+  if (problem) {
+    await deleteObject(v.key);
+    throw new Error(`Cannot add Reference: ${problem}`);
+  }
+  const [{ last }] = await db
+    .select({ last: max(s.principleReferences.position) })
+    .from(s.principleReferences)
+    .where(eq(s.principleReferences.principleId, v.principleId));
+  await db
+    .insert(s.principleReferences)
+    .values({
+      principleId: v.principleId,
+      key: v.key,
+      contentType: v.contentType,
+      sizeBytes: size,
+      position: (last ?? -1) + 1,
+    })
+    .onConflictDoNothing();
+  await done();
+}
+
+export async function deleteReference(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  const [reference] = await db.select().from(s.principleReferences).where(eq(s.principleReferences.id, id));
+  if (!reference) return;
+  await deleteObject(reference.key);
+  await db.delete(s.principleReferences).where(eq(s.principleReferences.id, id));
+  await done();
+}
+
+export async function reorderReferences(input: { principleId: string; ids: string[] }) {
+  await requireIvan();
+  const { principleId, ids } = z.object({ principleId: z.uuid(), ids: z.array(z.uuid()) }).parse(input);
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx
+        .update(s.principleReferences)
+        .set({ position })
+        .where(and(eq(s.principleReferences.id, id), eq(s.principleReferences.principleId, principleId)));
+    }
+  });
   await done();
 }
 

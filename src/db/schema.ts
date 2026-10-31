@@ -26,6 +26,19 @@ export const principles = pgTable("principles", {
   createdAt: createdAt(),
 });
 
+/** An image or video stored in R2 under `key`, shown on its Principle in `position` order. */
+export const principleReferences = pgTable("principle_references", {
+  id: id(),
+  principleId: uuid("principle_id")
+    .notNull()
+    .references(() => principles.id, { onDelete: "cascade" }),
+  key: text("key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
+
 /** Exactly one Season is active: the one with ended_on null. */
 export const seasons = pgTable("seasons", {
   id: id(),

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar } from "@/components/calendar";
+import { CheckInPrinciples } from "@/components/check-in-principles";
 import { CycleStartForm } from "@/components/cycle-start-form";
 import { Highlights } from "@/components/highlights";
 import { NoiseItems } from "@/components/noise-items";
@@ -97,17 +98,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
               )}
             </div>
 
-            <details>
-              <summary className="label cursor-pointer">Principles</summary>
-              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-                {context.principles.map((p) => (
-                  <li key={p.id}>
-                    <span className="font-medium">{p.title}</span>
-                    {p.body && <span className="text-muted"> — {p.body}</span>}
-                  </li>
-                ))}
-              </ol>
-            </details>
+            <CheckInPrinciples principles={context.principles} />
 
             {context.season && (
               <div>
