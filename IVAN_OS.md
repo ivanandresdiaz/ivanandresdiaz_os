@@ -1,7 +1,7 @@
 ---
-status: rebanadas 1 y 2 construidas (2026-10-30) — siguiente: publicar (Vercel + Postgres + Google) y rebanada 3
+status: rebanadas 1 y 2 construidas y desplegadas (2026-10-30) — siguiente: aportes de UX de Ivan y rebanada 3
 updated: 2026-10-30
-resume: "Rebanadas 1 y 2 construidas (ver README.md). Falta publicar: credenciales de Google y ALLOWED_EMAIL, Postgres administrado + Vercel. Siguiente: rebanada 3 (Daily Note completa + Weekly Review). Ivan tiene aportes de UX pendientes."
+resume: "Rebanadas 1 y 2 desplegadas en Vercel con Postgres en Neon y login de Google. Siguiente: los aportes de UX de Ivan y luego la rebanada 3 (Daily Note completa + Weekly Review)."
 fuentes:
   - strategian/ivan/Manifesto_with_ai/Manifesto_with_ai.md (v1.0)
   - strategian/ivan/principles/From the inside out & own yourself.md
@@ -197,3 +197,7 @@ Decisiones tomadas al construir (revisables):
 - Solo un Cycle a la vez: empezar otro cierra el anterior.
 - Las notificaciones salen de la página abierta (no hay servidor de push). Con la pestaña en segundo plano el navegador puede retrasarlas hasta ~1 min.
 - Un Cycle sin Task/Move es "libre" con etiqueta; la XP (rebanada 4) decidirá si cuenta.
+
+## Despliegue (2026-10-30)
+
+Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
