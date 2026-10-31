@@ -394,19 +394,27 @@ export async function setBlockTypeArchived(fd: FormData) {
   await done();
 }
 
-export async function addStructureBlock(fd: FormData) {
+/** One independent Block per weekday, all with the same times and Block type. */
+export async function addStructureBlocks(input: {
+  weekdays: number[];
+  startMin: number;
+  endMin: number;
+  blockTypeId: string;
+}) {
   await requireIvan();
-  const values = timeRange(
-    z
-      .object({
-        weekday: z.coerce.number().int().min(1).max(7),
-        startMin: hhmm,
-        endMin: hhmm,
-        blockTypeId: z.uuid(),
-      })
-      .parse(fields(fd)),
-  );
-  await db.insert(s.structureBlocks).values({ ...values, validFrom: today() });
+  const { weekdays, ...values } = z
+    .object({
+      weekdays: z.array(z.number().int().min(1).max(7)).min(1),
+      startMin: minute,
+      endMin: minute,
+      blockTypeId: z.uuid(),
+    })
+    .parse(input);
+  timeRange(values);
+  const validFrom = today();
+  await db
+    .insert(s.structureBlocks)
+    .values([...new Set(weekdays)].map((weekday) => ({ ...values, weekday, validFrom })));
   await done();
 }
 

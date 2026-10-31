@@ -1,10 +1,8 @@
 import { StructureEditor } from "@/components/structure-editor";
 import { GamesPicker, GameTags, Hidden, PageTitle } from "@/components/ui";
-import { WEEKDAY_NAMES, WEEKDAYS } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
 import {
-  addStructureBlock,
   createBlockType,
   setBlockTypeArchived,
   updateBlockType,
@@ -16,7 +14,6 @@ export const metadata = { title: "Structure" };
 export default async function StructurePage() {
   await requireIvan();
   const [blocks, types] = await Promise.all([getStructureOn(today()), getBlockTypes()]);
-  const active = types.filter((t) => !t.archived);
 
   return (
     <>
@@ -28,31 +25,6 @@ export default async function StructurePage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_minmax(280px,340px)]">
         <StructureEditor blocks={blocks} types={types} />
         <aside className="flex flex-col gap-4">
-          <section className="card flex flex-col gap-2">
-            <h2 className="font-semibold">Add a Block</h2>
-            <form action={addStructureBlock} className="flex flex-col gap-2">
-              <select name="weekday" className="input" defaultValue="1">
-                {WEEKDAYS.map((d) => (
-                  <option key={d} value={d}>
-                    {WEEKDAY_NAMES[d]}
-                  </option>
-                ))}
-              </select>
-              <select name="blockTypeId" className="input" required>
-                {active.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.kind})
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <input name="startMin" type="time" step={900} defaultValue="08:00" className="input" required />
-                <input name="endMin" type="time" step={900} defaultValue="09:00" className="input" required />
-              </div>
-              <button className="btn-primary self-start">Add</button>
-            </form>
-          </section>
-
           <section className="card flex flex-col gap-3">
             <h2 className="font-semibold">Block types</h2>
             <p className="text-xs text-muted">

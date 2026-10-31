@@ -2,7 +2,15 @@
 
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { formatMinutes } from "@/domain/dates";
-import { DAY_END_MIN, moveTo, resizeTo, snap } from "@/domain/slots";
+import {
+  clickedRange,
+  DAY_END_MIN,
+  drawnRange,
+  moveTo,
+  resizeStartTo,
+  resizeTo,
+  snap,
+} from "@/domain/slots";
 
 export const PX_PER_MIN = 1;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -35,11 +43,20 @@ export const WORK_MIME = "application/x-ivan-work";
 
 type Drag<T extends GridItem> = {
   item: T;
-  mode: "move" | "resize";
+  mode: "move" | "resize-start" | "resize-end";
   originX: number;
   originY: number;
   moved: boolean;
   preview: GridPosition;
+};
+
+/** A range being drawn on empty space with the mouse. */
+type Drawing = {
+  column: string;
+  anchorMin: number;
+  originY: number;
+  moved: boolean;
+  range: GridPosition;
 };
 
 type Props<T extends GridItem> = {
@@ -47,6 +64,12 @@ type Props<T extends GridItem> = {
   items: T[];
   renderItem: (item: T, position: GridPosition) => ReactNode;
   onChange: (item: T, next: GridPosition) => Promise<void>;
+  /** A press on an item that did not drag it. */
+  onItemClick?: (item: T) => void;
+  /** Drawing (or tapping) on empty space; omit to disable it. */
+  onCreate?: (range: GridPosition) => void;
+  /** Dashed placeholders, e.g. the range waiting for its Block type. */
+  ghosts?: GridPosition[];
   onDropWork?: (column: string, startMin: number, work: WorkDrop) => Promise<void>;
   /** Draws a "now" line in this column. */
   now?: { column: string; minute: number };
@@ -93,6 +116,9 @@ export function TimeGrid<T extends GridItem>({
   items,
   renderItem,
   onChange,
+  onItemClick,
+  onCreate,
+  ghosts = [],
   onDropWork,
   now,
   scrollToMin = 4.5 * 60,
@@ -106,6 +132,9 @@ export function TimeGrid<T extends GridItem>({
     new Map<string, { from: GridPosition; to: GridPosition }>(),
   );
   const [dropHint, setDropHint] = useState<{ column: string; startMin: number; durationMin: number } | null>(null);
+  const [drawing, setDrawing] = useState<Drawing | null>(null);
+  // Touch keeps scrolling the calendar, so only a tap creates there.
+  const tap = useRef<{ column: string; minute: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     // Wait a frame: the grid may mount before it has its full height.
@@ -158,8 +187,10 @@ export function TimeGrid<T extends GridItem>({
     const base = { startMin: drag.item.startMin, endMin: drag.item.endMin };
     const deltaMin = dy / PX_PER_MIN;
     let preview: GridPosition;
-    if (drag.mode === "resize") {
+    if (drag.mode === "resize-end") {
       preview = { column: drag.item.column, ...resizeTo(base, base.endMin + deltaMin) };
+    } else if (drag.mode === "resize-start") {
+      preview = { column: drag.item.column, ...resizeStartTo(base, base.startMin + deltaMin) };
     } else {
       const column = (drag.item.crossColumn && columnAt(event.clientX)) || drag.item.column;
       preview = { column, ...moveTo(base, base.startMin + deltaMin) };
@@ -172,6 +203,7 @@ export function TimeGrid<T extends GridItem>({
     const { item, preview, moved } = drag;
     setDrag(null);
     const from: GridPosition = { column: item.column, startMin: item.startMin, endMin: item.endMin };
+    if (!moved) onItemClick?.(item);
     if (!moved || samePosition(from, preview)) return;
     setPending((p) => new Map(p).set(item.id, { from, to: preview }));
     onChange(item, preview).catch((error) => {
@@ -204,6 +236,70 @@ export function TimeGrid<T extends GridItem>({
       window.removeEventListener("pointercancel", cancel);
     };
   }, [dragging]);
+
+  const busyIn = (column: string) =>
+    items.filter((item) => item.layer !== "focus").map(positionOf).filter((p) => p.column === column);
+
+  const createAt = (column: string, minute: number) => {
+    onCreate?.({ column, ...clickedRange(minute, busyIn(column)) });
+  };
+
+  const startDrawing = (event: React.PointerEvent, column: string) => {
+    if (!onCreate || event.button !== 0 || event.target !== event.currentTarget) return;
+    const minute = minuteAt(column, event.clientY);
+    if (event.pointerType === "touch") {
+      tap.current = { column, minute, x: event.clientX, y: event.clientY };
+      return;
+    }
+    event.preventDefault();
+    setDrawing({
+      column,
+      anchorMin: minute,
+      originY: event.clientY,
+      moved: false,
+      range: { column, ...drawnRange(minute, minute) },
+    });
+  };
+
+  const endTap = (event: React.PointerEvent) => {
+    const start = tap.current;
+    tap.current = null;
+    if (!start || event.pointerType !== "touch") return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < CLICK_TOLERANCE_PX) {
+      createAt(start.column, start.minute);
+    }
+  };
+
+  const onDrawMove = useEffectEvent((event: PointerEvent) => {
+    if (!drawing) return;
+    if (!drawing.moved && Math.abs(event.clientY - drawing.originY) < CLICK_TOLERANCE_PX) return;
+    const range = drawnRange(drawing.anchorMin, minuteAt(drawing.column, event.clientY));
+    setDrawing({ ...drawing, moved: true, range: { column: drawing.column, ...range } });
+  });
+  const onDrawEnd = useEffectEvent(() => {
+    if (!drawing) return;
+    setDrawing(null);
+    if (drawing.moved) onCreate?.(drawing.range);
+    else createAt(drawing.column, drawing.anchorMin);
+  });
+  const onDrawCancel = useEffectEvent(() => setDrawing(null));
+  const isDrawing = drawing !== null;
+  useEffect(() => {
+    if (!isDrawing) return;
+    const move = (e: PointerEvent) => onDrawMove(e);
+    const up = () => onDrawEnd();
+    const cancel = () => onDrawCancel();
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [isDrawing]);
+
+  const shownGhosts = drawing ? [...ghosts, drawing.range] : ghosts;
 
   const readDrop = (event: React.DragEvent): WorkDrop | null => {
     const raw = event.dataTransfer.getData(WORK_MIME);
@@ -244,10 +340,16 @@ export function TimeGrid<T extends GridItem>({
           >
             {renderItem(item, pos)}
             {item.editable && (
-              <div
-                className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
-                onPointerDown={(e) => startDrag(e, item, "resize")}
-              />
+              <>
+                <div
+                  className="absolute inset-x-0 -top-0.5 h-1.5 cursor-ns-resize"
+                  onPointerDown={(e) => startDrag(e, item, "resize-start")}
+                />
+                <div
+                  className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
+                  onPointerDown={(e) => startDrag(e, item, "resize-end")}
+                />
+              </>
             )}
           </div>
         );
@@ -289,7 +391,12 @@ export function TimeGrid<T extends GridItem>({
                 if (el) columnRefs.current.set(col.key, el);
                 else columnRefs.current.delete(col.key);
               }}
-              className="relative flex-1 border-l border-line"
+              className={`relative flex-1 border-l border-line ${onCreate ? "cursor-crosshair" : ""}`}
+              onPointerDown={(event) => startDrawing(event, col.key)}
+              onPointerUp={endTap}
+              onPointerCancel={() => {
+                tap.current = null;
+              }}
               onDragOver={(event) => {
                 if (!onDropWork || !event.dataTransfer.types.includes(WORK_MIME)) return;
                 event.preventDefault();
@@ -319,6 +426,23 @@ export function TimeGrid<T extends GridItem>({
                 />
               ))}
               {columnLayer(col.key)}
+              {shownGhosts
+                .filter((ghost) => ghost.column === col.key)
+                .map((ghost) => (
+                  <div
+                    key={`${ghost.startMin}-${ghost.endMin}`}
+                    className="pointer-events-none absolute inset-x-1 z-40 rounded border-2 border-dashed border-accent bg-accent/10"
+                    style={{
+                      top: ghost.startMin * PX_PER_MIN,
+                      height: (ghost.endMin - ghost.startMin) * PX_PER_MIN,
+                    }}
+                  >
+                    <span className="bg-surface px-1 text-[10px] text-accent">
+                      {typeof col.label === "string" ? `${col.label} ` : ""}
+                      {formatMinutes(ghost.startMin)}–{formatMinutes(ghost.endMin)}
+                    </span>
+                  </div>
+                ))}
               {dropHint?.column === col.key && (
                 <div
                   className="pointer-events-none absolute inset-x-1 z-40 rounded border-2 border-dashed border-accent"

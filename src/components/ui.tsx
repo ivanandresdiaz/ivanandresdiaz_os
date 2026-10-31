@@ -37,6 +37,20 @@ export function Hidden(props: Record<string, string>) {
   );
 }
 
+export function AddIconButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className="-my-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-lg leading-none text-muted hover:bg-line hover:text-foreground"
+    >
+      +
+    </button>
+  );
+}
+
 export function PageTitle({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">

@@ -47,7 +47,7 @@ _Evitar_: Movimiento, Meta.
 
 ## Calendario
 
-**Structure** (Estructura): la plantilla semanal del calendario, hecha de Blocks (p. ej. lunes de 8 a 12, Deep work for the company). Es un nudge, no una regla. Cambiarla aplica de hoy en adelante.
+**Structure** (Estructura): la plantilla semanal del calendario, hecha de Blocks (p. ej. lunes de 8 a 12, Deep work for the company). Es un nudge, no una regla. Cambiarla aplica de hoy en adelante. Sus Blocks no deberían superponerse, pero se permite mientras la ajusto; una superposición muestra un Warning.
 
 **Block type** (Tipo de bloque): la clase de un Block (Gym, Reading, Deep work for the company…). Es Habit o Container, tiene un color y sus Infinite Games. Una Campaign declara en qué Block type de tipo Container se juega.
 
@@ -61,7 +61,7 @@ _Evitar_: Movimiento, Meta.
 
 **Cycle** (Ciclo de trabajo): un tramo de foco con duración configurable (p. ej. 90 min y luego 5 de descanso). Al entrar se muestra una animación de enfoque para evitar distracciones. Se puede cerrar en cualquier momento (tomo un café y reinicio). Mide el tiempo real como ayuda de foco y de juego, no como estructura que haya que vigilar. Su ritmo sale de un **preset** (p. ej. Deep work 90 + 15); el primero es el predeterminado. Está **completo** si el foco llegó a su duración (cerrarlo en el descanso, o hasta un minuto antes, cuenta como completo); cerrarlo antes guarda el tiempo real y queda incompleto.
 
-**Warning**: un aviso que no bloquea. Salta cuando algo cae en un Block de otro tipo o en un Habit Block, cuando un Block se sobrecarga o cuando algo queda fuera de los Blocks.
+**Warning**: un aviso que no bloquea. Salta cuando algo cae en un Block de otro tipo o en un Habit Block, cuando un Block se sobrecarga, cuando algo queda fuera de los Blocks o cuando dos Blocks de la Structure se superponen.
 
 ## Personas
 

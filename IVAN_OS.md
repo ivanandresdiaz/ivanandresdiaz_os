@@ -177,6 +177,42 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 | Q76 | Día vacío | ✅ La sección muestra solo el título, los criterios y un botón "+ Add noise"; el input aparece al hacer clic. Si no hago clic, ese día no hay ruido. |
 | Q77 | Placeholder | ✅ "What noise do I eliminate today?", con el mismo verbo del título. |
 
+## Ronda 12 — Crear Blocks arrastrando en la Structure (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q78 | Alcance | ✅ Solo la página Structure. El calendario del día conserva su formulario; se revisa en otra ronda. |
+| Q79 | Gesto | ✅ Presionar en un espacio vacío de una columna y arrastrar vertical; un Block fantasma punteado muestra el rango en vivo ("Mon 08:00–10:30"), con snap de 15 min. Una sola columna. Presionar un Block existente lo sigue moviendo o redimensionando. |
+| Q80 | Clic sin arrastrar | ✅ Un clic o tap crea un rango de 1 h desde ahí y abre el modal. En pantallas táctiles, arrastrar en vacío sigue haciendo scroll. |
+| Q81 | Varios días | ✅ El modal tiene toggles M T W T F S S, con el día arrastrado preseleccionado. Cada día seleccionado recibe su propio Block independiente. |
+| Q82 | Modal | ✅ Muestra el rango y los toggles, y lista los Block types activos con su color, agrupados en Habit y Container. Un clic en un Block type lo crea y cierra; sin botón "Add". Escape o clic afuera cancela. |
+| Q83 | Horas en el modal | ✅ Solo lectura. Las horas se corrigen arrastrando en la grilla. |
+| Q84 | Superposición | 🔄 Primero "no se permite"; revisada en Q87: se permite y muestra un Warning. |
+| Q85 | Formulario lateral | ✅ Se elimina "Add a Block"; queda una pista "Drag on the calendar to add a Block". La sección Block types se queda. |
+| Q86 | Cambiar el Block type | ✅ Clic (sin arrastrar) en un Block existente abre el mismo modal para cambiar su Block type, de hoy en adelante. La × sigue siendo la forma de quitarlo. |
+
+## Ronda 13 — Superposición en la Structure (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q87 | Arrastrar sobre un vecino | ✅ Se permite superponer, no por lógica sino por UX: superpongo y luego ajusto. El fantasma no se detiene en el borde del vecino. |
+| Q88 | Clic en un hueco menor a 1 h | ✅ El rango se encoge para caber en el hueco (mínimo 15 min). |
+| Q89 | Mover y redimensionar | ✅ Igual que Q87: mover o redimensionar un Block puede superponerlo; no rebota ni se rechaza. |
+| Q91 | Tocarse no es superponerse | ✅ Un Block que termina a las 09:00 y otro que empieza a las 09:00 no generan Warning. |
+| Q92 | Servidor | ✅ El servidor acepta la superposición; la página Structure muestra un Warning. |
+| Q93 | Superposiciones existentes | ✅ Sin migración: como se permiten, las que haya en Neon solo mostrarán su Warning. |
+
+## Ronda 14 — Warning y resize (2026-10-31)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q95 | Toggles con choque (reemplaza Q90) | ✅ El toggle de un día donde el rango choca sigue activo, con ⚠ y tooltip ("Overlaps Reading 08:00–08:30"). Si lo creo igual, la grilla muestra el Warning. |
+| Q96 | Forma del Warning | ✅ Los Blocks superpuestos llevan borde ámbar y tooltip "⚠ Overlaps …"; arriba de la grilla una línea resume las superposiciones ("⚠ 2 overlaps: Mon 08:00 Reading / Deep work") y desaparece cuando no hay. |
+| Q97 | Dibujo de superposiciones | ✅ Se mantienen los carriles lado a lado, para ver y agarrar ambos Blocks. |
+| Q98 | Resize por ambos bordes | ✅ El borde superior también redimensiona, además del inferior. |
+| Q99 | Dónde aplica el borde superior | ✅ En toda la grilla compartida (Structure, día y semana; Blocks y Slots). |
+| Q100 | Calendario del día | ✅ Fuera de eso, sin cambios: conserva su formulario, sin drag-to-create ni Warning de superposición, hasta su propia ronda. |
+
 ## Resumen del diseño (v1) — ✅ confirmado 2026-10-30
 
 **Qué es.** ivanandresdiaz.com: un solo usuario, interfaz toda en inglés. Ivan OS ejecuta; Obsidian sabe.

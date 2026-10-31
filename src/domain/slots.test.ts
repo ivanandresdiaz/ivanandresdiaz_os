@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { carriedOver, moveTo, resizeTo, snap, type Slot } from "./slots";
+import {
+  carriedOver,
+  clickedRange,
+  drawnRange,
+  moveTo,
+  resizeStartTo,
+  resizeTo,
+  snap,
+  type Slot,
+} from "./slots";
 
 const slot = (id: string, date: string, workId: string): Slot => ({
   id,
@@ -24,6 +33,44 @@ describe("calendar geometry", () => {
   it("resizes keeping a minimum duration", () => {
     expect(resizeTo({ startMin: 480, endMin: 540 }, 610)).toEqual({ startMin: 480, endMin: 615 });
     expect(resizeTo({ startMin: 480, endMin: 540 }, 400)).toEqual({ startMin: 480, endMin: 495 });
+  });
+
+  it("resizes from the top keeping the end and a minimum duration", () => {
+    expect(resizeStartTo({ startMin: 480, endMin: 540 }, 452)).toEqual({ startMin: 450, endMin: 540 });
+    expect(resizeStartTo({ startMin: 480, endMin: 540 }, 600)).toEqual({ startMin: 525, endMin: 540 });
+    expect(resizeStartTo({ startMin: 30, endMin: 90 }, -40)).toEqual({ startMin: 0, endMin: 90 });
+  });
+});
+
+describe("drawnRange", () => {
+  it("covers the dragged span in either direction, snapped", () => {
+    expect(drawnRange(482, 628)).toEqual({ startMin: 480, endMin: 630 });
+    expect(drawnRange(628, 482)).toEqual({ startMin: 480, endMin: 630 });
+  });
+
+  it("keeps the minimum duration and stays inside the day", () => {
+    expect(drawnRange(480, 484)).toEqual({ startMin: 480, endMin: 495 });
+    expect(drawnRange(1435, 1500)).toEqual({ startMin: 1425, endMin: 1440 });
+    expect(drawnRange(-20, 30)).toEqual({ startMin: 0, endMin: 30 });
+  });
+});
+
+describe("clickedRange", () => {
+  it("is one hour from the clicked quarter", () => {
+    expect(clickedRange(490, [])).toEqual({ startMin: 480, endMin: 540 });
+  });
+
+  it("shrinks to fit before the next busy range", () => {
+    const busy = [
+      { startMin: 300, endMin: 360 },
+      { startMin: 510, endMin: 720 },
+    ];
+    expect(clickedRange(485, busy)).toEqual({ startMin: 480, endMin: 510 });
+  });
+
+  it("never goes below 15 minutes nor past midnight", () => {
+    expect(clickedRange(485, [{ startMin: 490, endMin: 600 }])).toEqual({ startMin: 480, endMin: 540 });
+    expect(clickedRange(1430, [])).toEqual({ startMin: 1425, endMin: 1440 });
   });
 });
 

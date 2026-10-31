@@ -34,5 +34,5 @@ Installable from the browser (manifest + `public/sw.js`, no offline). Cycle noti
 - `src/domain/` — pure rules: dates and Quarters, Structure + Exceptions, Slots and carried over, Highlights / Day Won, Secondary Tasks, Infinite Games, Cycles.
 - `src/db/` — Drizzle schema, client, seed. Migrations in `drizzle/`.
 - `src/server/` — queries and Server Actions (each one calls `requireIvan()`).
-- `src/components/` — `TimeGrid` (drag/resize grid), `Calendar`, `Stack`, `SecondaryTasks`, `NoiseItems`, `StructureEditor`, `FocusScreen`, `CycleBadge`.
+- `src/components/` — `TimeGrid` (drag/resize/draw grid), `Calendar`, `Stack`, `SecondaryTasks`, `NoiseItems`, `StructureEditor`, `StructureBlockDialog`, `FocusScreen`, `CycleBadge`.
 - `src/app/os/` — the private OS. `src/app/page.tsx` — minimal public root.

@@ -1,19 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { SECONDARY_TASK_DURATION_MIN, type SecondaryTaskView } from "@/domain/secondary-tasks";
 import { addSecondaryTask, deleteSecondaryTask, toggleWorkDone } from "@/server/actions";
 import { WORK_MIME, type WorkDrop } from "./time-grid";
-import { Hidden } from "./ui";
+import { AddIconButton, Hidden } from "./ui";
 
 export function SecondaryTasks({ date, tasks }: { date: string; tasks: SecondaryTaskView[] }) {
+  const [adding, setAdding] = useState(false);
+
   return (
     <section className="card flex flex-col gap-3">
-      <div>
-        <h2 className="font-semibold">Secondary Tasks</h2>
-        <p className="text-xs text-muted">Useful, not strategic. Check them off here or drag them onto the calendar.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">Secondary Tasks</h2>
+          <p className="text-xs text-muted">Useful, not strategic. Check them off here or drag them onto the calendar.</p>
+        </div>
+        {!adding && <AddIconButton label="Add Secondary Task" onClick={() => setAdding(true)} />}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 empty:hidden">
         {tasks.map((task) => (
           <div
             key={task.id}
@@ -61,11 +67,23 @@ export function SecondaryTasks({ date, tasks }: { date: string; tasks: Secondary
         ))}
       </div>
 
-      <form action={addSecondaryTask} className="flex gap-2 border-t border-line pt-3">
-        <Hidden date={date} />
-        <input name="title" required placeholder="Add a Secondary Task" className="input min-w-0 flex-1" />
-        <button className="btn">Add</button>
-      </form>
+      {adding && (
+        <form action={addSecondaryTask} className="flex gap-2">
+          <Hidden date={date} />
+          <input
+            name="title"
+            required
+            autoFocus
+            placeholder="What else do I want to get done?"
+            className="input min-w-0 flex-1"
+            onKeyDown={(event) => event.key === "Escape" && setAdding(false)}
+          />
+          <button className="btn">Add</button>
+          <button type="button" className="text-sm text-muted hover:underline" onClick={() => setAdding(false)}>
+            Done
+          </button>
+        </form>
+      )}
     </section>
   );
 }

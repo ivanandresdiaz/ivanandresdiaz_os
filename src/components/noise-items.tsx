@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import { addNoiseItem, deleteNoiseItem } from "@/server/actions";
-import { Hidden } from "./ui";
+import { AddIconButton, Hidden } from "./ui";
 
 export function NoiseItems({ date, items }: { date: string; items: { id: string; title: string }[] }) {
   const [adding, setAdding] = useState(false);
 
   return (
     <section className="card flex flex-col gap-3">
-      <div>
-        <h2 className="font-semibold">
-          Eliminate <span className="text-sm font-normal text-muted">(the noise for today)</span>
-        </h2>
-        <p className="text-xs text-muted">Low ROI. Doesn’t move the needle. Pulls me away from my goals. Irrelevant.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">
+            Eliminate <span className="text-sm font-normal text-muted">(the noise for today)</span>
+          </h2>
+          <p className="text-xs text-muted">Low ROI. Doesn’t move the needle. Pulls me away from my goals. Irrelevant.</p>
+        </div>
+        {!adding && <AddIconButton label="Add Noise item" onClick={() => setAdding(true)} />}
       </div>
 
       {items.length > 0 && (
@@ -37,7 +40,7 @@ export function NoiseItems({ date, items }: { date: string; items: { id: string;
         </ul>
       )}
 
-      {adding ? (
+      {adding && (
         <form action={addNoiseItem} className="flex gap-2">
           <Hidden date={date} />
           <input
@@ -53,10 +56,6 @@ export function NoiseItems({ date, items }: { date: string; items: { id: string;
             Done
           </button>
         </form>
-      ) : (
-        <button type="button" className="btn self-start" onClick={() => setAdding(true)}>
-          + Add noise
-        </button>
       )}
     </section>
   );

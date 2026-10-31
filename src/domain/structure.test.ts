@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  overlapsOn,
   planStructureEdit,
   planStructureRemoval,
   resolveDayBlocks,
+  structureOverlaps,
   type StructureBlock,
   type StructureException,
 } from "./structure";
@@ -114,5 +116,26 @@ describe("editing the Structure applies from today onward", () => {
     });
     const fresh = { ...deepWork, validFrom: "2026-10-30" };
     expect(planStructureRemoval(fresh, "2026-10-30")).toEqual({ kind: "delete", id: "b1" });
+  });
+});
+
+describe("overlapping Blocks raise a Warning", () => {
+  const gym = { ...reading, id: "b3", blockTypeId: "gym", startMin: 11 * 60, endMin: 13 * 60 };
+  const tuesday = { ...deepWork, id: "b4", weekday: 2 as const };
+
+  it("pairs Blocks of the same weekday whose times overlap", () => {
+    expect(structureOverlaps([gym, deepWork, reading, tuesday]).map(([a, b]) => [a.id, b.id])).toEqual([
+      ["b1", "b3"],
+    ]);
+  });
+
+  it("does not treat back-to-back Blocks as overlapping", () => {
+    expect(structureOverlaps([reading, deepWork])).toEqual([]);
+  });
+
+  it("finds what a new range would overlap on a weekday", () => {
+    const range = { startMin: 7 * 60, endMin: 9 * 60 };
+    expect(overlapsOn([deepWork, reading, tuesday], 1, range).map((b) => b.id)).toEqual(["b1", "b2"]);
+    expect(overlapsOn([deepWork, reading, tuesday], 3, range)).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar } from "@/components/calendar";
 import { CycleStartForm } from "@/components/cycle-start-form";
+import { Highlights } from "@/components/highlights";
 import { NoiseItems } from "@/components/noise-items";
 import { SecondaryTasks } from "@/components/secondary-tasks";
 import { Stack } from "@/components/stack";
@@ -17,17 +18,9 @@ import {
   WEEKDAY_NAMES,
   weekdayOf,
 } from "@/domain/dates";
-import { MAX_HIGHLIGHTS } from "@/domain/highlights";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
-import {
-  addHighlight,
-  completeCheckIn,
-  deleteException,
-  deleteHighlight,
-  setExceptionForm,
-  toggleHighlight,
-} from "@/server/actions";
+import { completeCheckIn, deleteException, setExceptionForm } from "@/server/actions";
 import {
   getActiveCycle,
   getBlockTypes,
@@ -151,48 +144,14 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
             </div>
           </section>
 
-          <section className="card flex flex-col gap-3">
-            <h2 className="font-semibold">
-              Highlights <span className="text-sm font-normal text-muted">({note.highlights.length}/{MAX_HIGHLIGHTS})</span>
-            </h2>
-            {note.highlights.map((h) => (
-              <div key={h.id} className="flex items-start gap-2">
-                <form action={toggleHighlight}>
-                  <Hidden id={h.id} />
-                  <button className="mt-0.5 text-lg leading-none" aria-label={h.done ? "Mark not done" : "Mark done"}>
-                    {h.done ? "☑" : "☐"}
-                  </button>
-                </form>
-                <div className="min-w-0 flex-1">
-                  <div className={`font-medium ${h.done ? "line-through opacity-60" : ""}`}>{h.title}</div>
-                  <div className="text-sm text-muted">Why: {h.why}</div>
-                </div>
-                <form action={deleteHighlight}>
-                  <Hidden id={h.id} />
-                  <button className="text-muted hover:text-red-600" title="Remove">
-                    ×
-                  </button>
-                </form>
-              </div>
-            ))}
-            {note.highlights.length < MAX_HIGHLIGHTS && (
-              <form action={addHighlight} className="flex flex-col gap-2 border-t border-line pt-3">
-                <Hidden date={date} />
-                <input name="title" required placeholder="What is critical to get done today?" className="input" />
-                <input name="why" required placeholder="Why does it move the needle?" className="input" />
-                <select name="work" className="input" defaultValue="">
-                  <option value="">Not linked to a Task or Move</option>
-                  {stackItems.map((item) => (
-                    <option key={`${item.kind}:${item.id}`} value={`${item.kind}:${item.id}`}>
-                      {item.title}
-                      {item.campaignTitle ? ` (${item.campaignTitle})` : ""}
-                    </option>
-                  ))}
-                </select>
-                <button className="btn-primary self-start">Add Highlight</button>
-              </form>
-            )}
-          </section>
+          <Highlights
+            date={date}
+            highlights={note.highlights.map(({ id, title, why, done }) => ({ id, title, why, done }))}
+            workOptions={stackItems.map((item) => ({
+              value: `${item.kind}:${item.id}`,
+              label: item.campaignTitle ? `${item.title} (${item.campaignTitle})` : item.title,
+            }))}
+          />
 
           <SecondaryTasks date={date} tasks={note.secondaryTasks} />
 

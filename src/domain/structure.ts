@@ -41,6 +41,40 @@ export type DayBlock = {
   exceptionId: string | null;
 };
 
+type TimeRange = { startMin: Minutes; endMin: Minutes };
+
+/** Back-to-back ranges (one ends at 09:00, the next starts at 09:00) do not overlap. */
+export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
+  return a.startMin < b.endMin && b.startMin < a.endMin;
+}
+
+type PlacedBlock = TimeRange & { id: string; weekday: Weekday };
+
+/** The Blocks of `weekday` that `range` would overlap. */
+export function overlapsOn<T extends PlacedBlock>(
+  blocks: readonly T[],
+  weekday: Weekday,
+  range: TimeRange,
+): T[] {
+  return blocks.filter((b) => b.weekday === weekday && rangesOverlap(b, range));
+}
+
+/**
+ * Pairs of Blocks on the same weekday whose times overlap. Overlap is allowed
+ * while adjusting the Structure; it only raises a Warning.
+ */
+export function structureOverlaps<T extends PlacedBlock>(blocks: readonly T[]): [T, T][] {
+  const sorted = [...blocks].sort((a, b) => a.weekday - b.weekday || a.startMin - b.startMin);
+  const pairs: [T, T][] = [];
+  sorted.forEach((a, i) => {
+    for (const b of sorted.slice(i + 1)) {
+      if (b.weekday !== a.weekday) break;
+      if (rangesOverlap(a, b)) pairs.push([a, b]);
+    }
+  });
+  return pairs;
+}
+
 export function isBlockActiveOn(block: StructureBlock, date: IsoDate): boolean {
   return (
     block.weekday === weekdayOf(date) &&
