@@ -1334,7 +1334,8 @@
       "schema": "public",
       "values": [
         "task",
-        "move"
+        "move",
+        "secondary"
       ]
     }
   },

@@ -1,4 +1,3 @@
-ALTER TYPE "public"."work_kind" ADD VALUE IF NOT EXISTS 'secondary';--> statement-breakpoint
 CREATE TABLE "secondary_tasks" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"title" text NOT NULL,

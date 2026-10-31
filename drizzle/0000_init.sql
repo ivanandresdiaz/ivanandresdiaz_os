@@ -1,6 +1,6 @@
 CREATE TYPE "public"."block_kind" AS ENUM('habit', 'container');--> statement-breakpoint
 CREATE TYPE "public"."campaign_status" AS ENUM('candidate', 'active', 'done', 'dropped');--> statement-breakpoint
-CREATE TYPE "public"."work_kind" AS ENUM('task', 'move');--> statement-breakpoint
+CREATE TYPE "public"."work_kind" AS ENUM('task', 'move', 'secondary');--> statement-breakpoint
 CREATE TABLE "block_types" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
