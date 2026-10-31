@@ -12,12 +12,14 @@ import {
   updateExceptionTimes,
   updateSlot,
 } from "@/server/actions";
-import type { CalendarBlock, CalendarDay, CalendarSlot } from "@/server/queries";
+import type { CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
+import { StartCycleButton } from "./start-cycle-button";
 import { TimeGrid, type GridItem } from "./time-grid";
 
 type Item =
   | (GridItem & { layer: "block"; block: CalendarBlock; habitDone: boolean })
-  | (GridItem & { layer: "work"; slot: CalendarSlot });
+  | (GridItem & { layer: "work"; slot: CalendarSlot })
+  | (GridItem & { layer: "focus"; focus: CalendarFocus });
 
 const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
 
@@ -77,6 +79,18 @@ export function Calendar({
         slot,
       }),
     ),
+    ...day.focus.map(
+      (focus): Item => ({
+        id: `f:${focus.id}`,
+        column: day.date,
+        startMin: focus.startMin,
+        endMin: focus.endMin,
+        layer: "focus",
+        editable: false,
+        crossColumn: false,
+        focus,
+      }),
+    ),
   ]);
 
   return (
@@ -95,6 +109,7 @@ export function Calendar({
       items={items}
       now={minute !== null && days.some((d) => d.date === today) ? { column: today, minute } : undefined}
       onChange={async (item, next) => {
+        if (item.layer === "focus") return;
         if (item.layer === "work") {
           await updateSlot({ id: item.slot.id, date: next.column, ...pick(next) });
         } else if (item.block.structureBlockId === null && item.block.exceptionId) {
@@ -119,7 +134,9 @@ export function Calendar({
         });
       }}
       renderItem={(item, pos) =>
-        item.layer === "block" ? (
+        item.layer === "focus" ? (
+          <FocusBar focus={item.focus} />
+        ) : item.layer === "block" ? (
           <BlockView item={item} startMin={pos.startMin} endMin={pos.endMin} />
         ) : (
           <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} />
@@ -208,6 +225,7 @@ function SlotView({
         <span className={`flex-1 font-medium leading-tight ${work.done ? "line-through" : ""}`}>
           {work.title}
         </span>
+        {!work.done && <StartCycleButton slotId={slot.id} className="text-[10px]" />}
         <button
           type="button"
           className="hidden text-muted hover:text-red-600 group-hover:block"
@@ -226,5 +244,17 @@ function SlotView({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Real focus from a Cycle: separate from the plan, on the column's left edge. */
+function FocusBar({ focus }: { focus: CalendarFocus }) {
+  return (
+    <div
+      className={`h-full rounded-full ${focus.running ? "animate-pulse bg-amber-500" : focus.complete ? "bg-amber-500/80" : "bg-amber-500/40"}`}
+      title={`Real focus: ${focus.title} ${formatMinutes(focus.startMin)}–${formatMinutes(focus.endMin)}${
+        focus.complete ? " ✓" : focus.running ? " (running)" : " (closed early)"
+      }`}
+    />
   );
 }

@@ -227,3 +227,40 @@ export const habitChecks = pgTable(
   },
   (t) => [unique().on(t.date, t.blockTypeId)],
 );
+
+/** A rhythm for Cycles, e.g. 90 min of focus + 15 of break. The first one is the default. */
+export const cyclePresets = pgTable(
+  "cycle_presets",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    focusMin: integer("focus_min").notNull(),
+    breakMin: integer("break_min").notNull(),
+    position: integer("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("preset_times", sql`${t.focusMin} > 0 and ${t.breakMin} >= 0`)],
+);
+
+/**
+ * A Cycle of focus as it really happened. `endedAt` is when the focus stopped
+ * (null while running). It may point to the Task/Move worked on and the Slot
+ * it was planned in; without them it carries a free label.
+ */
+export const cycles = pgTable(
+  "cycles",
+  {
+    id: id(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    focusMin: integer("focus_min").notNull(),
+    breakMin: integer("break_min").notNull(),
+    workKind: workKind("work_kind"),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    moveId: uuid("move_id").references(() => moves.id, { onDelete: "set null" }),
+    slotId: uuid("slot_id").references(() => slots.id, { onDelete: "set null" }),
+    label: text("label").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [check("cycle_times", sql`${t.focusMin} > 0 and ${t.breakMin} >= 0`)],
+);

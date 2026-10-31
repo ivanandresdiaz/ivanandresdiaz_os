@@ -59,7 +59,7 @@ _Evitar_: Movimiento, Meta.
 
 **Container Block** (Bloque-contenedor): un Block que recibe trabajo de las Campaigns (Deep work for the company, Side hustle, Learning).
 
-**Cycle** (Ciclo de trabajo): un tramo de foco con duración configurable (p. ej. 90 min y luego 5 de descanso). Al entrar se muestra una animación de enfoque para evitar distracciones. Se puede cerrar en cualquier momento (tomo un café y reinicio). Mide el tiempo real como ayuda de foco y de juego, no como estructura que haya que vigilar.
+**Cycle** (Ciclo de trabajo): un tramo de foco con duración configurable (p. ej. 90 min y luego 5 de descanso). Al entrar se muestra una animación de enfoque para evitar distracciones. Se puede cerrar en cualquier momento (tomo un café y reinicio). Mide el tiempo real como ayuda de foco y de juego, no como estructura que haya que vigilar. Su ritmo sale de un **preset** (p. ej. Deep work 90 + 15); el primero es el predeterminado. Está **completo** si el foco llegó a su duración (cerrarlo en el descanso, o hasta un minuto antes, cuenta como completo); cerrarlo antes guarda el tiempo real y queda incompleto.
 
 **Warning**: un aviso que no bloquea. Salta cuando algo cae en un Block de otro tipo o en un Habit Block, cuando un Block se sobrecarga o cuando algo queda fuera de los Blocks.
 

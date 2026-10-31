@@ -109,3 +109,29 @@ export function parseMinutes(hhmm: string): Minutes {
   }
   return h * 60 + m;
 }
+
+/** Where an instant falls in Ivan's day: its civil date and minute of the day. */
+export function localMoment(instant: Date, timeZone: string): { date: IsoDate; minute: Minutes } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  return {
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    minute: Number(get("hour")) * 60 + Number(get("minute")),
+  };
+}
+
+/** "1h 05m", "45m". */
+export function formatDuration(minutes: number): string {
+  const total = Math.round(minutes);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  formatDuration,
   formatMinutes,
   isIsoDate,
+  localMoment,
   parseMinutes,
   quarterOf,
   quarterRange,
@@ -70,5 +72,16 @@ describe("dates", () => {
     expect(parseMinutes("7:30")).toBe(450);
     expect(parseMinutes("24:00")).toBe(1440);
     expect(() => parseMinutes("25:00")).toThrow();
+  });
+});
+
+describe("local moments", () => {
+  it("places an instant in Ivan's day", () => {
+    expect(localMoment(new Date("2026-11-02T13:12:00Z"), "America/Bogota")).toEqual({
+      date: "2026-11-02",
+      minute: 492,
+    });
+    expect(formatDuration(65)).toBe("1h 05m");
+    expect(formatDuration(45)).toBe("45m");
   });
 });

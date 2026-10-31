@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatMinutes, WEEKDAY_NAMES, weekdayOf } from "@/domain/dates";
 import { toggleWorkDone } from "@/server/actions";
 import type { StackItem } from "@/server/queries";
+import { StartCycleButton } from "./start-cycle-button";
 import { WORK_MIME, type WorkDrop } from "./time-grid";
 
 /** The work to place on the calendar. Drag an item onto a day. */
@@ -102,6 +103,7 @@ function Row({ item }: { item: StackItem }) {
             .join(" · ")}
         </div>
       </div>
+      {!item.done && <StartCycleButton work={{ kind: item.kind, id: item.id }} className="mt-0.5 text-xs" />}
     </div>
   );
 }

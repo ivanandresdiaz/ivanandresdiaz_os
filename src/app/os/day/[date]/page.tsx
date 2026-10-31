@@ -1,9 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar } from "@/components/calendar";
+import { CycleStartForm } from "@/components/cycle-start-form";
 import { Stack } from "@/components/stack";
 import { Hidden } from "@/components/ui";
-import { addDays, isIsoDate, quarterLabel, startOfWeek, WEEKDAY_NAMES, weekdayOf } from "@/domain/dates";
+import {
+  addDays,
+  formatDuration,
+  formatMinutes,
+  isIsoDate,
+  localMoment,
+  quarterLabel,
+  startOfWeek,
+  WEEKDAY_NAMES,
+  weekdayOf,
+} from "@/domain/dates";
 import { MAX_HIGHLIGHTS } from "@/domain/highlights";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
@@ -16,7 +27,16 @@ import {
   setExceptionForm,
   toggleHighlight,
 } from "@/server/actions";
-import { getBlockTypes, getCalendar, getCheckInContext, getDailyNote, getStack } from "@/server/queries";
+import {
+  getActiveCycle,
+  getBlockTypes,
+  getCalendar,
+  getCheckInContext,
+  getCycleHistory,
+  getCyclePresets,
+  getDailyNote,
+  getStack,
+} from "@/server/queries";
 
 export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
   await requireIvan();
@@ -24,13 +44,17 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
   if (!isIsoDate(date)) notFound();
 
   const now = today();
-  const [context, note, [day], stack, blockTypes] = await Promise.all([
+  const [context, note, [day], stack, blockTypes, presets, cycles, activeCycle] = await Promise.all([
     getCheckInContext(date),
     getDailyNote(date),
     getCalendar([date]),
     getStack(date),
     getBlockTypes(),
+    getCyclePresets(),
+    getCycleHistory(date, date),
+    getActiveCycle(),
   ]);
+  const realFocus = cycles.reduce((sum, c) => sum + c.realFocusMin, 0);
   const stackItems = [...stack.carriedOver, ...stack.thisWeek, ...stack.loose].filter((i) => !i.done);
 
   return (
@@ -178,6 +202,47 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
               <textarea id="eliminate" name="eliminate" rows={3} defaultValue={note.eliminate} className="input" />
               <button className="btn self-start">Save</button>
             </form>
+          </section>
+
+          <section className="card flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-semibold">Reality</h2>
+              <Link href="/os/cycles" className="text-xs text-muted hover:underline">
+                Cycles →
+              </Link>
+            </div>
+            <p className="text-sm text-muted">
+              {cycles.length === 0
+                ? "No Cycles yet. They are optional: real time is a focus aid, not the measure."
+                : `${formatDuration(realFocus)} of real focus · ${cycles.filter((c) => c.complete).length}/${cycles.length} Cycles complete`}
+            </p>
+            {cycles.length > 0 && (
+              <ul className="space-y-0.5 text-xs">
+                {cycles.map((c) => (
+                  <li key={c.id} className="flex gap-2">
+                    <span className="w-10 text-muted">{formatMinutes(localMoment(c.startedAt, APP_TIMEZONE).minute)}</span>
+                    <span className="flex-1 truncate">{c.work?.title ?? (c.label || "Free Cycle")}</span>
+                    <span className={c.complete ? "text-accent" : "text-muted"}>
+                      {formatDuration(c.realFocusMin)}
+                      {c.startDelayMin ? ` · ${c.startDelayMin > 0 ? "+" : ""}${c.startDelayMin}m` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {date === now &&
+              (activeCycle ? (
+                <Link href="/os/focus" className="btn-primary self-start">
+                  Back to the running Cycle
+                </Link>
+              ) : (
+                <details>
+                  <summary className="cursor-pointer text-sm text-muted">Start a Cycle</summary>
+                  <div className="mt-2">
+                    <CycleStartForm presets={presets} work={stackItems} compact />
+                  </div>
+                </details>
+              ))}
           </section>
 
           <section className="card flex flex-col gap-2">

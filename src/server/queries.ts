@@ -1,8 +1,9 @@
 import "server-only";
-import { and, asc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
-import { quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
+import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
+import { cyclePhase, focusSpanOn, isComplete, realFocusMin, startDelayMin } from "@/domain/cycles";
 import { normalizeGames, type InfiniteGame } from "@/domain/infinite-games";
 import { carriedOver, type CarriedOver, type WorkKind } from "@/domain/slots";
 import {
@@ -13,7 +14,7 @@ import {
   type StructureException,
 } from "@/domain/structure";
 import { isDayWon } from "@/domain/highlights";
-import { today } from "@/lib/today";
+import { APP_TIMEZONE, today } from "@/lib/today";
 
 export type BlockType = {
   id: string;
@@ -224,17 +225,28 @@ export type CalendarSlot = {
 
 export type CalendarBlock = DayBlock & { type: BlockType };
 
+/** Real focus drawn next to the plan; never mixed with it. */
+export type CalendarFocus = {
+  id: string;
+  startMin: number;
+  endMin: number;
+  running: boolean;
+  complete: boolean;
+  title: string;
+};
+
 export type CalendarDay = {
   date: IsoDate;
   blocks: CalendarBlock[];
   slots: CalendarSlot[];
   habitsDone: string[];
+  focus: CalendarFocus[];
 };
 
 export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
   const start = dates[0];
   const end = dates[dates.length - 1];
-  const [types, structureRows, exceptionRows, slotRows, checks, index] = await Promise.all([
+  const [types, structureRows, exceptionRows, slotRows, checks, index, cycleRows] = await Promise.all([
     getBlockTypes(),
     db
       .select()
@@ -259,7 +271,9 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
       .from(s.habitChecks)
       .where(and(gte(s.habitChecks.date, start), lte(s.habitChecks.date, end))),
     getWorkIndex(),
+    cyclesAround(start, end),
   ]);
+  const now = new Date();
   const structure = structureRows.map(toStructureBlock);
   const exceptions: StructureException[] = exceptionRows;
 
@@ -280,7 +294,41 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
           : [];
       }),
     habitsDone: checks.filter((c) => c.date === date).map((c) => c.blockTypeId),
+    focus: cycleRows.flatMap((cycle) => {
+      const span = focusSpanOn(cycle, date, now, APP_TIMEZONE);
+      if (!span) return [];
+      const work = workOf(index, cycle);
+      return [
+        {
+          id: cycle.id,
+          ...span,
+          running: cyclePhase(cycle, now).phase === "focus",
+          complete: isComplete(cycle, now),
+          title: work?.title ?? (cycle.label || "Cycle"),
+        },
+      ];
+    }),
   }));
+}
+
+/** Cycles that may touch [start, end] in Ivan's timezone (a day of margin each side). */
+async function cyclesAround(start: IsoDate, end: IsoDate) {
+  return db
+    .select()
+    .from(s.cycles)
+    .where(
+      and(
+        gte(s.cycles.startedAt, new Date(`${addDays(start, -1)}T00:00:00Z`)),
+        lt(s.cycles.startedAt, new Date(`${addDays(end, 2)}T00:00:00Z`)),
+      ),
+    )
+    .orderBy(asc(s.cycles.startedAt));
+}
+
+function workOf(index: Map<string, WorkItem>, cycle: typeof s.cycles.$inferSelect) {
+  if (cycle.workKind === "task" && cycle.taskId) return index.get(workKey("task", cycle.taskId)) ?? null;
+  if (cycle.workKind === "move" && cycle.moveId) return index.get(workKey("move", cycle.moveId)) ?? null;
+  return null;
 }
 
 export type StackItem = WorkItem & {
@@ -364,4 +412,82 @@ export async function getCheckInContext(date: IsoDate) {
     ? (await getCampaigns({ quarterId: quarter.id })).filter((c) => c.status === "active")
     : [];
   return { principles, season, quarter, quarterRef: ref, campaigns };
+}
+
+// ─── Cycles ──────────────────────────────────────────────────────────────────
+
+export async function getCyclePresets() {
+  return db
+    .select()
+    .from(s.cyclePresets)
+    .orderBy(asc(s.cyclePresets.position), asc(s.cyclePresets.createdAt));
+}
+
+export type CycleView = {
+  id: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  focusMin: number;
+  breakMin: number;
+  label: string;
+  work: WorkItem | null;
+  steps: { id: string; title: string; done: boolean }[];
+  /** Minutes late against the Slot it was planned in (negative = early). */
+  startDelayMin: number | null;
+  realFocusMin: number;
+  complete: boolean;
+};
+
+async function toCycleViews(rows: (typeof s.cycles.$inferSelect)[]): Promise<CycleView[]> {
+  if (rows.length === 0) return [];
+  const index = await getWorkIndex();
+  const slotIds = rows.flatMap((r) => (r.slotId ? [r.slotId] : []));
+  const taskIds = rows.flatMap((r) => (r.workKind === "task" && r.taskId ? [r.taskId] : []));
+  const [slotRows, stepRows] = await Promise.all([
+    slotIds.length ? db.select().from(s.slots).where(inArray(s.slots.id, slotIds)) : [],
+    taskIds.length
+      ? db
+          .select()
+          .from(s.steps)
+          .where(inArray(s.steps.taskId, taskIds))
+          .orderBy(asc(s.steps.position), asc(s.steps.createdAt))
+      : [],
+  ]);
+  const now = new Date();
+  return rows.map((row) => {
+    const slot = slotRows.find((sl) => sl.id === row.slotId);
+    return {
+      id: row.id,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      focusMin: row.focusMin,
+      breakMin: row.breakMin,
+      label: row.label,
+      work: workOf(index, row),
+      steps: stepRows
+        .filter((st) => row.workKind === "task" && st.taskId === row.taskId)
+        .map((st) => ({ id: st.id, title: st.title, done: st.done })),
+      startDelayMin: slot ? startDelayMin(slot, row.startedAt, APP_TIMEZONE) : null,
+      realFocusMin: realFocusMin(row, now),
+      complete: isComplete(row, now),
+    };
+  });
+}
+
+/** The Cycle in focus or in its break right now, if any. */
+export async function getActiveCycle(): Promise<CycleView | null> {
+  const [latest] = await db.select().from(s.cycles).orderBy(desc(s.cycles.startedAt)).limit(1);
+  if (!latest || cyclePhase(latest, new Date()).phase === "over") return null;
+  const [view] = await toCycleViews([latest]);
+  return view;
+}
+
+/** Cycles started on the given days (Ivan's timezone), newest first. */
+export async function getCycleHistory(start: IsoDate, end: IsoDate) {
+  const rows = (await cyclesAround(start, end)).reverse();
+  const views = await toCycleViews(rows);
+  return views.filter((c) => {
+    const day = localMoment(c.startedAt, APP_TIMEZONE).date;
+    return start <= day && day <= end;
+  });
 }

@@ -1,11 +1,12 @@
 "use server";
 
-import { and, eq, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
+import { closeAt } from "@/domain/cycles";
 import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
@@ -691,5 +692,140 @@ export async function toggleHabit(input: { date: string; blockTypeId: string }) 
   if (deleted.length === 0) {
     await db.insert(s.habitChecks).values({ date, blockTypeId });
   }
+  await done();
+}
+
+// ─── Cycles ──────────────────────────────────────────────────────────────────
+
+const cycleMinutes = z.coerce.number().int().min(1).max(8 * 60);
+
+/** Closes any Cycle still running, keeping it complete if it was already in its break. */
+async function closeOpenCycles(now: Date) {
+  const open = await db.select().from(s.cycles).where(isNull(s.cycles.endedAt));
+  for (const cycle of open) {
+    await db
+      .update(s.cycles)
+      .set({ endedAt: closeAt(cycle, now) })
+      .where(eq(s.cycles.id, cycle.id));
+  }
+}
+
+/**
+ * Starts a Cycle now. The rhythm comes from a preset (the default one when
+ * none is given). What is worked on comes from the Slot, the Task/Move, or a
+ * free label. Only one Cycle runs at a time.
+ */
+export async function startCycle(input: {
+  presetId?: string;
+  work?: { kind: "task" | "move"; id: string } | null;
+  slotId?: string | null;
+  label?: string;
+}) {
+  await requireIvan();
+  const v = z
+    .object({
+      presetId: z.uuid().optional(),
+      work: workRef.nullable().optional(),
+      slotId: z.uuid().nullable().optional(),
+      label: text.optional(),
+    })
+    .parse(input);
+
+  const presets = await db
+    .select()
+    .from(s.cyclePresets)
+    .orderBy(asc(s.cyclePresets.position), asc(s.cyclePresets.createdAt));
+  const preset = presets.find((p) => p.id === v.presetId) ?? presets[0];
+  if (!preset) throw new Error("Create a Cycle preset first");
+
+  let work = v.work ?? null;
+  if (v.slotId) {
+    const [slot] = await db.select().from(s.slots).where(eq(s.slots.id, v.slotId));
+    if (slot) work = { kind: slot.workKind, id: (slot.workKind === "task" ? slot.taskId : slot.moveId)! };
+  }
+
+  const now = new Date();
+  await closeOpenCycles(now);
+  await db.insert(s.cycles).values({
+    startedAt: now,
+    focusMin: preset.focusMin,
+    breakMin: preset.breakMin,
+    workKind: work?.kind ?? null,
+    taskId: work?.kind === "task" ? work.id : null,
+    moveId: work?.kind === "move" ? work.id : null,
+    slotId: v.slotId ?? null,
+    label: work ? "" : (v.label ?? ""),
+  });
+  await done();
+}
+
+export async function startCycleForm(fd: FormData) {
+  const { presetId, work, label } = z
+    .object({
+      presetId: z.uuid(),
+      work: z.string().optional(),
+      label: text.optional(),
+    })
+    .parse(fields(fd));
+  const ref = work && /^(task|move):[0-9a-f-]{36}$/.test(work) ? work.split(":") : null;
+  await startCycle({
+    presetId,
+    work: ref ? { kind: ref[0] as "task" | "move", id: ref[1] } : null,
+    label,
+  });
+  redirect("/os/focus");
+}
+
+/** Closes the Cycle now: early in the focus, or at its planned end if already in the break. */
+export async function endCycle(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  const [cycle] = await db.select().from(s.cycles).where(eq(s.cycles.id, id));
+  if (!cycle) return;
+  await db
+    .update(s.cycles)
+    .set({ endedAt: closeAt(cycle, new Date()) })
+    .where(eq(s.cycles.id, id));
+  await done();
+}
+
+const presetFields = z.object({ name: required, focusMin: cycleMinutes, breakMin: z.coerce.number().int().min(0).max(120) });
+
+export async function createCyclePreset(fd: FormData) {
+  await requireIvan();
+  const values = presetFields.parse(fields(fd));
+  const [{ last }] = await db.select({ last: max(s.cyclePresets.position) }).from(s.cyclePresets);
+  await db.insert(s.cyclePresets).values({ ...values, position: (last ?? -1) + 1 });
+  await done();
+}
+
+export async function updateCyclePreset(fd: FormData) {
+  await requireIvan();
+  const { id, ...values } = presetFields.extend({ id: z.uuid() }).parse(fields(fd));
+  await db.update(s.cyclePresets).set(values).where(eq(s.cyclePresets.id, id));
+  await done();
+}
+
+export async function deleteCyclePreset(fd: FormData) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
+  await db.delete(s.cyclePresets).where(eq(s.cyclePresets.id, id));
+  await done();
+}
+
+/** The default preset is the first one. */
+export async function makeDefaultCyclePreset(fd: FormData) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
+  const all = await db
+    .select()
+    .from(s.cyclePresets)
+    .orderBy(asc(s.cyclePresets.position), asc(s.cyclePresets.createdAt));
+  const ordered = [...all.filter((p) => p.id === id), ...all.filter((p) => p.id !== id)];
+  await db.transaction(async (tx) => {
+    for (const [position, p] of ordered.entries()) {
+      await tx.update(s.cyclePresets).set({ position }).where(eq(s.cyclePresets.id, p.id));
+    }
+  });
   await done();
 }

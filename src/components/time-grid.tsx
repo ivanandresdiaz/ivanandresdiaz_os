@@ -15,12 +15,17 @@ export type GridItem = {
   column: string;
   startMin: number;
   endMin: number;
-  /** Blocks sit behind, full width; work sits on top, split in lanes when overlapping. */
-  layer: "block" | "work";
+  /**
+   * Blocks sit behind, full width; work sits on top, split in lanes when
+   * overlapping; focus (real time from Cycles) is a thin bar on the left edge.
+   */
+  layer: "block" | "work" | "focus";
   editable: boolean;
   /** Whether it can be dragged to another column. */
   crossColumn: boolean;
 };
+
+const LAYER_ORDER: Record<GridItem["layer"], number> = { block: 0, focus: 1, work: 2 };
 
 export type GridPosition = { column: string; startMin: number; endMin: number };
 
@@ -210,16 +215,20 @@ export function TimeGrid<T extends GridItem>({
     const work = columnItems.filter((i) => i.layer === "work");
     const laneOf = lanes(work, positionOf);
     return columnItems
-      .sort((a, b) => (a.layer === b.layer ? 0 : a.layer === "block" ? -1 : 1))
+      .sort((a, b) => LAYER_ORDER[a.layer] - LAYER_ORDER[b.layer])
       .map((item) => {
         const pos = positionOf(item);
         const lane = laneOf.get(item.id);
+        const top = pos.startMin * PX_PER_MIN;
+        const height = (pos.endMin - pos.startMin) * PX_PER_MIN;
         const style: React.CSSProperties =
           item.layer === "block"
-            ? { top: pos.startMin * PX_PER_MIN, height: (pos.endMin - pos.startMin) * PX_PER_MIN, left: 0, right: 0 }
-            : {
-                top: pos.startMin * PX_PER_MIN,
-                height: (pos.endMin - pos.startMin) * PX_PER_MIN,
+            ? { top, height, left: 0, right: 0 }
+            : item.layer === "focus"
+              ? { top, height, left: 3, width: 8 }
+              : {
+                top,
+                height,
                 left: `calc(14px + (100% - 16px) * ${(lane?.lane ?? 0) / (lane?.lanes ?? 1)})`,
                 width: `calc((100% - 16px) / ${lane?.lanes ?? 1})`,
               };
@@ -228,7 +237,7 @@ export function TimeGrid<T extends GridItem>({
           <div
             key={item.id}
             className={`absolute select-none ${item.editable ? "cursor-grab touch-none" : ""} ${
-              dragging ? "z-30 cursor-grabbing opacity-90 shadow-lg" : item.layer === "work" ? "z-20" : "z-10"
+              dragging ? "z-30 cursor-grabbing opacity-90 shadow-lg" : item.layer === "block" ? "z-10" : "z-20"
             }`}
             style={style}
             onPointerDown={(e) => startDrag(e, item, "move")}

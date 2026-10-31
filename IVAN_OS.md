@@ -1,7 +1,7 @@
 ---
-status: rebanada 1 construida (2026-10-30) — siguiente paso: Ivan la usa e itera; luego rebanada 2
+status: rebanadas 1 y 2 construidas (2026-10-30) — siguiente: publicar (Vercel + Postgres + Google) y rebanada 3
 updated: 2026-10-30
-resume: "Rebanada 1 construida (ver README.md). Falta: credenciales de Google y ALLOWED_EMAIL; Postgres administrado + Vercel. Siguiente: rebanada 2 (Cycles + PWA)."
+resume: "Rebanadas 1 y 2 construidas (ver README.md). Falta publicar: credenciales de Google y ALLOWED_EMAIL, Postgres administrado + Vercel. Siguiente: rebanada 3 (Daily Note completa + Weekly Review). Ivan tiene aportes de UX pendientes."
 fuentes:
   - strategian/ivan/Manifesto_with_ai/Manifesto_with_ai.md (v1.0)
   - strategian/ivan/principles/From the inside out & own yourself.md
@@ -184,3 +184,16 @@ Decisiones tomadas al construir (revisables):
 - Una Task carried over que pertenece a un Move de esta semana se muestra con ×N dentro de "This week's Moves", no duplicada.
 - Un Highlight enlazado a una Task o Move se marca hecho cuando esa Task/Move se marca hecha (y al revés).
 - Todo se ajusta a 15 minutos.
+
+## Rebanada 2 — construida (2026-10-30): Cycles + PWA
+
+- **Cycles:** presets editables (Deep work 90+15, Steady 50+10, Pomodoro 25+5; el primero es el predeterminado) en `/os/cycles`, con el historial de 7 días. ▶ en cada Slot del calendario y en cada ítem del Stack arranca un Cycle con el preset predeterminado; `/os/focus` permite elegir preset y trabajo, o un Cycle libre con etiqueta.
+- **Pantalla de foco:** respiración de 6 s al entrar (se salta con clic), cuenta regresiva grande con anillo, Steps de la Task, marcar hecha, cerrar el Cycle en cualquier momento; luego el descanso y "Next Cycle". El título de la pestaña muestra el tiempo.
+- **Plan vs realidad, por separado:** el foco real aparece como una barra fina a la izquierda de la columna del calendario; la tarjeta Reality del día muestra el foco real y cuántos Cycles quedaron completos; "+12m" = empezó 12 min después del Slot planeado.
+- **Insignia en el encabezado** con el Cycle en curso (foco o descanso), visible en todo el OS.
+- **PWA:** manifest, íconos, service worker sin offline, notificaciones locales al terminar el foco y el descanso (más un sonido suave). Instalable desde el navegador.
+
+Decisiones tomadas al construir (revisables):
+- Solo un Cycle a la vez: empezar otro cierra el anterior.
+- Las notificaciones salen de la página abierta (no hay servidor de push). Con la pestaña en segundo plano el navegador puede retrasarlas hasta ~1 min.
+- Un Cycle sin Task/Move es "libre" con etiqueta; la XP (rebanada 4) decidirá si cuenta.

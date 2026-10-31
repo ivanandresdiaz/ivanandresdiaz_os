@@ -53,3 +53,23 @@ body {
     @apply text-xs font-medium uppercase tracking-wide text-muted;
   }
 }
+
+/* Focus screen: one slow breath before the countdown. */
+@keyframes breathe {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  50% { transform: scale(1.4); opacity: 1; }
+}
+@keyframes breathe-text {
+  0% { opacity: 0; transform: translateY(6px); }
+  20%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+.breathe {
+  animation: breathe 6s ease-in-out 1;
+}
+.breathe-text {
+  animation: breathe-text 6s ease-in-out 1 forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .breathe, .breathe-text { animation: none; }
+}

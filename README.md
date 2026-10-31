@@ -23,10 +23,16 @@ pnpm dev                      # http://localhost:3000 → "Dev sign-in (local on
 
 The dev sign-in only exists when `NODE_ENV !== "production"` and `AUTH_DEV_LOGIN=1`.
 
+## PWA and notifications
+
+Installable from the browser (manifest + `public/sw.js`, no offline). Cycle notifications are local: the page asks for permission
+("Enable notifications" on `/os/focus` or `/os/cycles`) and shows them through the service worker. Browsers only allow this on
+`localhost` or HTTPS; to test on a phone in the LAN use `pnpm dev --experimental-https`.
+
 ## Layout
 
-- `src/domain/` — pure rules: dates and Quarters, Structure + Exceptions, Slots and carried over, Highlights / Day Won, Infinite Games.
+- `src/domain/` — pure rules: dates and Quarters, Structure + Exceptions, Slots and carried over, Highlights / Day Won, Infinite Games, Cycles.
 - `src/db/` — Drizzle schema, client, seed. Migrations in `drizzle/`.
 - `src/server/` — queries and Server Actions (each one calls `requireIvan()`).
-- `src/components/` — `TimeGrid` (drag/resize grid), `Calendar`, `Stack`, `StructureEditor`.
+- `src/components/` — `TimeGrid` (drag/resize grid), `Calendar`, `Stack`, `StructureEditor`, `FocusScreen`, `CycleBadge`.
 - `src/app/os/` — the private OS. `src/app/page.tsx` — minimal public root.

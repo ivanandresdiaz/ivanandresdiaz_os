@@ -1,7 +1,7 @@
 /**
  * Seeds an empty database with the starting point agreed in the design:
- * Season, Q4 2026, Campaign "Build Ivan OS" and Monday's Structure.
- * Run with `pnpm db:seed`. Does nothing if a Season already exists.
+ * Season, Q4 2026, Campaign "Build Ivan OS" and Monday's Structure, plus the
+ * Cycle presets. Run with `pnpm db:seed`. Each part is skipped if it exists.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -12,7 +12,20 @@ import * as schema from "./schema";
 const client = postgres(process.env.DATABASE_URL!, { max: 1 });
 const db = drizzle(client, { schema });
 
+async function seedCyclePresets() {
+  const existing = await db.select({ id: schema.cyclePresets.id }).from(schema.cyclePresets).limit(1);
+  if (existing.length > 0) return;
+  await db.insert(schema.cyclePresets).values([
+    { name: "Deep work", focusMin: 90, breakMin: 15, position: 0 },
+    { name: "Steady", focusMin: 50, breakMin: 10, position: 1 },
+    { name: "Pomodoro", focusMin: 25, breakMin: 5, position: 2 },
+  ]);
+  console.log("Seeded Cycle presets.");
+}
+
 async function main() {
+  await seedCyclePresets();
+
   const existing = await db.select({ id: schema.seasons.id }).from(schema.seasons).limit(1);
   if (existing.length > 0) {
     console.log("Database already has a Season; skipping seed.");
