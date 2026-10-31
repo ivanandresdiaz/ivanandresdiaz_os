@@ -1,7 +1,7 @@
 ---
-status: diseño CONFIRMADO por Ivan (2026-10-30) — siguiente paso: construir la rebanada 1
+status: rebanada 1 construida (2026-10-30) — siguiente paso: Ivan la usa e itera; luego rebanada 2
 updated: 2026-10-30
-resume: "Diseño confirmado. Empezar la rebanada 1: scaffold Next.js en esta carpeta, módulo de dominio con Vitest, seed. Leer GLOSSARY.md y docs/adr/ antes de codificar."
+resume: "Rebanada 1 construida (ver README.md). Falta: credenciales de Google y ALLOWED_EMAIL; Postgres administrado + Vercel. Siguiente: rebanada 2 (Cycles + PWA)."
 fuentes:
   - strategian/ivan/Manifesto_with_ai/Manifesto_with_ai.md (v1.0)
   - strategian/ivan/principles/From the inside out & own yourself.md
@@ -173,3 +173,14 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 - Formulario de contacto / mensajes en la raíz pública → inbox del OS
 - English Coach que lee en voz alta (TTS); historial de errores de inglés
 - "Pill of the day" (modelos mentales de Obsidian en el check-in)
+
+## Rebanada 1 — construida (2026-10-30)
+
+Next.js 16 + Drizzle/Postgres + Auth.js (Google restringido a ALLOWED_EMAIL; login "dev" solo en local). Dominio puro en `src/domain/` con Vitest (24 tests). Rutas: `/os/day/[date]` (Check-in, Highlights, Eliminate, Blocks del día, calendario, Stack), `/os/week/[date]`, `/os/plan` (Season, Season Goals, Quarter, Campaigns, Backlog), `/os/campaigns/[id]` (GPS, Moves, Tasks, Steps), `/os/structure`, `/os/principles`.
+
+Decisiones tomadas al construir (revisables):
+- **Slot** y **Block type** entran al glosario.
+- Mover un Block en el calendario de un día crea una Exception; moverlo en `/os/structure` cambia la Structure desde hoy (la fila vieja se cierra ayer).
+- Una Task carried over que pertenece a un Move de esta semana se muestra con ×N dentro de "This week's Moves", no duplicada.
+- Un Highlight enlazado a una Task o Move se marca hecho cuando esa Task/Move se marca hecha (y al revés).
+- Todo se ajusta a 15 minutos.

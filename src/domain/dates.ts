@@ -1,0 +1,111 @@
+/**
+ * Calendar dates as ISO strings ("2026-10-30"). Days are civil days in Ivan's
+ * timezone, so the domain never handles Date objects with hidden UTC offsets.
+ */
+export type IsoDate = string;
+
+/** ISO weekday: 1 = Monday … 7 = Sunday. */
+export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export const WEEKDAYS: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 7];
+export const WEEKDAY_NAMES: Record<Weekday, string> = {
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+  7: "Sunday",
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isIsoDate(value: string): value is IsoDate {
+  if (!ISO_DATE.test(value)) return false;
+  return toIso(fromIso(value)) === value;
+}
+
+function fromIso(date: IsoDate): Date {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function toIso(date: Date): IsoDate {
+  return date.toISOString().slice(0, 10);
+}
+
+export function addDays(date: IsoDate, days: number): IsoDate {
+  const d = fromIso(date);
+  d.setUTCDate(d.getUTCDate() + days);
+  return toIso(d);
+}
+
+export function weekdayOf(date: IsoDate): Weekday {
+  const day = fromIso(date).getUTCDay();
+  return (day === 0 ? 7 : day) as Weekday;
+}
+
+/** The Monday that starts the week containing `date`. */
+export function startOfWeek(date: IsoDate): IsoDate {
+  return addDays(date, 1 - weekdayOf(date));
+}
+
+export function weekDates(date: IsoDate): IsoDate[] {
+  const monday = startOfWeek(date);
+  return WEEKDAYS.map((_, i) => addDays(monday, i));
+}
+
+/** Today's civil date in the given IANA timezone. */
+export function todayIn(timeZone: string, now: Date = new Date()): IsoDate {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export type QuarterNumber = 1 | 2 | 3 | 4;
+export type QuarterRef = { year: number; quarter: QuarterNumber };
+
+export function quarterOf(date: IsoDate): QuarterRef {
+  const [year, month] = date.split("-").map(Number);
+  return { year, quarter: (Math.floor((month - 1) / 3) + 1) as QuarterNumber };
+}
+
+export function quarterRange({ year, quarter }: QuarterRef): {
+  start: IsoDate;
+  end: IsoDate;
+} {
+  const startMonth = (quarter - 1) * 3 + 1;
+  const start = `${year}-${String(startMonth).padStart(2, "0")}-01`;
+  const nextStart =
+    quarter === 4
+      ? `${year + 1}-01-01`
+      : `${year}-${String(startMonth + 3).padStart(2, "0")}-01`;
+  return { start, end: addDays(nextStart, -1) };
+}
+
+export function quarterLabel({ year, quarter }: QuarterRef): string {
+  return `Q${quarter} ${year}`;
+}
+
+/** Minutes since midnight, e.g. 450 = 07:30. */
+export type Minutes = number;
+
+export function formatMinutes(min: Minutes): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+export function parseMinutes(hhmm: string): Minutes {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!match) throw new Error(`Invalid time "${hhmm}"`);
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (h > 24 || m > 59 || (h === 24 && m > 0)) {
+    throw new Error(`Invalid time "${hhmm}"`);
+  }
+  return h * 60 + m;
+}

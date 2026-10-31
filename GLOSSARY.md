@@ -49,6 +49,10 @@ _Evitar_: Movimiento, Meta.
 
 **Structure** (Estructura): la plantilla semanal del calendario, hecha de Blocks (p. ej. lunes de 8 a 12, Deep work for the company). Es un nudge, no una regla. Cambiarla aplica de hoy en adelante.
 
+**Block type** (Tipo de bloque): la clase de un Block (Gym, Reading, Deep work for the company…). Es Habit o Container, tiene un color y sus Infinite Games. Una Campaign declara en qué Block type de tipo Container se juega.
+
+**Slot**: una Task (o un Move sin Tasks) puesta en el calendario en una fecha y un horario. Una Task puede tener varios Slots en días distintos. Si quedan Slots en días pasados y la Task no está hecha, vuelve como carried over ×N (N = días en que se agendó).
+
 **Exception** (Excepción): un cambio a la Structure en una sola fecha; no toca la plantilla.
 
 **Habit Block** (Bloque-hábito): un Block cuyo contenido es el input mismo; se marca cumplido o no (gym, Reading, Nap).

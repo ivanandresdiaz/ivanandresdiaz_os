@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ivan_os_postgres
+    environment:
+      POSTGRES_USER: ivan_os
+      POSTGRES_PASSWORD: ivan_os
+      POSTGRES_DB: ivan_os
+    ports:
+      - "5440:5432"
+    volumes:
+      - ivan_os_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ivan_os"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  ivan_os_pg:
