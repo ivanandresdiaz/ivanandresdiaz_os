@@ -117,4 +117,9 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Herramientas
 
-**English Coach**: corrige el inglés de los textos largos (los MD). Muestra las correcciones; Ivan las lee y decide si reemplaza el original.
+**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
+
+**Dictation** (Dictado): hablar en inglés para que el texto se escriba en un Long text, donde está el cursor y sin borrar lo que ya hay. Transcribe literal, con mis errores, porque corregirlos es trabajo del English Coach. El audio no se guarda.
+_Evitar_: Voice input, audio (un audio es una Reference).
+
+**English Coach**: revisa el inglés de un Long text cuando se lo pido. Muestra mis errores (spelling, grammar, word choice, lo que no suena natural), cada uno con su corrección y un porqué en inglés sencillo, y una versión pulida que conserva mi voz y mis ideas. Yo decido si uso la versión pulida; no guarda nada hasta que guardo el texto.

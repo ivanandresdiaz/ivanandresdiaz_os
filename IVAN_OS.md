@@ -249,6 +249,7 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 - Sync con Obsidian, gráficas
 - Formulario de contacto / mensajes en la raíz pública → inbox del OS
 - English Coach que lee en voz alta (TTS); historial de errores de inglés
+- Dictation en vivo: el texto aparece mientras hablo (hoy aparece al terminar)
 - "Pill of the day" (modelos mentales de Obsidian en el check-in)
 
 ## Rebanada 1 — construida (2026-10-30)
