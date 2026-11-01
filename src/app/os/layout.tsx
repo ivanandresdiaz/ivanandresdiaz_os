@@ -3,18 +3,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { auth, isAllowedEmail, signOut } from "@/auth";
 import { CycleBadge } from "@/components/cycle-badge";
+import { OsNav } from "@/components/os-nav";
 import { PwaSetup } from "@/components/pwa";
 import { getActiveCycle } from "@/server/queries";
-
-const NAV = [
-  { href: "/os", label: "Today" },
-  { href: "/os/week", label: "Week" },
-  { href: "/os/focus", label: "Focus" },
-  { href: "/os/feed", label: "Feed" },
-  { href: "/os/plan", label: "Plan" },
-  { href: "/os/structure", label: "Structure" },
-  { href: "/os/principles", label: "Principles" },
-];
 
 /** Shows the running Cycle; renders nothing when signed out or idle. */
 async function ActiveCycle() {
@@ -35,17 +26,13 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <PwaSetup />
-      <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-line bg-surface px-4 pt-[max(0.25rem,env(safe-area-inset-top))] pb-1">
-        <Link href="/os" className="font-semibold tracking-tight">
+      {/* 12px below the status bar of the installed iPhone app, so nothing sits under the clock. */}
+      <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-line bg-surface px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-1">
+        <Link href="/os" className="flex min-h-11 items-center font-semibold tracking-tight">
           Ivan OS
         </Link>
-        <nav className="flex flex-1 gap-1 overflow-x-auto text-sm">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="flex min-h-11 shrink-0 items-center rounded px-2 text-muted hover:bg-background hover:text-foreground">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <OsNav placement="top" />
+        <div className="flex-1 md:hidden" />
         <Suspense fallback={null}>
           <ActiveCycle />
         </Suspense>
@@ -53,9 +40,11 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
           <button className="min-h-11 text-xs whitespace-nowrap text-muted hover:underline">Sign out</button>
         </form>
       </header>
-      <main className="flex flex-1 flex-col gap-4 p-4">
+      {/* On a phone the bottom bar covers the last 3.5rem; leave room to scroll past it. */}
+      <main className="flex flex-1 flex-col gap-4 p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-4">
         <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>{children}</Suspense>
       </main>
+      <OsNav placement="bottom" />
     </div>
   );
 }
