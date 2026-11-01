@@ -17,6 +17,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@dnd-kit/helpers": "^0.5.3",
+    "@dnd-kit/react": "^0.5.3",
     "@vercel/analytics": "^2.0.1",
     "aws4fetch": "^1.0.20",
     "drizzle-orm": "^0.45.4",

@@ -180,19 +180,16 @@ export async function reorderReferences(input: { principleId: string; ids: strin
   await done();
 }
 
-export async function movePrinciple(fd: FormData) {
+/** Saves the order Ivan dragged the Principles into; `ids` must list every Principle. */
+export async function reorderPrinciples(input: { ids: string[] }) {
   await requireIvan();
-  const { id, direction } = z
-    .object({ id: z.uuid(), direction: z.enum(["up", "down"]) })
-    .parse(fields(fd));
-  const all = await db.select().from(s.principles).orderBy(s.principles.position);
-  const i = all.findIndex((p) => p.id === id);
-  const j = direction === "up" ? i - 1 : i + 1;
-  if (i < 0 || j < 0 || j >= all.length) return;
-  [all[i], all[j]] = [all[j], all[i]];
+  const { ids } = z.object({ ids: z.array(z.uuid()) }).parse(input);
+  const existing = await db.select({ id: s.principles.id }).from(s.principles);
+  const known = new Set(existing.map((p) => p.id));
+  if (ids.length !== known.size || new Set(ids).size !== ids.length || !ids.every((id) => known.has(id))) return;
   await db.transaction(async (tx) => {
-    for (const [position, p] of all.entries()) {
-      await tx.update(s.principles).set({ position }).where(eq(s.principles.id, p.id));
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.principles).set({ position }).where(eq(s.principles.id, id));
     }
   });
   await done();
