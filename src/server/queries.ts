@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -13,6 +13,7 @@ import {
   type StructureBlock,
   type StructureException,
 } from "@/domain/structure";
+import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
 import { secondaryTasksForDate } from "@/domain/secondary-tasks";
@@ -70,6 +71,129 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
     body: p.body,
     references: signed.filter((r) => r.principleId === p.id).map((r) => r.view),
   }));
+}
+
+// ─── Feed ────────────────────────────────────────────────────────────────────
+
+export type FeedItem = ReferenceView & { principleTitle: string };
+export type FeedLikes = Record<string, { total: number; likedToday: boolean }>;
+export type TopReference = FeedItem & { likes: number };
+export type FeedView = {
+  date: IsoDate;
+  items: FeedItem[];
+  likes: FeedLikes;
+  position: number;
+  seen: number;
+  top: TopReference[];
+};
+
+async function likeTotals(ids?: string[]) {
+  const rows = await db
+    .select({ id: s.referenceLikes.referenceId, total: count() })
+    .from(s.referenceLikes)
+    .where(ids ? inArray(s.referenceLikes.referenceId, ids) : undefined)
+    .groupBy(s.referenceLikes.referenceId);
+  return new Map(rows.map((r) => [r.id, r.total]));
+}
+
+/** References with their Principle's title, signed for viewing, in the order of `ids`. */
+async function feedItems(ids: string[]): Promise<FeedItem[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ reference: s.principleReferences, principleTitle: s.principles.title })
+    .from(s.principleReferences)
+    .innerJoin(s.principles, eq(s.principles.id, s.principleReferences.principleId))
+    .where(inArray(s.principleReferences.id, ids));
+  const byId = new Map(rows.map((r) => [r.reference.id, r]));
+  return Promise.all(
+    ids.flatMap((id) => {
+      const row = byId.get(id);
+      if (!row) return [];
+      const r = row.reference;
+      return [
+        presignView(r.key).then((url) => ({
+          id: r.id,
+          kind: referenceKindOf(r.contentType) ?? "image",
+          contentType: r.contentType,
+          title: r.title ?? "",
+          url,
+          principleTitle: row.principleTitle,
+        })),
+      ];
+    }),
+  );
+}
+
+/** The References with the most Likes, only those liked at least once. */
+async function getTopReferences(): Promise<TopReference[]> {
+  const rows = await db
+    .select({ id: s.referenceLikes.referenceId, total: count() })
+    .from(s.referenceLikes)
+    .groupBy(s.referenceLikes.referenceId)
+    .orderBy(desc(count()))
+    .limit(TOP_SIZE);
+  const items = await feedItems(rows.map((r) => r.id));
+  const totals = new Map(rows.map((r) => [r.id, r.total]));
+  return items.map((item) => ({ ...item, likes: totals.get(item.id) ?? 0 }));
+}
+
+/** Today's Feed, drawn the first time it is opened and fixed for the rest of the day. */
+export async function getTodayFeed(): Promise<FeedView> {
+  const date = today();
+  let [feed] = await db.select().from(s.feeds).where(eq(s.feeds.date, date));
+  if (!feed) {
+    const [references, totals] = await Promise.all([
+      db.select({ id: s.principleReferences.id }).from(s.principleReferences),
+      likeTotals(),
+    ]);
+    const ids = pickFeed(
+      references.map((r) => r.id),
+      totals,
+      Math.random,
+    );
+    // An empty Feed is not saved, so the first upload of the day can still fill it.
+    if (ids.length > 0) {
+      await db.insert(s.feeds).values({ date, referenceIds: ids }).onConflictDoNothing();
+      [feed] = await db.select().from(s.feeds).where(eq(s.feeds.date, date));
+    }
+  }
+  const ids = feed?.referenceIds ?? [];
+  const [items, totals, likedToday, top] = await Promise.all([
+    feedItems(ids),
+    ids.length ? likeTotals(ids) : new Map<string, number>(),
+    ids.length
+      ? db
+          .select({ id: s.referenceLikes.referenceId })
+          .from(s.referenceLikes)
+          .where(and(eq(s.referenceLikes.date, date), inArray(s.referenceLikes.referenceId, ids)))
+      : [],
+    getTopReferences(),
+  ]);
+  const liked = new Set(likedToday.map((l) => l.id));
+  return {
+    date,
+    items,
+    likes: Object.fromEntries(items.map((i) => [i.id, { total: totals.get(i.id) ?? 0, likedToday: liked.has(i.id) }])),
+    position: Math.min(feed?.position ?? 0, items.length),
+    seen: feedSeen(feed?.seen ?? 0, items.length),
+    top,
+  };
+}
+
+/** How far the Feed of a date went, without drawing it; null when there is nothing to watch. */
+export async function getFeedProgress(date: IsoDate) {
+  const [feed] = await db.select().from(s.feeds).where(eq(s.feeds.date, date));
+  if (feed) {
+    const [{ live }] = feed.referenceIds.length
+      ? await db
+          .select({ live: count() })
+          .from(s.principleReferences)
+          .where(inArray(s.principleReferences.id, feed.referenceIds))
+      : [{ live: 0 }];
+    return live > 0 ? { seen: feedSeen(feed.seen, live), total: live } : null;
+  }
+  const [{ total }] = await db.select({ total: count() }).from(s.principleReferences);
+  return total > 0 ? { seen: 0, total: Math.min(total, FEED_SIZE) } : null;
 }
 
 export async function getActiveSeason() {

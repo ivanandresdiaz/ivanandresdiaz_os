@@ -47,6 +47,44 @@ async function done() {
   refresh();
 }
 
+// ─── Feed ────────────────────────────────────────────────────────────────────
+
+/** Gives today's Like (`liked: true`) or takes it back; Likes from earlier days never change. */
+export async function setLike(input: { referenceId: string; liked: boolean }) {
+  await requireIvan();
+  const { referenceId, liked } = z.object({ referenceId: z.uuid(), liked: z.boolean() }).parse(input);
+  const date = today();
+  if (liked) {
+    const [reference] = await db
+      .select({ id: s.principleReferences.id })
+      .from(s.principleReferences)
+      .where(eq(s.principleReferences.id, referenceId));
+    if (!reference) return;
+    await db.insert(s.referenceLikes).values({ referenceId, date }).onConflictDoNothing();
+  } else {
+    await db
+      .delete(s.referenceLikes)
+      .where(and(eq(s.referenceLikes.referenceId, referenceId), eq(s.referenceLikes.date, date)));
+  }
+  await done();
+}
+
+/**
+ * Remembers where Ivan is in today's Feed. Not refreshed: the screen already
+ * shows it, and re-rendering would interrupt the playing Reference.
+ */
+export async function saveFeedPosition(input: { position: number }) {
+  await requireIvan();
+  const { position } = z.object({ position: z.number().int().min(0) }).parse(input);
+  await db
+    .update(s.feeds)
+    .set({
+      position,
+      seen: sql`greatest(${s.feeds.seen}, least(${position + 1}, cardinality(${s.feeds.referenceIds})))`,
+    })
+    .where(eq(s.feeds.date, today()));
+}
+
 // ─── Principles ──────────────────────────────────────────────────────────────
 
 export async function createPrinciple(fd: FormData) {

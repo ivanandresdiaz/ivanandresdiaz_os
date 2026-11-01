@@ -41,6 +41,33 @@ export const principleReferences = pgTable("principle_references", {
   createdAt: createdAt(),
 });
 
+/**
+ * The Feed of one date: the References drawn that morning, in order (ids, not a
+ * foreign key, so a deleted Reference just drops out). `position` is where Ivan
+ * left off; `seen` how many he has reached.
+ */
+export const feeds = pgTable("feeds", {
+  date: isoDate("date").primaryKey(),
+  referenceIds: uuid("reference_ids").array().notNull(),
+  position: integer("position").notNull().default(0),
+  seen: integer("seen").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+/** One Like for a Reference on one date. */
+export const referenceLikes = pgTable(
+  "reference_likes",
+  {
+    id: id(),
+    referenceId: uuid("reference_id")
+      .notNull()
+      .references(() => principleReferences.id, { onDelete: "cascade" }),
+    date: isoDate("date").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [unique().on(t.referenceId, t.date)],
+);
+
 /** Exactly one Season is active: the one with ended_on null. */
 export const seasons = pgTable("seasons", {
   id: id(),

@@ -30,6 +30,7 @@ import {
   getCycleHistory,
   getCyclePresets,
   getDailyNote,
+  getFeedProgress,
   getStack,
 } from "@/server/queries";
 
@@ -39,7 +40,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
   if (!isIsoDate(date)) notFound();
 
   const now = today();
-  const [context, note, [day], stack, blockTypes, presets, cycles, activeCycle] = await Promise.all([
+  const [context, note, [day], stack, blockTypes, presets, cycles, activeCycle, feed] = await Promise.all([
     getCheckInContext(date),
     getDailyNote(date),
     getCalendar([date]),
@@ -48,6 +49,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
     getCyclePresets(),
     getCycleHistory(date, date),
     getActiveCycle(),
+    date === now ? getFeedProgress(date) : null,
   ]);
   const realFocus = cycles.reduce((sum, c) => sum + c.realFocusMin, 0);
   const stackItems = [...stack.carriedOver, ...stack.thisWeek, ...stack.loose].filter((i) => !i.done);
@@ -73,6 +75,12 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
         <Link className="btn" href={`/os/week/${startOfWeek(date)}`}>
           Week view
         </Link>
+        {feed && (
+          // Optional: no checkbox, no XP, no nudge when skipped.
+          <Link className="ml-auto text-sm text-muted hover:text-foreground" href="/os/feed">
+            Feed {feed.seen}/{feed.total}
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(320px,380px)_1fr_minmax(260px,300px)]">

@@ -350,7 +350,7 @@ export function StoryViewer({
   );
 }
 
-function PrincipleCaption({ title }: { title: string }) {
+export function PrincipleCaption({ title }: { title: string }) {
   return (
     <p className="pointer-events-none line-clamp-2 max-w-[70%] text-sm font-medium break-words text-white/80 drop-shadow">
       {title}
