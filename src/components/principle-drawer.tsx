@@ -174,7 +174,12 @@ function Drawer({
         </div>
       </div>
       {story !== null && (
-        <StoryViewer references={principle.references} startIndex={story} onClose={() => setStory(null)} />
+        <StoryViewer
+          principleTitle={principle.title}
+          references={principle.references}
+          startIndex={story}
+          onClose={() => setStory(null)}
+        />
       )}
     </dialog>
   );

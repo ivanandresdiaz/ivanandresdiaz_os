@@ -12,10 +12,13 @@ type Direction = -1 | 1;
 
 /** Full-screen, story-style playback of a Principle's References. */
 export function StoryViewer({
+  principleTitle,
   references,
   startIndex,
   onClose,
 }: {
+  /** Shown as a quiet caption so Ivan knows which Principle these References carry. */
+  principleTitle: string;
   references: ReferenceView[];
   startIndex: number;
   onClose: () => void;
@@ -237,8 +240,15 @@ export function StoryViewer({
           )}
         </div>
 
+        {!listening && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-4 pt-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <PrincipleCaption title={principleTitle} />
+          </div>
+        )}
+
         {listening && (
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 bg-gradient-to-t from-black/60 to-transparent px-6 pt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <PrincipleCaption title={principleTitle} />
             <input
               type="range"
               min={0}
@@ -337,6 +347,14 @@ export function StoryViewer({
         </div>
       </div>
     </dialog>
+  );
+}
+
+function PrincipleCaption({ title }: { title: string }) {
+  return (
+    <p className="pointer-events-none line-clamp-2 max-w-[70%] text-sm font-medium break-words text-white/80 drop-shadow">
+      {title}
+    </p>
   );
 }
 
