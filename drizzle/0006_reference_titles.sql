@@ -1,0 +1,1 @@
+ALTER TABLE "principle_references" ADD COLUMN "title" text;

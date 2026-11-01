@@ -40,7 +40,7 @@ export async function getPrinciples() {
   return db.select().from(s.principles).orderBy(asc(s.principles.position));
 }
 
-export type ReferenceView = { id: string; kind: ReferenceKind; contentType: string; url: string };
+export type ReferenceView = { id: string; kind: ReferenceKind; contentType: string; title: string; url: string };
 export type PrincipleView = { id: string; title: string; body: string; references: ReferenceView[] };
 
 /** Principles with their References, each signed for viewing. */
@@ -59,6 +59,7 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
         id: r.id,
         kind: referenceKindOf(r.contentType) ?? "image",
         contentType: r.contentType,
+        title: r.title ?? "",
         url: await presignView(r.key),
       },
     })),

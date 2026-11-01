@@ -26,7 +26,7 @@ export const principles = pgTable("principles", {
   createdAt: createdAt(),
 });
 
-/** An image or video stored in R2 under `key`, shown on its Principle in `position` order. */
+/** An image, video or audio stored in R2 under `key`, shown on its Principle in `position` order. */
 export const principleReferences = pgTable("principle_references", {
   id: id(),
   principleId: uuid("principle_id")
@@ -34,6 +34,8 @@ export const principleReferences = pgTable("principle_references", {
     .references(() => principles.id, { onDelete: "cascade" }),
   key: text("key").notNull().unique(),
   contentType: text("content_type").notNull(),
+  /** Shown only for audios, which have nothing to look at. */
+  title: text("title"),
   sizeBytes: integer("size_bytes").notNull(),
   position: integer("position").notNull(),
   createdAt: createdAt(),

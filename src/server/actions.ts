@@ -10,7 +10,7 @@ import { closeAt } from "@/domain/cycles";
 import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
-import { referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
+import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import { planStructureEdit, planStructureRemoval, type StructureBlock } from "@/domain/structure";
 import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
@@ -101,11 +101,27 @@ export async function createReferenceUpload(input: { principleId: string; conten
   return { key, uploadUrl: await presignUpload(key) };
 }
 
+const referenceTitle = z
+  .string()
+  .trim()
+  .max(MAX_REFERENCE_TITLE)
+  .transform((v) => v || null);
+
 /** Records a Reference once its file is in R2. */
-export async function confirmReferenceUpload(input: { principleId: string; key: string; contentType: string }) {
+export async function confirmReferenceUpload(input: {
+  principleId: string;
+  key: string;
+  contentType: string;
+  title: string;
+}) {
   await requireIvan();
   const v = z
-    .object({ principleId: z.uuid(), key: z.string().regex(/^[\w/.-]+$/), contentType: z.string() })
+    .object({
+      principleId: z.uuid(),
+      key: z.string().regex(/^[\w/.-]+$/),
+      contentType: z.string(),
+      title: referenceTitle,
+    })
     .parse(input);
   if (!v.key.startsWith(referencePrefix(v.principleId))) throw new Error("Key outside the Principle");
   const size = await objectSize(v.key);
@@ -125,10 +141,18 @@ export async function confirmReferenceUpload(input: { principleId: string; key: 
       principleId: v.principleId,
       key: v.key,
       contentType: v.contentType,
+      title: v.title,
       sizeBytes: size,
       position: (last ?? -1) + 1,
     })
     .onConflictDoNothing();
+  await done();
+}
+
+export async function renameReference(input: { id: string; title: string }) {
+  await requireIvan();
+  const { id, title } = z.object({ id: z.uuid(), title: referenceTitle.pipe(z.string()) }).parse(input);
+  await db.update(s.principleReferences).set({ title }).where(eq(s.principleReferences.id, id));
   await done();
 }
 

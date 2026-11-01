@@ -3,18 +3,29 @@
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import {
   ACCEPTED_REFERENCE_TYPES,
+  MAX_REFERENCE_TITLE,
   moveItem,
+  referenceContentType,
   TILE_PREVIEW_SECONDS,
+  titleFromFileName,
   validateReferenceFile,
   type ReferenceFileProblem,
 } from "@/domain/references";
-import { confirmReferenceUpload, createReferenceUpload, deleteReference, reorderReferences } from "@/server/actions";
+import {
+  confirmReferenceUpload,
+  createReferenceUpload,
+  deleteReference,
+  renameReference,
+  reorderReferences,
+} from "@/server/actions";
 import type { ReferenceView } from "@/server/queries";
 
 const TILE_MIME = "application/x-ivan-reference";
 
+export const UNTITLED_AUDIO = "Untitled audio";
+
 const PROBLEM_TEXT: Record<ReferenceFileProblem, string> = {
-  "unsupported-type": "Only JPG, PNG, WebP, GIF, MP4, WebM or MOV.",
+  "unsupported-type": "Only JPG, PNG, WebP, GIF, MP4, WebM, MOV, MP3, M4A, AAC, OGG, Opus or WAV.",
   empty: "The file is empty.",
   "too-large": "Over 200 MB.",
 };
@@ -55,57 +66,110 @@ export function ReferenceStrip({
     });
   }
 
+  function rename(id: string, title: string) {
+    startTransition(async () => {
+      setShown(shown.map((r) => (r.id === id ? { ...r, title } : r)));
+      await renameReference({ id, title });
+    });
+  }
+
   return (
-    <div className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 pb-1">
+    <div className="-mx-4 flex shrink-0 items-start gap-2 overflow-x-auto px-4 pb-1">
       {shown.map((reference, i) => (
-        <div
-          key={reference.id}
-          draggable={editing}
-          onDragStart={(event) => {
-            event.dataTransfer.setData(TILE_MIME, reference.id);
-            event.dataTransfer.effectAllowed = "move";
-            setDragFrom(i);
-          }}
-          onDragOver={(event) => {
-            if (editing && event.dataTransfer.types.includes(TILE_MIME)) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            drop(event.dataTransfer.getData(TILE_MIME), i);
-          }}
-          onDragEnd={() => setDragFrom(null)}
-          className={`relative aspect-[9/16] w-24 shrink-0 overflow-hidden rounded-lg bg-line ${
-            editing ? "cursor-grab active:cursor-grabbing" : ""
-          } ${dragFrom === i ? "opacity-40" : ""}`}
-        >
-          <button
-            type="button"
-            onClick={() => onOpen(i)}
-            className="block h-full w-full"
-            aria-label={`Open Reference ${i + 1} of ${shown.length}`}
+        <div key={reference.id} className="flex w-24 shrink-0 flex-col gap-1">
+          <div
+            draggable={editing}
+            onDragStart={(event) => {
+              event.dataTransfer.setData(TILE_MIME, reference.id);
+              event.dataTransfer.effectAllowed = "move";
+              setDragFrom(i);
+            }}
+            onDragOver={(event) => {
+              if (editing && event.dataTransfer.types.includes(TILE_MIME)) event.preventDefault();
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              drop(event.dataTransfer.getData(TILE_MIME), i);
+            }}
+            onDragEnd={() => setDragFrom(null)}
+            className={`relative aspect-[9/16] w-24 overflow-hidden rounded-lg bg-line ${
+              editing ? "cursor-grab active:cursor-grabbing" : ""
+            } ${dragFrom === i ? "opacity-40" : ""}`}
           >
-            {reference.kind === "video" ? (
-              <VideoTile url={reference.url} />
-            ) : (
-              // Signed R2 links expire, so they bypass the Next.js image optimizer.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={reference.url} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
-            )}
-          </button>
-          {editing && (
             <button
               type="button"
-              onClick={() => remove(reference.id)}
-              title="Delete Reference"
-              aria-label="Delete Reference"
-              className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-xs leading-none text-white hover:bg-red-600"
+              onClick={() => onOpen(i)}
+              className="block h-full w-full"
+              aria-label={`Open Reference ${i + 1} of ${shown.length}`}
             >
-              ×
+              {reference.kind === "video" ? (
+                <VideoTile url={reference.url} />
+              ) : reference.kind === "audio" ? (
+                <AudioTile title={reference.title} />
+              ) : (
+                // Signed R2 links expire, so they bypass the Next.js image optimizer.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={reference.url} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+              )}
             </button>
+            {editing && (
+              <button
+                type="button"
+                onClick={() => remove(reference.id)}
+                title="Delete Reference"
+                aria-label="Delete Reference"
+                className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-xs leading-none text-white hover:bg-red-600"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {editing && reference.kind === "audio" && (
+            <TitleInput title={reference.title} onRename={(title) => rename(reference.id, title)} />
           )}
         </div>
       ))}
     </div>
+  );
+}
+
+function AudioTile({ title }: { title: string }) {
+  return (
+    <span className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-700 to-neutral-950 p-2 text-white">
+      <span aria-hidden className="text-3xl">
+        🎧
+      </span>
+      <span className="line-clamp-4 text-center text-[11px] leading-tight break-words">{title || UNTITLED_AUDIO}</span>
+    </span>
+  );
+}
+
+/** Saves on blur; an emptied title goes back to the last saved one. */
+function TitleInput({ title, onRename }: { title: string; onRename: (title: string) => void }) {
+  const [value, setValue] = useState(title);
+
+  return (
+    <input
+      value={value}
+      maxLength={MAX_REFERENCE_TITLE}
+      aria-label="Audio title"
+      placeholder={UNTITLED_AUDIO}
+      onChange={(event) => setValue(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setValue(title);
+        }
+      }}
+      onBlur={() => {
+        const next = value.trim();
+        if (!next) return setValue(title);
+        setValue(next);
+        if (next !== title) onRename(next);
+      }}
+      className="w-full rounded border border-line bg-transparent px-1 py-0.5 text-[11px]"
+    />
   );
 }
 
@@ -150,11 +214,11 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
     setUploads((all) => all.map((u) => (u.id === id ? { ...u, ...change } : u)));
   }
 
-  async function upload(file: File, id: string) {
+  async function upload(file: File, contentType: string, id: string) {
     try {
-      const { key, uploadUrl } = await createReferenceUpload({ principleId, contentType: file.type, size: file.size });
-      await putFile(uploadUrl, file, (progress) => patch(id, { progress }));
-      await confirmReferenceUpload({ principleId, key, contentType: file.type });
+      const { key, uploadUrl } = await createReferenceUpload({ principleId, contentType, size: file.size });
+      await putFile(uploadUrl, file, contentType, (progress) => patch(id, { progress }));
+      await confirmReferenceUpload({ principleId, key, contentType, title: titleFromFileName(file.name) });
       setUploads((all) => all.filter((u) => u.id !== id));
     } catch (error) {
       patch(id, { error: error instanceof Error ? error.message : "Upload failed" });
@@ -164,9 +228,10 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
   function add(files: FileList | null) {
     for (const file of Array.from(files ?? [])) {
       const id = crypto.randomUUID();
-      const problem = validateReferenceFile({ contentType: file.type, size: file.size });
+      const contentType = referenceContentType(file);
+      const problem = validateReferenceFile({ contentType, size: file.size });
       setUploads((all) => [...all, { id, name: file.name, progress: 0, error: problem && PROBLEM_TEXT[problem] }]);
-      if (!problem) queue.current = queue.current.then(() => upload(file, id));
+      if (!problem) queue.current = queue.current.then(() => upload(file, contentType, id));
     }
   }
 
@@ -189,7 +254,7 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
           over ? "border-accent text-foreground" : "border-line text-muted hover:border-accent"
         }`}
       >
-        <span>Drop images or videos, or click to choose</span>
+        <span>Drop images, videos or audio, or click to choose</span>
         <span className="text-xs">Up to 200 MB each · MP4 (H.264) plays everywhere</span>
         <input
           type="file"
@@ -227,11 +292,11 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
   );
 }
 
-function putFile(url: string, file: File, onProgress: (fraction: number) => void) {
+function putFile(url: string, file: File, contentType: string, onProgress: (fraction: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => event.lengthComputable && onProgress(event.loaded / event.total);
     xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
     xhr.onerror = () => reject(new Error("Upload failed: network error"));

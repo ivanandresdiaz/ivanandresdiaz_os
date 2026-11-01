@@ -43,6 +43,13 @@
       "when": 1793479662349,
       "tag": "0005_principle_references",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793502568572,
+      "tag": "0006_reference_titles",
+      "breakpoints": true
     }
   ]
 }
