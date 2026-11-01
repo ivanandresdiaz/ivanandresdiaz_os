@@ -26,6 +26,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // The installed iPhone app draws under a translucent status bar; screens pad themselves by the safe area.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
     { media: "(prefers-color-scheme: dark)", color: "#1c1917" },

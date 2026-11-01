@@ -88,7 +88,7 @@ function Drawer({
       className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-full max-w-[560px] translate-x-0 border-l border-line bg-surface p-0 text-foreground transition-transform duration-200 ease-out backdrop:bg-black/40 starting:translate-x-full motion-reduce:transition-none"
     >
       <div className="flex h-full flex-col">
-        <header className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <header className="flex items-center gap-3 border-b border-line px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
           <h2 className="min-w-0 flex-1 truncate font-semibold">{principle.title}</h2>
           <div role="group" aria-label="Mode" className="flex rounded-md border border-line p-0.5 text-sm">
             {(["preview", "edit"] as const).map((m) => (

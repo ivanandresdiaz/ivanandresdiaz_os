@@ -34,13 +34,13 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <PwaSetup />
-      <header className="flex items-center gap-4 border-b border-line bg-surface px-4 py-2">
+      <header className="sticky top-0 z-40 flex items-center gap-4 border-b border-line bg-surface px-4 pt-[max(0.25rem,env(safe-area-inset-top))] pb-1">
         <Link href="/os" className="font-semibold tracking-tight">
           Ivan OS
         </Link>
         <nav className="flex flex-1 gap-1 overflow-x-auto text-sm">
           {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="rounded px-2 py-1 text-muted hover:bg-background hover:text-foreground">
+            <Link key={item.href} href={item.href} className="flex min-h-11 shrink-0 items-center rounded px-2 text-muted hover:bg-background hover:text-foreground">
               {item.label}
             </Link>
           ))}
@@ -49,7 +49,7 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
           <ActiveCycle />
         </Suspense>
         <form action={logout}>
-          <button className="text-xs text-muted hover:underline">Sign out</button>
+          <button className="min-h-11 text-xs whitespace-nowrap text-muted hover:underline">Sign out</button>
         </form>
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4">

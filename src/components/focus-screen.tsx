@@ -84,7 +84,7 @@ export function FocusScreen({ cycle, presets }: { cycle: CycleView; presets: Pre
   const C = 2 * Math.PI * R;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 overflow-y-auto bg-stone-950 p-6 text-stone-200">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 overflow-y-auto bg-stone-950 p-6 pt-[max(1.5rem,env(safe-area-inset-top))] text-stone-200">
       <Link href="/os" className="absolute left-5 top-4 text-sm text-stone-500 hover:text-stone-300">
         ← Back to the OS
       </Link>
