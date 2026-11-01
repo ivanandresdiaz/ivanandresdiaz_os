@@ -14,7 +14,8 @@ const short = (weekday: Weekday) => WEEKDAY_NAMES[weekday].slice(0, 3);
 
 /**
  * The weekly template. Drawing on empty space adds Blocks; dragging or
- * resizing a Block changes it from today on. Overlap is allowed, with a Warning.
+ * resizing a Block with the mouse, or editing it in its dialog, changes it from
+ * today on. Overlap is allowed, with a Warning.
  */
 export function StructureEditor({ blocks, types }: { blocks: StructureBlock[]; types: BlockType[] }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
@@ -29,7 +30,8 @@ export function StructureEditor({ blocks, types }: { blocks: StructureBlock[]; t
             startMin: block.startMin,
             endMin: block.endMin,
             layer: "work" as const,
-            editable: true,
+            // A finger only taps (the dialog edits it), so scrolling never moves the template.
+            drag: "mouse",
             crossColumn: true,
             block,
             type,
@@ -53,7 +55,7 @@ export function StructureEditor({ blocks, types }: { blocks: StructureBlock[]; t
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs text-muted">Drag on the calendar to add a Block. Click a Block to change its type.</p>
+      <p className="text-xs text-muted">Drag or tap on empty space to add a Block. Tap a Block to change its hours or type, or remove it.</p>
       {overlaps.length > 0 && (
         <p className="text-sm text-amber-600 dark:text-amber-400">
           ⚠ {overlaps.length} {overlaps.length === 1 ? "overlap" : "overlaps"}:{" "}

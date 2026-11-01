@@ -28,7 +28,11 @@ export type GridItem = {
    * overlapping; focus (real time from Cycles) is a thin bar on the left edge.
    */
   layer: "block" | "work" | "focus";
-  editable: boolean;
+  /**
+   * Who may move and resize it: any pointer, only a mouse or pen ("mouse"; a
+   * finger scrolls past it, so a touch screen never moves it by accident), or nobody.
+   */
+  drag: "any" | "mouse" | "none";
   /** Whether it can be dragged to another column. */
   crossColumn: boolean;
 };
@@ -135,6 +139,8 @@ export function TimeGrid<T extends GridItem>({
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   // Touch keeps scrolling the calendar, so only a tap creates there.
   const tap = useRef<{ column: string; minute: number; x: number; y: number } | null>(null);
+  // A finger on an item it may not drag: a tap still counts as a click.
+  const itemTap = useRef<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     // Wait a frame: the grid may mount before it has its full height.
@@ -165,8 +171,17 @@ export function TimeGrid<T extends GridItem>({
     return (clientY - el.getBoundingClientRect().top) / PX_PER_MIN;
   };
 
+  const canDrag = (item: T, pointerType: string) =>
+    item.drag === "any" || (item.drag === "mouse" && pointerType !== "touch");
+
   const startDrag = (event: React.PointerEvent, item: T, mode: Drag<T>["mode"]) => {
-    if (!item.editable || event.button !== 0) return;
+    if (event.button !== 0) return;
+    if (!canDrag(item, event.pointerType)) {
+      if (mode === "move" && event.pointerType === "touch") {
+        itemTap.current = { id: item.id, x: event.clientX, y: event.clientY };
+      }
+      return;
+    }
     event.stopPropagation();
     event.preventDefault();
     setDrag({
@@ -177,6 +192,13 @@ export function TimeGrid<T extends GridItem>({
       moved: false,
       preview: positionOf(item),
     });
+  };
+
+  const endItemTap = (event: React.PointerEvent, item: T) => {
+    const start = itemTap.current;
+    itemTap.current = null;
+    if (start?.id !== item.id) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < CLICK_TOLERANCE_PX) onItemClick?.(item);
   };
 
   const dragMove = (event: PointerEvent) => {
@@ -332,14 +354,20 @@ export function TimeGrid<T extends GridItem>({
         return (
           <div
             key={item.id}
-            className={`absolute select-none ${item.editable ? "cursor-grab touch-none" : ""} ${
+            className={`absolute select-none ${
+              item.drag === "any" ? "cursor-grab touch-none" : item.drag === "mouse" ? "cursor-grab" : ""
+            } ${
               dragging ? "z-30 cursor-grabbing opacity-90 shadow-lg" : item.layer === "block" ? "z-10" : "z-20"
             }`}
             style={style}
             onPointerDown={(e) => startDrag(e, item, "move")}
+            onPointerUp={(e) => endItemTap(e, item)}
+            onPointerCancel={() => {
+              itemTap.current = null;
+            }}
           >
             {renderItem(item, pos)}
-            {item.editable && (
+            {item.drag !== "none" && (
               <>
                 <div
                   className="absolute inset-x-0 -top-0.5 h-1.5 cursor-ns-resize"

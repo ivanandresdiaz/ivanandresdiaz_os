@@ -200,7 +200,8 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
           <section className="card flex flex-col gap-2">
             <h2 className="font-semibold">This day&apos;s Blocks</h2>
             <p className="text-xs text-muted">
-              Drag a Block on the calendar to change it for this day only. The weekly{" "}
+              To move a Block for this day only, use the{" "}
+              <Link href={`/os/week/${startOfWeek(date)}`} className="underline">Week</Link> on a computer. The weekly{" "}
               <Link href="/os/structure" className="underline">Structure</Link> stays the same.
             </p>
             <ul className="space-y-1 text-sm">

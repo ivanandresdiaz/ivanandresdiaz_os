@@ -51,6 +51,8 @@ export function Calendar({
     return () => clearInterval(timer);
   }, [timeZone]);
 
+  // The Day shows the Blocks as they are; only the Week (with a mouse) changes
+  // one date of them. On a touch screen the Week is read-only: too small to drag.
   const single = days.length === 1;
   const items: Item[] = days.flatMap((day) => [
     ...day.blocks.map(
@@ -60,8 +62,8 @@ export function Calendar({
         startMin: block.startMin,
         endMin: block.endMin,
         layer: "block",
-        // Dragging a Block on the calendar changes that date only (an Exception).
-        editable: true,
+        // Dragging a Block changes that date only (an Exception).
+        drag: single ? "none" : "mouse",
         crossColumn: false,
         block,
         habitDone: day.habitsDone.includes(block.blockTypeId),
@@ -74,7 +76,7 @@ export function Calendar({
         startMin: slot.startMin,
         endMin: slot.endMin,
         layer: "work",
-        editable: true,
+        drag: single ? "any" : "mouse",
         crossColumn: true,
         slot,
       }),
@@ -86,7 +88,7 @@ export function Calendar({
         startMin: focus.startMin,
         endMin: focus.endMin,
         layer: "focus",
-        editable: false,
+        drag: "none",
         crossColumn: false,
         focus,
       }),
