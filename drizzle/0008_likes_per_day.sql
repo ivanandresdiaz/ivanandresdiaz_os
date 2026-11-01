@@ -1,0 +1,2 @@
+ALTER TABLE "reference_likes" ADD COLUMN "count" smallint DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "reference_likes" ADD CONSTRAINT "likes_per_day" CHECK ("reference_likes"."count" between 1 and 5);

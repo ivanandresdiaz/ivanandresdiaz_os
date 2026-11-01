@@ -8,6 +8,17 @@ export const FEED_SIZE = 10;
 /** How many References the "most Likes" pool and the Top list hold. */
 export const TOP_SIZE = 10;
 
+/** How many Likes one Reference can get in a day: 1 if it moved me, up to 5 if I love it. */
+export const MAX_DAILY_LIKES = 5;
+
+/** How long to hold the heart to take back one of today's Likes. */
+export const UNLIKE_HOLD_MS = 500;
+
+/** Today's Likes of a Reference after one more (+1) or one fewer (-1), kept within 0 and the daily max. */
+export function stepLikes(today: number, delta: 1 | -1) {
+  return Math.max(0, Math.min(today + delta, MAX_DAILY_LIKES));
+}
+
 /** How long a tap waits for a second tap before it counts as a pause. */
 export const DOUBLE_TAP_MS = 250;
 

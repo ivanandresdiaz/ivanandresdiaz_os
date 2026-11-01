@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FEED_SIZE, feedSeen, pickFeed, rankByLikes } from "./feed";
+import { FEED_SIZE, feedSeen, MAX_DAILY_LIKES, pickFeed, rankByLikes, stepLikes } from "./feed";
 
 /** A small deterministic generator so the draws are reproducible. */
 function seeded(seed: number) {
@@ -61,6 +61,14 @@ describe("Feed", () => {
     expect(ranked[0]).toBe("b");
     expect(ranked.slice(1, 3).sort()).toEqual(["a", "c"]);
     expect(ranked[3]).toBe("d");
+  });
+
+  it("gives up to 5 Likes a day to a Reference and takes back only down to none", () => {
+    expect(stepLikes(0, 1)).toBe(1);
+    expect(stepLikes(4, 1)).toBe(MAX_DAILY_LIKES);
+    expect(stepLikes(MAX_DAILY_LIKES, 1)).toBe(MAX_DAILY_LIKES);
+    expect(stepLikes(3, -1)).toBe(2);
+    expect(stepLikes(0, -1)).toBe(0);
   });
 
   it("never counts more seen than the Feed still holds", () => {

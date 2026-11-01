@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -76,7 +76,8 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
 // ─── Feed ────────────────────────────────────────────────────────────────────
 
 export type FeedItem = ReferenceView & { principleTitle: string };
-export type FeedLikes = Record<string, { total: number; likedToday: boolean }>;
+/** Per Reference: all its Likes ever, and how many of them (0 to 5) were given today. */
+export type FeedLikes = Record<string, { total: number; today: number }>;
 export type TopReference = FeedItem & { likes: number };
 export type FeedView = {
   date: IsoDate;
@@ -87,9 +88,11 @@ export type FeedView = {
   top: TopReference[];
 };
 
+const likeSum = sql<number>`cast(sum(${s.referenceLikes.count}) as int)`;
+
 async function likeTotals(ids?: string[]) {
   const rows = await db
-    .select({ id: s.referenceLikes.referenceId, total: count() })
+    .select({ id: s.referenceLikes.referenceId, total: likeSum })
     .from(s.referenceLikes)
     .where(ids ? inArray(s.referenceLikes.referenceId, ids) : undefined)
     .groupBy(s.referenceLikes.referenceId);
@@ -127,10 +130,10 @@ async function feedItems(ids: string[]): Promise<FeedItem[]> {
 /** The References with the most Likes, only those liked at least once. */
 async function getTopReferences(): Promise<TopReference[]> {
   const rows = await db
-    .select({ id: s.referenceLikes.referenceId, total: count() })
+    .select({ id: s.referenceLikes.referenceId, total: likeSum })
     .from(s.referenceLikes)
     .groupBy(s.referenceLikes.referenceId)
-    .orderBy(desc(count()))
+    .orderBy(desc(likeSum))
     .limit(TOP_SIZE);
   const items = await feedItems(rows.map((r) => r.id));
   const totals = new Map(rows.map((r) => [r.id, r.total]));
@@ -158,22 +161,22 @@ export async function getTodayFeed(): Promise<FeedView> {
     }
   }
   const ids = feed?.referenceIds ?? [];
-  const [items, totals, likedToday, top] = await Promise.all([
+  const [items, totals, todays, top] = await Promise.all([
     feedItems(ids),
     ids.length ? likeTotals(ids) : new Map<string, number>(),
     ids.length
       ? db
-          .select({ id: s.referenceLikes.referenceId })
+          .select({ id: s.referenceLikes.referenceId, count: s.referenceLikes.count })
           .from(s.referenceLikes)
           .where(and(eq(s.referenceLikes.date, date), inArray(s.referenceLikes.referenceId, ids)))
       : [],
     getTopReferences(),
   ]);
-  const liked = new Set(likedToday.map((l) => l.id));
+  const givenToday = new Map(todays.map((l) => [l.id, l.count]));
   return {
     date,
     items,
-    likes: Object.fromEntries(items.map((i) => [i.id, { total: totals.get(i.id) ?? 0, likedToday: liked.has(i.id) }])),
+    likes: Object.fromEntries(items.map((i) => [i.id, { total: totals.get(i.id) ?? 0, today: givenToday.get(i.id) ?? 0 }])),
     position: Math.min(feed?.position ?? 0, items.length),
     seen: feedSeen(feed?.seen ?? 0, items.length),
     top,

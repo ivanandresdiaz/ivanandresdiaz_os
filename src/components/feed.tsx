@@ -1,14 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
-import { DOUBLE_TAP_MS } from "@/domain/feed";
+import { DOUBLE_TAP_MS, MAX_DAILY_LIKES, stepLikes, UNLIKE_HOLD_MS } from "@/domain/feed";
 import { AUDIO_SKIP_SECONDS, formatClock, IMAGE_STORY_MS, skipTo } from "@/domain/references";
-import { saveFeedPosition, setLike } from "@/server/actions";
+import { likeReference, saveFeedPosition } from "@/server/actions";
 import type { FeedItem, FeedLikes, FeedView, TopReference } from "@/server/queries";
 import { UNTITLED_AUDIO } from "./references";
 import { PrincipleCaption } from "./story-viewer";
 
 const SETTLE_MS = 120;
+const NO_LIKES = { total: 0, today: 0 };
+
+type LikeChange = { id: string; delta: 1 | -1 };
+
+function applyLike(likes: FeedLikes, { id, delta }: LikeChange): FeedLikes {
+  const current = likes[id] ?? NO_LIKES;
+  const today = stepLikes(current.today, delta);
+  return { ...likes, [id]: { total: current.total + today - current.today, today } };
+}
 
 type Mode = "start" | "playing" | "end";
 
@@ -22,17 +31,20 @@ export function Feed({ feed }: { feed: FeedView }) {
   const [mode, setMode] = useState<Mode>(feed.position >= feed.items.length && feed.items.length > 0 ? "end" : "start");
   const [startAt, setStartAt] = useState(feed.position >= feed.items.length ? 0 : feed.position);
   const [seen, setSeen] = useState(feed.seen);
-  const [likes, setLikes] = useOptimistic(feed.likes);
+  // A reducer, so quick taps stack on top of each other until the server answers.
+  const [likes, changeLikes] = useOptimistic(feed.likes, applyLike);
   const [, startTransition] = useTransition();
   const [player, setPlayer] = useState<HTMLVideoElement | null>(null);
 
-  function like(id: string, liked: boolean) {
-    const current = likes[id] ?? { total: 0, likedToday: false };
-    if (current.likedToday === liked) return;
+  /** Gives (+1) or takes back (-1) one of today's Likes; false when there is nothing to change. */
+  function like(id: string, delta: 1 | -1) {
+    const today = (likes[id] ?? NO_LIKES).today;
+    if (stepLikes(today, delta) === today) return false;
     startTransition(async () => {
-      setLikes({ ...likes, [id]: { total: current.total + (liked ? 1 : -1), likedToday: liked } });
-      await setLike({ referenceId: id, liked });
+      changeLikes({ id, delta });
+      await likeReference({ referenceId: id, delta });
     });
+    return true;
   }
 
   /** Runs inside the tap: on iPhone, a media element may play with sound only once a tap has played it. */
@@ -136,7 +148,7 @@ function FeedPlayer({
   player: HTMLVideoElement;
   startAt: number;
   likes: FeedLikes;
-  onLike: (id: string, liked: boolean) => void;
+  onLike: (id: string, delta: 1 | -1) => boolean;
   onReach: (index: number) => void;
   onClose: (index: number) => void;
 }) {
@@ -269,13 +281,31 @@ function FeedPlayer({
     }, SETTLE_MS);
   }
 
-  /** One tap pauses; a second tap within a moment is a double tap and gives the Like instead. */
+  /** One more Like, with the burst only when it counted (none past the daily max). */
+  function likeOnce(item: FeedItem) {
+    if (onLike(item.id, 1)) setBurst((b) => b + 1);
+  }
+
+  // Holding the heart takes back one of today's Likes; the click that ends the hold then gives none.
+  const hold = useRef({ timer: 0, fired: false });
+  function startHold(item: FeedItem) {
+    window.clearTimeout(hold.current.timer);
+    hold.current.fired = false;
+    hold.current.timer = window.setTimeout(() => {
+      hold.current.fired = true;
+      onLike(item.id, -1);
+    }, UNLIKE_HOLD_MS);
+  }
+  function endHold() {
+    window.clearTimeout(hold.current.timer);
+  }
+
+  /** One tap pauses; a second tap within a moment is a double tap and gives a Like instead. */
   function onTap(item: FeedItem) {
     if (tap.current) {
       window.clearTimeout(tap.current);
       tap.current = 0;
-      onLike(item.id, true);
-      setBurst((b) => b + 1);
+      likeOnce(item);
       return;
     }
     tap.current = window.setTimeout(() => {
@@ -293,7 +323,7 @@ function FeedPlayer({
       >
         {items.map((item, i) => {
           const isActive = i === active;
-          const like = likes[item.id] ?? { total: 0, likedToday: false };
+          const like = likes[item.id] ?? NO_LIKES;
           const listening = item.kind === "audio" && !(isActive && failed);
           return (
             <section
@@ -364,22 +394,35 @@ function FeedPlayer({
 
               <button
                 type="button"
+                onPointerDown={() => startHold(item)}
+                onPointerUp={endHold}
+                onPointerLeave={endHold}
+                onPointerCancel={endHold}
+                onContextMenu={(event) => event.preventDefault()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onLike(item.id, !like.likedToday);
+                  if (hold.current.fired) hold.current.fired = false;
+                  else likeOnce(item);
                 }}
-                aria-pressed={like.likedToday}
-                aria-label={like.likedToday ? "Remove today’s Like" : "Like"}
-                className={`absolute right-2 flex min-w-11 flex-col items-center gap-0.5 text-xs drop-shadow ${
+                aria-label={`Like (${like.today} of ${MAX_DAILY_LIKES} today). Hold to take one back.`}
+                className={`absolute right-2 flex min-w-11 flex-col items-center gap-0.5 text-xs drop-shadow [-webkit-touch-callout:none] ${
                   listening
                     ? "bottom-[max(11rem,calc(env(safe-area-inset-bottom)+10rem))]"
                     : "bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))]"
                 }`}
               >
-                <span className={`text-3xl leading-none ${like.likedToday ? "text-red-500" : "text-white"}`}>
-                  {like.likedToday ? "♥" : "♡"}
+                <span className={`text-3xl leading-none ${like.today > 0 ? "text-red-500" : "text-white"}`}>
+                  {like.today > 0 ? "♥" : "♡"}
                 </span>
                 <span className="tabular-nums">{like.total}</span>
+                <span aria-hidden className="flex gap-0.5">
+                  {Array.from({ length: MAX_DAILY_LIKES }, (_, n) => (
+                    <span
+                      key={n}
+                      className={`size-1.5 rounded-full ${n < like.today ? "bg-red-500" : "border border-white/70"}`}
+                    />
+                  ))}
+                </span>
               </button>
 
               {listening ? (

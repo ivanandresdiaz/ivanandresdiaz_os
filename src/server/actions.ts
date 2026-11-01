@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, max, sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { db } from "@/db";
 import * as s from "@/db/schema";
 import { closeAt } from "@/domain/cycles";
 import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
+import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
@@ -49,22 +50,34 @@ async function done() {
 
 // ─── Feed ────────────────────────────────────────────────────────────────────
 
-/** Gives today's Like (`liked: true`) or takes it back; Likes from earlier days never change. */
-export async function setLike(input: { referenceId: string; liked: boolean }) {
+/** One more Like (+1, up to 5 a day) or one fewer (-1, only from today's) for a Reference. */
+export async function likeReference(input: { referenceId: string; delta: 1 | -1 }) {
   await requireIvan();
-  const { referenceId, liked } = z.object({ referenceId: z.uuid(), liked: z.boolean() }).parse(input);
+  const { referenceId, delta } = z
+    .object({ referenceId: z.uuid(), delta: z.union([z.literal(1), z.literal(-1)]) })
+    .parse(input);
   const date = today();
-  if (liked) {
+  const todays = and(eq(s.referenceLikes.referenceId, referenceId), eq(s.referenceLikes.date, date));
+  if (delta === 1) {
     const [reference] = await db
       .select({ id: s.principleReferences.id })
       .from(s.principleReferences)
       .where(eq(s.principleReferences.id, referenceId));
     if (!reference) return;
-    await db.insert(s.referenceLikes).values({ referenceId, date }).onConflictDoNothing();
-  } else {
     await db
-      .delete(s.referenceLikes)
-      .where(and(eq(s.referenceLikes.referenceId, referenceId), eq(s.referenceLikes.date, date)));
+      .insert(s.referenceLikes)
+      .values({ referenceId, date })
+      .onConflictDoUpdate({
+        target: [s.referenceLikes.referenceId, s.referenceLikes.date],
+        set: { count: sql`least(${s.referenceLikes.count} + 1, ${MAX_DAILY_LIKES})` },
+      });
+  } else {
+    const left = await db
+      .update(s.referenceLikes)
+      .set({ count: sql`${s.referenceLikes.count} - 1` })
+      .where(and(todays, gt(s.referenceLikes.count, 1)))
+      .returning({ id: s.referenceLikes.id });
+    if (left.length === 0) await db.delete(s.referenceLikes).where(todays);
   }
   await done();
 }

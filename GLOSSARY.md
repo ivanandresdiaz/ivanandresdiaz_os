@@ -19,7 +19,7 @@ _Evitar_: Story, Reel, Media, Podcast.
 
 **Feed**: la ronda diaria de hasta 10 References de cualquier Principle, que paso a mi ritmo. Las 9 primeras salen al azar y la última sale de las 10 con más Likes, sin repetir ninguna en el día. Se elige una vez al día y no cambia; al terminarla no hay más, aunque puedo volver a ver las de hoy. Es opcional: no da ni quita XP, no tiene Streak y no es Task ni Habit.
 
-**Like** (Me gusta): la marca que le doy a una Reference en el Feed porque me movió. Una por Reference y por día, así que una Reference puede juntar 365 en un año; el total muestra cuáles influyen más en mí. Solo se puede quitar el mismo día.
+**Like** (Me gusta): la marca que le doy a una Reference en el Feed porque me movió. Le doy de 1 a 5 por día según cuánto me movió, así que una Reference puede juntar hasta 1.825 en un año; el total muestra cuáles influyen más en mí. Solo se pueden quitar los del mismo día.
 
 **Input**: lo que hago en el presente (un hábito cumplido, un bloque de trabajo). Se juega por inputs; solo los inputs suman puntos y rachas.
 **Output**: el resultado que llega después (ingresos, kilos, features en producción). No se persigue directamente, porque trae ansiedad y saca del presente. Puede ser el objetivo declarado, pero nunca da puntos.
