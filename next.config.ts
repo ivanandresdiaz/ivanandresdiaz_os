@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
+  // Whether each Long text tool has its key, baked into the bundle as a flag
+  // (never the key itself) so its button can be disabled without a provider.
+  env: {
+    AI_DICTATION: process.env.OPENAI_API_KEY ? "on" : "",
+    AI_COACH: process.env.ANTHROPIC_API_KEY ? "on" : "",
+  },
   partialPrefetching: true,
   async headers() {
     return [

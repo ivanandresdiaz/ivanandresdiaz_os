@@ -8,13 +8,22 @@ import { db } from "@/db";
 import * as s from "@/db/schema";
 import { closeAt } from "@/domain/cycles";
 import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
+import {
+  type CoachReview,
+  dictationExtension,
+  dictationKey,
+  isDictationKey,
+  MAX_COACH_CHARS,
+  MAX_DICTATION_BYTES,
+} from "@/domain/english";
 import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import { planStructureEdit, planStructureRemoval, type StructureBlock } from "@/domain/structure";
-import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
+import { aiAvailability, CoachError, reviewEnglish, transcribe } from "@/lib/ai";
+import { deleteObject, getObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
 
@@ -46,6 +55,70 @@ function timeRange<T extends { startMin: number; endMin: number }>(value: T): T 
 
 async function done() {
   refresh();
+}
+
+// ─── Long text: Dictation and English Coach ──────────────────────────────────
+// They answer { ok: false, error } instead of throwing, because production
+// hides the message of a thrown error and these failures are worth reading.
+
+type Outcome<T> = ({ ok: true } & T) | { ok: false; error: string };
+
+/** Signs a one-off upload for a recording; the browser sends it straight to R2. */
+export async function createDictationUpload(input: {
+  contentType: string;
+  size: number;
+}): Promise<Outcome<{ key: string; uploadUrl: string }>> {
+  await requireIvan();
+  if (!aiAvailability().dictation) return { ok: false, error: "Set OPENAI_API_KEY to dictate." };
+  const v = z.object({ contentType: z.string(), size: z.number().int().positive() }).parse(input);
+  const extension = dictationExtension(v.contentType);
+  if (!extension) return { ok: false, error: `This browser records ${v.contentType}, which cannot be transcribed.` };
+  if (v.size > MAX_DICTATION_BYTES) return { ok: false, error: "The recording is too large to transcribe." };
+  const key = dictationKey(crypto.randomUUID(), extension);
+  return { ok: true, key, uploadUrl: await presignUpload(key) };
+}
+
+/**
+ * Transcribes an uploaded recording and deletes it. When transcription fails the
+ * recording stays, so it can be retried; R2 clears what is left after a day.
+ */
+export async function transcribeDictation(input: { key: string; contentType: string }): Promise<Outcome<{ text: string }>> {
+  await requireIvan();
+  const { key, contentType } = z.object({ key: z.string(), contentType: z.string() }).parse(input);
+  if (!isDictationKey(key)) throw new Error("Not a Dictation recording");
+  const audio = await getObject(key);
+  if (!audio) return { ok: false, error: "The recording is gone. Dictate again." };
+  try {
+    const text = await transcribe(audio, key.slice(key.lastIndexOf("/") + 1), contentType.split(";")[0]);
+    await deleteObject(key);
+    return { ok: true, text };
+  } catch (error) {
+    console.error("Dictation failed", error);
+    return { ok: false, error: "Transcription failed." };
+  }
+}
+
+export async function discardDictation(input: { key: string }) {
+  await requireIvan();
+  const { key } = z.object({ key: z.string() }).parse(input);
+  if (!isDictationKey(key)) throw new Error("Not a Dictation recording");
+  await deleteObject(key);
+}
+
+/** The English Coach's review of a Long text. Nothing is saved. */
+export async function coachEnglish(input: { text: string; markdown: boolean }): Promise<Outcome<{ review: CoachReview }>> {
+  await requireIvan();
+  if (!aiAvailability().coach) return { ok: false, error: "Set ANTHROPIC_API_KEY to use the Coach." };
+  const { text, markdown } = z.object({ text: z.string(), markdown: z.boolean() }).parse(input);
+  if (!text.trim()) return { ok: false, error: "Write something first." };
+  if (text.length > MAX_COACH_CHARS) return { ok: false, error: "The text is too long for one review." };
+  try {
+    return { ok: true, review: await reviewEnglish(text, markdown) };
+  } catch (error) {
+    if (error instanceof CoachError) return { ok: false, error: error.message };
+    console.error("English Coach failed", error);
+    return { ok: false, error: "The Coach could not answer. Try again." };
+  }
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────

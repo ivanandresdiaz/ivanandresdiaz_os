@@ -65,3 +65,12 @@ export async function deleteObject(key: string) {
   const res = await client.fetch(objectUrl(base, key), { method: "DELETE" });
   if (!res.ok && res.status !== 404) throw new Error(`R2 DELETE failed: ${res.status}`);
 }
+
+/** The bytes of a stored object, or null when it does not exist. */
+export async function getObject(key: string): Promise<ArrayBuffer | null> {
+  const { client, base } = config();
+  const res = await client.fetch(objectUrl(base, key));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`R2 GET failed: ${res.status}`);
+  return res.arrayBuffer();
+}
