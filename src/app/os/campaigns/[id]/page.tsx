@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LongText } from "@/components/long-text";
 import { GamesPicker, Hidden } from "@/components/ui";
 import { addDays, startOfWeek } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
@@ -81,11 +82,11 @@ export default async function CampaignPage({ params }: PageProps<"/os/campaigns/
           <Hidden id={campaign.id} />
           <input name="title" defaultValue={campaign.title} required className="input text-lg font-semibold" />
           <label className="label" htmlFor="goal">Goal</label>
-          <textarea id="goal" name="goal" rows={2} defaultValue={campaign.goal} className="input" />
+          <LongText id="goal" name="goal" rows={2} defaultValue={campaign.goal} />
           <label className="label" htmlFor="why">Why</label>
-          <textarea id="why" name="why" rows={2} defaultValue={campaign.why} className="input" />
+          <LongText id="why" name="why" rows={2} defaultValue={campaign.why} />
           <label className="label" htmlFor="antiGoal">Anti-goal / constraints</label>
-          <textarea id="antiGoal" name="antiGoal" rows={2} defaultValue={campaign.antiGoal} className="input" />
+          <LongText id="antiGoal" name="antiGoal" rows={2} defaultValue={campaign.antiGoal} />
           <div className="flex flex-wrap gap-2">
             <select name="seasonGoalId" className="input w-auto" defaultValue={campaign.seasonGoalId ?? ""}>
               <option value="">No Season Goal</option>

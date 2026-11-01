@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePrinciple } from "@/server/actions";
 import type { PrincipleView } from "@/server/queries";
+import { LongText } from "./long-text";
 import { Markdown } from "./markdown";
 import { ReferenceStrip, ReferenceUploader } from "./references";
 import { StoryViewer } from "./story-viewer";
@@ -154,13 +155,14 @@ function Drawer({
                   <span className="label">Expansion</span>
                   <span className="text-xs text-muted">Markdown</span>
                 </div>
-                <textarea
+                <LongText
                   value={body}
-                  onChange={(event) => setBody(event.target.value)}
+                  onValueChange={setBody}
                   autoFocus
+                  markdown
                   aria-label="Expansion"
                   placeholder="Explain it, give examples, link the videos that carry it."
-                  className="input min-h-64 font-mono leading-relaxed field-sizing-content"
+                  className="input min-h-64 font-mono leading-relaxed"
                 />
               </div>
               <div className="flex items-center gap-3">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LongText } from "@/components/long-text";
 import { GamesPicker, GameTags, Hidden, PageTitle } from "@/components/ui";
 import { quarterLabel, quarterOf, quarterRange, type QuarterNumber, type QuarterRef } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
@@ -64,12 +65,11 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
             <form action={updateSeason} className="flex flex-col gap-2">
               <Hidden id={season.id} />
               <input name="title" defaultValue={season.title} required className="input text-lg font-semibold" />
-              <textarea
+              <LongText
                 name="body"
                 rows={4}
                 defaultValue={season.body}
                 placeholder="My reality right now: career, emotional state, questions about myself…"
-                className="input"
               />
               <button className="btn self-start">Save Season</button>
             </form>
@@ -139,12 +139,11 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
         <form action={saveQuarter} className="flex flex-col gap-2">
           <Hidden year={String(ref.year)} quarter={String(ref.quarter)} />
           <input name="title" defaultValue={quarter?.title ?? ""} placeholder="Title of the Quarter" className="input" />
-          <textarea
+          <LongText
             name="body"
             rows={3}
             defaultValue={quarter?.body ?? ""}
             placeholder="What these 3 months are about…"
-            className="input"
           />
           <button className="btn self-start">{quarter ? "Save Quarter" : "Create Quarter"}</button>
         </form>
@@ -247,9 +246,9 @@ function CampaignForm({
     <form action={createCampaign} className="mt-2 flex flex-col gap-2">
       <Hidden quarterId={quarterId} />
       <input name="title" required placeholder="Campaign title (e.g. Build Ivan OS)" className="input" />
-      <textarea name="goal" rows={2} placeholder="Goal — what" className="input" />
-      <textarea name="why" rows={2} placeholder="Why" className="input" />
-      <textarea name="antiGoal" rows={2} placeholder="Anti-goal — what I avoid, constraints" className="input" />
+      <LongText name="goal" rows={2} placeholder="Goal — what" />
+      <LongText name="why" rows={2} placeholder="Why" />
+      <LongText name="antiGoal" rows={2} placeholder="Anti-goal — what I avoid, constraints" />
       <div className="flex flex-wrap gap-2">
         <select name="seasonGoalId" className="input w-auto" defaultValue={goals[0]?.id ?? ""}>
           <option value="">No Season Goal</option>

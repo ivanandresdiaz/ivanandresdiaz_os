@@ -1,3 +1,4 @@
+import { LongText } from "@/components/long-text";
 import { PrinciplesList } from "@/components/principles-list";
 import { PageTitle } from "@/components/ui";
 import { requireIvan } from "@/lib/session";
@@ -17,12 +18,7 @@ export default async function PrinciplesPage() {
       <PrinciplesList principles={principles} />
       <form action={createPrinciple} className="card flex flex-col gap-2">
         <input name="title" required placeholder="New Principle" className="input" />
-        <textarea
-          name="body"
-          rows={2}
-          placeholder="Expansion (optional, Markdown)"
-          className="input font-mono field-sizing-content"
-        />
+        <LongText name="body" rows={2} markdown placeholder="Expansion (optional, Markdown)" className="input font-mono" />
         <button className="btn-primary self-start">Add</button>
       </form>
     </div>
