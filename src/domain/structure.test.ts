@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isDayEditable,
   overlapsOn,
+  planDayBlockChange,
   planStructureEdit,
   planStructureRemoval,
   resolveDayBlocks,
@@ -137,5 +139,55 @@ describe("overlapping Blocks raise a Warning", () => {
     const range = { startMin: 7 * 60, endMin: 9 * 60 };
     expect(overlapsOn([deepWork, reading, tuesday], 1, range).map((b) => b.id)).toEqual(["b1", "b2"]);
     expect(overlapsOn([deepWork, reading, tuesday], 3, range)).toEqual([]);
+  });
+});
+
+describe("changing one date's Blocks (Exceptions)", () => {
+  const [fromStructure] = resolveDayBlocks([deepWork], [], monday);
+  const added = {
+    date: monday,
+    startMin: 18 * 60,
+    endMin: 20 * 60,
+    blockTypeId: "side-hustle",
+    structureBlockId: null,
+    exceptionId: "x1",
+  };
+
+  it("edits only today and later dates", () => {
+    expect(isDayEditable("2026-11-02", "2026-11-02")).toBe(true);
+    expect(isDayEditable("2026-11-03", "2026-11-02")).toBe(true);
+    expect(isDayEditable("2026-11-01", "2026-11-02")).toBe(false);
+  });
+
+  it("reassigns a Structure Block through its Exception, keeping its hours", () => {
+    expect(planDayBlockChange(fromStructure, { blockTypeId: "side-hustle" })).toEqual({
+      kind: "upsert",
+      values: {
+        date: monday,
+        structureBlockId: "b1",
+        removed: false,
+        startMin: 480,
+        endMin: 720,
+        blockTypeId: "side-hustle",
+      },
+    });
+  });
+
+  it("removes a Structure Block for that date only", () => {
+    const plan = planDayBlockChange(fromStructure, "remove");
+    expect(plan).toMatchObject({ kind: "upsert", values: { structureBlockId: "b1", removed: true } });
+    if (plan.kind !== "upsert") throw new Error("expected an upsert");
+    const exception = { id: "x9", ...plan.values };
+    expect(resolveDayBlocks([deepWork], [exception], monday)).toEqual([]);
+    expect(resolveDayBlocks([deepWork], [exception], "2026-11-09")).toHaveLength(1);
+  });
+
+  it("edits or deletes a Block added for that date directly", () => {
+    expect(planDayBlockChange(added, { blockTypeId: "reading" })).toEqual({
+      kind: "update",
+      id: "x1",
+      values: { startMin: 1080, endMin: 1200, blockTypeId: "reading" },
+    });
+    expect(planDayBlockChange(added, "remove")).toEqual({ kind: "delete", id: "x1" });
   });
 });

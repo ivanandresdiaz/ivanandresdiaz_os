@@ -134,6 +134,53 @@ export function resolveDayBlocks(
   return result.sort((a, b) => a.startMin - b.startMin);
 }
 
+/**
+ * Exceptions are the real plan of a day, so only today and later dates take
+ * them: the plan of a day already lived is not rewritten.
+ */
+export function isDayEditable(date: IsoDate, today: IsoDate): boolean {
+  return date >= today;
+}
+
+/** A Block of one date, as the calendar shows it. */
+export type DayBlockRef = Pick<
+  DayBlock,
+  "date" | "startMin" | "endMin" | "blockTypeId" | "structureBlockId" | "exceptionId"
+>;
+
+export type DayBlockChange =
+  | Partial<Pick<DayBlock, "startMin" | "endMin" | "blockTypeId">>
+  | "remove";
+
+/**
+ * How to persist a change to one Block on one date. A Block of the Structure
+ * gets (or updates) its Exception for that date; a Block added for that date
+ * is its own Exception, so it is edited or deleted directly.
+ */
+export type DayBlockPlan =
+  | { kind: "upsert"; values: Omit<StructureException, "id"> & { structureBlockId: string } }
+  | { kind: "update"; id: string; values: Pick<DayBlock, "startMin" | "endMin" | "blockTypeId"> }
+  | { kind: "delete"; id: string };
+
+export function planDayBlockChange(block: DayBlockRef, change: DayBlockChange): DayBlockPlan {
+  const values = {
+    startMin: block.startMin,
+    endMin: block.endMin,
+    blockTypeId: block.blockTypeId,
+    ...(change === "remove" ? {} : change),
+  };
+  if (block.structureBlockId !== null) {
+    return {
+      kind: "upsert",
+      values: { date: block.date, structureBlockId: block.structureBlockId, removed: change === "remove", ...values },
+    };
+  }
+  if (block.exceptionId === null) throw new Error("A day Block comes from the Structure or an Exception");
+  return change === "remove"
+    ? { kind: "delete", id: block.exceptionId }
+    : { kind: "update", id: block.exceptionId, values };
+}
+
 export type BlockChange = Partial<
   Pick<StructureBlock, "weekday" | "startMin" | "endMin" | "blockTypeId">
 >;
