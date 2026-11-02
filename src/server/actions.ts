@@ -20,6 +20,7 @@ import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
+import { dayAfterScheduling } from "@/domain/secondary-tasks";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import {
   type DayBlockChange,
@@ -815,14 +816,17 @@ export async function scheduleWork(input: {
     .extend({ date: isoDate, startMin: minute, endMin: minute })
     .parse(input);
   timeRange(v);
-  await db.insert(s.slots).values({
-    date: v.date,
-    startMin: v.startMin,
-    endMin: v.endMin,
-    workKind: v.kind,
-    taskId: v.kind === "task" ? v.id : null,
-    moveId: v.kind === "move" ? v.id : null,
-    secondaryTaskId: v.kind === "secondary" ? v.id : null,
+  await db.transaction(async (tx) => {
+    await tx.insert(s.slots).values({
+      date: v.date,
+      startMin: v.startMin,
+      endMin: v.endMin,
+      workKind: v.kind,
+      taskId: v.kind === "task" ? v.id : null,
+      moveId: v.kind === "move" ? v.id : null,
+      secondaryTaskId: v.kind === "secondary" ? v.id : null,
+    });
+    if (v.kind === "secondary") await followSlot(tx, v.id, v.date);
   });
   await done();
 }
@@ -838,8 +842,30 @@ export async function updateSlot(input: {
     .object({ id: z.uuid(), date: isoDate, startMin: minute, endMin: minute })
     .parse(input);
   timeRange(values);
-  await db.update(s.slots).set(values).where(eq(s.slots.id, id));
+  await db.transaction(async (tx) => {
+    const [slot] = await tx
+      .update(s.slots)
+      .set(values)
+      .where(eq(s.slots.id, id))
+      .returning({ secondaryTaskId: s.slots.secondaryTaskId });
+    if (slot?.secondaryTaskId) await followSlot(tx, slot.secondaryTaskId, values.date);
+  });
   await done();
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** A pending Secondary Task moves to the day of its Slot when that postpones it or brings it forward. */
+async function followSlot(tx: Tx, secondaryTaskId: string, slotDate: string) {
+  const [task] = await tx
+    .select({ day: s.secondaryTasks.day, doneAt: s.secondaryTasks.doneAt })
+    .from(s.secondaryTasks)
+    .where(eq(s.secondaryTasks.id, secondaryTaskId));
+  if (!task || task.doneAt !== null) return;
+  const day = dayAfterScheduling(task.day, slotDate, today());
+  if (day !== task.day) {
+    await tx.update(s.secondaryTasks).set({ day }).where(eq(s.secondaryTasks.id, secondaryTaskId));
+  }
 }
 
 export async function deleteSlot(input: { id: string }) {
@@ -859,7 +885,7 @@ export async function addSecondaryTask(fd: FormData) {
   await requireIvan();
   const { date, title } = z.object({ date: isoDate, title: required }).parse(fields(fd));
   await ensureDailyNote(date);
-  await db.insert(s.secondaryTasks).values({ title, createdOn: date });
+  await db.insert(s.secondaryTasks).values({ title, day: date });
   await done();
 }
 

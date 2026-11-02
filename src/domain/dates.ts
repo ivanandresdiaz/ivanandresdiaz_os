@@ -55,6 +55,55 @@ export function weekDates(date: IsoDate): IsoDate[] {
   return WEEKDAYS.map((_, i) => addDays(monday, i));
 }
 
+/** A calendar month, e.g. "2026-11". Only a way to look at days, never a level of the plan. */
+export type IsoMonth = string;
+
+const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+export function isIsoMonth(value: string): value is IsoMonth {
+  return ISO_MONTH.test(value);
+}
+
+export function monthOf(date: IsoDate): IsoMonth {
+  return date.slice(0, 7);
+}
+
+export function addMonths(month: IsoMonth, months: number): IsoMonth {
+  const [y, m] = month.split("-").map(Number);
+  return monthOf(toIso(new Date(Date.UTC(y, m - 1 + months, 1))));
+}
+
+/** "November 2026". */
+export function monthLabel(month: IsoMonth): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+/** The weeks, Monday to Sunday, that cover the month, with the edge days of the months around it. */
+export function monthGrid(month: IsoMonth): IsoDate[][] {
+  const last = addDays(`${addMonths(month, 1)}-01`, -1);
+  const weeks: IsoDate[][] = [];
+  for (let monday = startOfWeek(`${month}-01`); monday <= last; monday = addDays(monday, 7)) {
+    weeks.push(weekDates(monday));
+  }
+  return weeks;
+}
+
 /** Today's civil date in the given IANA timezone. */
 export function todayIn(timeZone: string, now: Date = new Date()): IsoDate {
   return new Intl.DateTimeFormat("en-CA", {

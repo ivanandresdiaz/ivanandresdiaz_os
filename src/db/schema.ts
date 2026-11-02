@@ -215,7 +215,8 @@ export const structureExceptions = pgTable(
 export const secondaryTasks = pgTable("secondary_tasks", {
   id: id(),
   title: text("title").notNull(),
-  createdOn: isoDate("created_on").notNull(),
+  /** Its day: it shows up in the Check-in from then on. The column keeps its first name. */
+  day: isoDate("created_on").notNull(),
   doneAt: timestamp("done_at", { withTimezone: true }),
   createdAt: createdAt(),
 });

@@ -16,7 +16,7 @@ import {
 import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
-import { secondaryTasksForDate } from "@/domain/secondary-tasks";
+import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/domain/secondary-tasks";
 import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
 
@@ -505,6 +505,63 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
   }));
 }
 
+/** What a day shows in the Month: only what is scheduled on it. */
+export type MonthItem = {
+  key: string;
+  title: string;
+  done: boolean;
+  color: string;
+  /** Null for a Secondary Task of that day without a Slot on it. */
+  startMin: number | null;
+};
+
+export type MonthDay = { date: IsoDate; items: MonthItem[] };
+
+/**
+ * The Slots of each date, plus the Secondary Tasks that sit on it without a
+ * Slot there. No Blocks, Exceptions, Habits, Highlights or Cycles: seen a month
+ * at a time, the Structure is noise.
+ */
+export async function getMonth(dates: IsoDate[]): Promise<MonthDay[]> {
+  const start = dates[0];
+  const end = dates[dates.length - 1];
+  const [slotRows, index, secondaryRows] = await Promise.all([
+    db
+      .select()
+      .from(s.slots)
+      .where(and(gte(s.slots.date, start), lte(s.slots.date, end)))
+      .orderBy(asc(s.slots.startMin)),
+    getWorkIndex(),
+    db.select().from(s.secondaryTasks).orderBy(asc(s.secondaryTasks.createdAt)),
+  ]);
+  const secondary = secondaryRows.map(toSecondaryTask);
+
+  return dates.map((date) => {
+    const slots = slotRows.filter((slot) => slot.date === date);
+    const unscheduled = secondary.filter(
+      (task) => secondaryTaskDate(task) === date && !slots.some((slot) => slot.secondaryTaskId === task.id),
+    );
+    return {
+      date,
+      items: [
+        ...unscheduled.map((task) => ({
+          key: `secondary:${task.id}`,
+          title: task.title,
+          done: task.doneOn !== null,
+          color: LOOSE_COLOR,
+          startMin: null,
+        })),
+        ...slots.flatMap((slot) => {
+          const work = index.get(workKey(slot.workKind, slotWorkId(slot)));
+          return work
+            ? [{ key: slot.id, title: work.title, done: work.done, color: work.color, startMin: slot.startMin }]
+            : [];
+        }),
+      ],
+    };
+  });
+}
+
 /** Cycles that may touch [start, end] in Ivan's timezone (a day of margin each side). */
 async function cyclesAround(start: IsoDate, end: IsoDate) {
   return db
@@ -583,6 +640,15 @@ export async function getStack(date: IsoDate) {
   };
 }
 
+function toSecondaryTask(row: typeof s.secondaryTasks.$inferSelect): SecondaryTask {
+  return {
+    id: row.id,
+    title: row.title,
+    day: row.day,
+    doneOn: row.doneAt ? localMoment(row.doneAt, APP_TIMEZONE).date : null,
+  };
+}
+
 export async function getDailyNote(date: IsoDate) {
   const [[note], highlights, secondary, noiseItems] = await Promise.all([
     db.select().from(s.dailyNotes).where(eq(s.dailyNotes.date, date)),
@@ -603,15 +669,7 @@ export async function getDailyNote(date: IsoDate) {
     noiseItems,
     checkInDoneAt: note?.checkInDoneAt ?? null,
     highlights,
-    secondaryTasks: secondaryTasksForDate(
-      secondary.map((task) => ({
-        id: task.id,
-        title: task.title,
-        createdOn: task.createdOn,
-        doneOn: task.doneAt ? localMoment(task.doneAt, APP_TIMEZONE).date : null,
-      })),
-      date,
-    ),
+    secondaryTasks: secondaryTasksForDate(secondary.map(toSecondaryTask), date),
     dayWon: isDayWon(highlights),
   };
 }

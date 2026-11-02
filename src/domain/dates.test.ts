@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  addMonths,
   formatDuration,
   formatMinutes,
   isIsoDate,
+  isIsoMonth,
   localMoment,
+  monthGrid,
+  monthLabel,
+  monthOf,
   parseMinutes,
   quarterOf,
   quarterRange,
@@ -83,5 +88,36 @@ describe("local moments", () => {
     });
     expect(formatDuration(65)).toBe("1h 05m");
     expect(formatDuration(45)).toBe("45m");
+  });
+});
+
+describe("months", () => {
+  it("validates and names months", () => {
+    expect(isIsoMonth("2026-11")).toBe(true);
+    expect(isIsoMonth("2026-13")).toBe(false);
+    expect(isIsoMonth("2026-1")).toBe(false);
+    expect(isIsoMonth("2026-11-02")).toBe(false);
+    expect(monthOf("2026-11-02")).toBe("2026-11");
+    expect(monthLabel("2026-11")).toBe("November 2026");
+  });
+
+  it("moves across years", () => {
+    expect(addMonths("2026-11", 1)).toBe("2026-12");
+    expect(addMonths("2026-12", 1)).toBe("2027-01");
+    expect(addMonths("2026-01", -1)).toBe("2025-12");
+    expect(addMonths("2026-11", 3)).toBe("2027-02");
+  });
+
+  it("covers the month with whole weeks from Monday to Sunday", () => {
+    const november = monthGrid("2026-11");
+    expect(november).toHaveLength(6);
+    expect(november[0][0]).toBe("2026-10-26");
+    expect(november[0][6]).toBe("2026-11-01");
+    expect(november.at(-1)?.[6]).toBe("2026-12-06");
+    // February 2027 starts on a Monday and ends on a Sunday: exactly 4 weeks.
+    const february = monthGrid("2027-02");
+    expect(february).toHaveLength(4);
+    expect(february[0][0]).toBe("2027-02-01");
+    expect(february[3][6]).toBe("2027-02-28");
   });
 });
