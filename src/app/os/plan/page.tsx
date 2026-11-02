@@ -418,7 +418,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
               {moves.length === 0 && (
                 <p className="text-sm text-muted">No Moves yet. A Move is a step that fits in a week.</p>
               )}
-              <MovePriority moves={moveCards} selectedId={move?.id} />
+              <MovePriority moves={moveCards} selectedId={move?.id} next={href({ ...here, move: undefined })} />
               <form action={createMove} className="flex flex-wrap gap-2">
                 <Hidden campaignId={campaign.id} />
                 <input name="title" required placeholder="New Move (e.g. SSO login)" className="input min-w-40 flex-1" />
@@ -451,7 +451,14 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
           }
         >
           {move ? (
-            <MovePanel move={move} thisWeek={thisWeek} nextWeek={nextWeek} weekLabel={weekLabel(move.weekOf)} />
+            // Keyed: its forms start over with each Move instead of keeping the last one's text.
+            <MovePanel
+              key={move.id}
+              move={move}
+              thisWeek={thisWeek}
+              nextWeek={nextWeek}
+              weekLabel={weekLabel(move.weekOf)}
+            />
           ) : (
             <p className="text-sm text-muted">
               {campaign

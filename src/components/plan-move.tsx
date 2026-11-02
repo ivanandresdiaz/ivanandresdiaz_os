@@ -16,7 +16,10 @@ type Step = { id: string; title: string; done: boolean };
 type Task = { id: string; title: string; durationMin: number; doneAt: Date | null; steps: Step[] };
 export type MoveDetail = { id: string; title: string; weekOf: string | null; doneAt: Date | null; tasks: Task[] };
 
-/** A Move in its column: its week, and its Tasks with their Steps. */
+/**
+ * A Move in its column: its title to read, its week, and its Tasks with their Steps.
+ * It is ticked done in the Campaign's list, not here.
+ */
 export function MovePanel({
   move,
   thisWeek,
@@ -30,24 +33,31 @@ export function MovePanel({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <form action={toggleWorkDoneForm}>
-          <Hidden kind="move" id={move.id} />
-          <button className="text-lg leading-none" title={move.doneAt ? "Mark not done" : "Mark done"}>
-            {move.doneAt ? "☑" : "☐"}
-          </button>
-        </form>
-        <form action={updateMove} className="flex min-w-0 flex-1 gap-2">
-          <Hidden id={move.id} />
-          <input
-            name="title"
-            defaultValue={move.title}
-            required
-            aria-label="Move title"
-            className={`input font-medium ${move.doneAt ? "line-through opacity-60" : ""}`}
-          />
-          <button className="btn">Save</button>
-        </form>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className={`text-lg leading-tight font-semibold ${move.doneAt ? "line-through opacity-60" : ""}`}>
+            {move.title}
+          </h3>
+          {move.doneAt && <span className="text-xs text-muted">Done</span>}
+        </div>
+        {/* Keyed by the title: once renamed, it closes. */}
+        <details key={move.title} className="relative">
+          <summary
+            title="Rename Move"
+            aria-label={`Rename ${move.title}`}
+            className="cursor-pointer list-none rounded px-1 text-muted hover:bg-line hover:text-foreground [&::-webkit-details-marker]:hidden"
+          >
+            ✎
+          </summary>
+          <form
+            action={updateMove}
+            className="absolute right-0 z-10 mt-1 flex w-72 gap-2 rounded-md border border-line bg-surface p-2 shadow-lg"
+          >
+            <Hidden id={move.id} />
+            <input name="title" defaultValue={move.title} required aria-label="Move title" className="input" />
+            <button className="btn">Save</button>
+          </form>
+        </details>
         <form action={deleteMove}>
           <Hidden id={move.id} />
           <button className="text-muted hover:text-red-600" title="Delete Move" aria-label={`Delete ${move.title}`}>
