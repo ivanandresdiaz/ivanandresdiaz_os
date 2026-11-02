@@ -452,6 +452,15 @@ Origen: Ivan agendó una Task suelta para dentro de dos meses y le seguía apare
 | Q165 | La Task suelta agendada sale del Stack | ✅ En Loose Tasks del Stack solo está la Task suelta que nunca se ha agendado. Agendada, para hoy o para cualquier fecha, vive en el calendario. Si se queda sin hacer, vuelve una sola vez, en Carried over. Los Moves de la semana no cambian: siguen en el Stack con su "on Wed 10:00". |
 | Q166 | Lo agendado hoy se puede elegir | ✅ El Highlight y el Cycle eligen entre el trabajo del Stack y las Tasks sueltas agendadas ese día. Una agendada para otra fecha no se ofrece. |
 
+## Ronda 24 — Los Principles del Check-in, cerrados (2026-11-02)
+
+Origen: el Check-in mostraba los Principles abiertos desde la mejora de los Principles (drawer y References, 2026-10-31). Ivan quiere volver al original: cerrados por defecto, y abiertos solo cuando él quiera.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q167 | Cerrados por defecto | ✅ Los Principles del Check-in arrancan cerrados. El título "Principles" los abre y los cierra, sin un botón extra. Lo demás no cambia: el título de cada uno abre su drawer y muestra cuántas References tiene. No son un paso del ritual: están a mano para leerlos. |
+| Q168 | Recuerda la última elección | ✅ Si Ivan los abre, quedan abiertos la próxima vez, y cerrados si los cierra. Es algo sencillo: lo recuerda cada navegador (localStorage), así que el teléfono y el portátil llevan cada uno la suya. |
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
