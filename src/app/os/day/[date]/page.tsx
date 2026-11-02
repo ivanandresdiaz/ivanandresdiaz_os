@@ -134,7 +134,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
                 <ul className="mt-1 space-y-1 text-sm">
                   {context.campaigns.map((c) => (
                     <li key={c.id}>
-                      <Link href={`/os/campaigns/${c.id}`} className="font-medium hover:underline">
+                      <Link href={`/os/plan?campaign=${c.id}&col=campaign`} className="font-medium hover:underline">
                         {c.title}
                       </Link>
                       {c.goal && <span className="text-muted"> — {c.goal}</span>}
