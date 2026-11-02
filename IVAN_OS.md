@@ -258,6 +258,28 @@ Origen: Ivan quiere agendar cosas en los próximos 3 meses sin avanzar día por 
 | Q125 | Navegación | ✅ `/os/month/YYYY-MM`, ← →, "This month", semanas de lunes a domingo, días de otros meses tenues. Botón "Month" junto a "Week" en el Day y la Week; no entra a la barra de navegación. En el teléfono, la misma cuadrícula con el texto recortado. |
 | Q126 | Posponer una arrastrada | ✅ Desaparece de los Check-ins y del Month en sus días anteriores, como si no hubiera existido; sus Slots pasados quedan como historial. |
 
+## Ronda 18 — El Plan en columnas (2026-11-02)
+
+Origen: la página Plan es larga y obliga a hacer scroll (el texto de la Season, entero y siempre abierto, ocupa casi todo). Ivan quiere una vista tipo carpetas.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q127 | Tres columnas | ✅ Seasons · Quarters · Campaigns llenan la pantalla. Cada columna tiene su propio scroll y la página no hace scroll. Elegir algo en una columna llena la siguiente. Es una forma de mirar el Plan: el modelo no cambia. |
+| Q128 | Columna Seasons | ✅ Todas: la activa arriba y las cerradas debajo, de la más nueva a la más vieja. Cada una muestra su título, sus fechas y sus Season Goals siempre a la vista; el texto va plegado. "+ New Season" arriba, con aviso de que cierra la actual. Las cerradas se leen y se editan, pero no se reabren. |
+| Q129 | Editar | ✅ En drawers ("amo los drawers"): título, texto con Dictate y Coach, y Save. En la Season, también las Season Goals. → Q139. |
+| Q130 | Quarters de una Season | ✅ (afinado en Q140) Los Quarters que la Season toca, desde su inicio hasta su fin (o hasta hoy). Un Quarter partido aparece bajo las dos Seasons con las mismas Campaigns. "Mostrar arriba siempre el más reciente" → Q140. |
+| Q131 | Un Quarter | ✅ Muestra su nombre, sus fechas y su título; el texto va plegado. Uno que aún no existe se crea solo al escribirle un título o al agregarle la primera Campaign. |
+| Q132 | Prioridad | ✅ Las Campaigns del Quarter se reordenan arrastrando del ⠿. Ese orden es su prioridad, se ve igual en el Plan y en el Check-in y no sigue el orden de los Season Goals. Una nueva, o una candidata que se activa, entra de última. |
+| Q133 | Stack | ✅ El "This week" del Stack sigue la prioridad de las Campaigns. |
+| Q134 | Cerradas | ✅ Activas arriba en su orden; done y dropped debajo, tenues y sin arrastre. Reactivar una la devuelve de última entre las activas. |
+| Q135 | Tarjeta | ✅ Número de prioridad, título, Season Goal, Block (color), línea del Goal e Infinite Games. Un clic abre la página de la Campaign; no hay cuarta columna. |
+| Q136 | Crear Campaign | ✅ "+ New Campaign" pide solo el título y abre la página de la Campaign para escribir el GPS y elegir Season Goal, Block e Infinite Games. |
+| Q137 | Backlog | ✅ Una carpeta "Backlog" fija al final de la columna Quarters: candidatas (ordenables por prioridad) y Loose Tasks. |
+| Q138 | Teléfono | ✅ B: una columna a la vez con flecha de atrás, como la app Archivos. → Q141. |
+| Q139 | Leer en el drawer | ✅ La columna muestra el título, las fechas y las Season Goals, sin texto desplegable. "Read" abre el drawer con el texto formateado y ancho; ahí mismo "Edit" pasa a edición, como en los Principles. Igual para la Season y el Quarter. |
+| Q140 | El más reciente arriba | ✅ Orden estricto por fecha, el más nuevo arriba. El siguiente Quarter entra a la lista cuando existe (con título o una Campaign); mientras no exista, arriba hay un botón "+ Plan Q1 2027". Al entrar queda seleccionado el Quarter actual. Los Quarters pasados que nunca se crearon no aparecen. |
+| Q141 | Teléfono | ✅ Abre en las Campaigns del Quarter actual. "‹ Q4 2026" lleva a los Quarters y "‹ Faithful to me" a las Seasons. El Backlog está en la columna Quarters. Los drawers ocupan toda la pantalla y el ⠿ funciona al tacto. |
+
 ## Resumen del diseño (v1) — ✅ confirmado 2026-10-30
 
 **Qué es.** ivanandresdiaz.com: un solo usuario, interfaz toda en inglés. Ivan OS ejecuta; Obsidian sabe.
@@ -349,6 +371,68 @@ Decisiones tomadas al construir (revisables):
 - **El día de una Secondary Task:** el campo `createdOn` pasa a llamarse `day` (la columna sigue siendo `created_on`, sin migración). `dayAfterScheduling` en `src/domain/secondary-tasks.ts`: agendarla en un día futuro la pospone allí, agendarla hoy la adelanta si su día no había llegado, una arrastrada agendada hoy conserva su ×N y un Slot en un día pasado no cambia nada. `scheduleWork` y `updateSlot` lo aplican a las pendientes (soltar en el calendario y mover el Slot en la Week).
 - **Month:** `/os/month/YYYY-MM` (y `/os/month` lleva al mes actual). Semanas de lunes a domingo, ← →, "This month", días de otros meses tenues, hoy resaltado; cada día es un enlace a su Day. `getMonth` trae solo lo agendado: Slots con su hora y las Secondary Tasks del día sin Slot (`secondaryTaskDate`: pendiente en su día, hecha en el día en que se hizo, tachada). En el teléfono se oculta la hora para que se lea el título. Botón "Month view" en el Day y la Week; en la navegación, Month marca "Week".
 - Sin migraciones. Verificación: 84 tests, typecheck, lint y prueba en el navegador (agendar mañana a las 9:00, mover el Slot martes → jueves y jueves → hoy, posponer una arrastrada, conservar ×N al agendarla hoy, Month con pendientes, hechas y sin hora, navegación, clic a un Day, 404 con un mes inválido, ancho de teléfono); la base local quedó sin filas de prueba.
+
+## Ronda 19 — La Campaign dentro del Plan (2026-11-02)
+
+Origen: al dar clic en una Campaign, Ivan iba a otra página y perdía la visión: "no quiero ir a otra página porque pierdo la visión, el GRAN STRATEGY de mi juego". Esta ronda cambia Q135.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q142 | La Campaign en el Plan | ✅ Un clic abre una cuarta columna con todo lo de su página, y la página aparte desaparece. Los enlaces del Check-in abren el Plan con la Campaign abierta; una Campaign nueva o una candidata se abren igual. |
+| Q143 | Colapso automático | ✅ (afinado en Q149) "Por defecto se comporta como que tiene 3 columnas abiertas"; Quarter queda abierto al abrir la Campaign, y al abrir un Move se cierra Quarters. Ivan puede colapsarlas todas, horizontalmente. → Q149–Q152. |
+| Q144 | Franjas con la cadena | 🔁 → Q151. |
+| Q145 | Colapsar a mano | ✅ (afinado en Q152) "Puedo colapsarlas todas". |
+| Q146 | Columna de la Campaign | ✅ Arriba, la prioridad, el título y el GPS recortado a dos líneas. "Read" abre un drawer con el GPS, Season Goal, Block, Infinite Games y las acciones de estado y borrar. Debajo, los Moves. (Dónde van sus Tasks y Steps → Q150.) |
+| Q147 | Teléfono | ✅ Un nivel más en la navegación de una columna a la vez: "‹ Build Ivan OS" vuelve a las Campaigns. Sin franjas. |
+| Q148 | Alignment | ✅ Sigue siendo solo la medida del tiempo. Ver la línea Season → Quarter → Campaign → Moves es una forma de mirar el Plan, no un concepto nuevo. |
+| Q149 | Tres columnas abiertas | ✅ Por defecto hay tres columnas abiertas: al bajar un nivel, la de más arriba se colapsa; al subir, vuelve a abrirse. Al abrir una Campaign: Quarters, Campaigns y la Campaign. Ivan igual puede cerrarlas "para ver más espacio". |
+| Q150 | El Move en su columna | ✅ La Campaign lista sus Moves de forma compacta (título, semana, hecho, "2/5 Tasks", "New Move"). Abrir un Move muestra en su columna sus Tasks con duración y sus Steps. En el teléfono, "‹ SSO login" vuelve a la Campaign. |
+| Q151 | La cadena | ❌ Los títulos largos no caben en una franja vertical. Se pensó en un breadcrumb (Q153–Q154), pero cayó con Q159. |
+| Q152 | Colapsar a mano | ✅ Un « en cada columna abierta. "Collapse all" deja solo la más profunda, que nunca se colapsa. Lo colapsado se guarda en el enlace, y al bajar o subir de nivel vuelve la regla de las tres columnas. |
+
+## Ronda 20 — Una columna de estrategia (2026-11-02)
+
+Origen: idea de último momento de Ivan. "Seasons realmente no es una info que constantemente esté cambiando": Seasons, Quarters y Campaigns pasan a una sola columna que se pliega hacia abajo, y por defecto queda elegido todo hasta el trabajo de mayor prioridad, "así puedo ver todo de una vez". Esto reemplaza las columnas de Q127 y la regla de Q149.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q153–Q154 | Breadcrumb | ❌ Propuesto por Ivan y luego descartado en Q159. |
+| Q155 | Tres columnas: Estrategia, Campaign y Move | ✅ La columna de estrategia tiene secciones plegables: Season, Quarter, Campaigns y Backlog. Por defecto las tres columnas están abiertas, y cada una se puede colapsar hacia el lado (Q152). |
+| Q156 | Las secciones | ✅ Season va plegada: título, Season Goals numeradas y "Read"; abierta, muestra todas las Seasons y "+ New Season". Quarter va plegada: "Q4 2026 · título" y "Read"; abierta, muestra los Quarters de la Season y "+ Plan Q1 2027". Campaigns va abierta: la lista por prioridad, las cerradas debajo y "+ New Campaign". Backlog va plegada: candidatas ordenables y Loose Tasks. Pueden abrirse varias a la vez. |
+| Q157 | Lo elegido al entrar | ✅ La Season activa, el Quarter actual (aunque exista el siguiente, como en Q140), la Campaign #1 no hecha y su primer Move. |
+| Q158 | Prioridad de los Moves | ✅ "La tarea con mayor prioridad" es un Move. Los Moves de una Campaign se ordenan con el ⠿; se abre el primero no hecho y su columna muestra sus Tasks. Dentro de una Campaign, el Stack sigue ese orden. Las Tasks mantienen su orden, sin arrastre. |
+| Q159 | Breadcrumb | ❌ "Con este nuevo diseño, siento que el breadcrumb puede esperar". No queda pendiente: Ivan avisará si lo necesita. |
+| Q160 | Teléfono | ✅ Una columna a la vez: Estrategia → Campaign → Move. Abre en la de estrategia, y tocar una Campaign o un Move abre su columna. Sin breadcrumb (Q159), cada columna conserva su "‹" para volver. |
+
+## El Plan en columnas — construido en local (2026-11-02)
+
+- **Dominio:** `src/domain/plan.ts`. `seasonQuarters` lista los Quarters de una Season, del más nuevo al más viejo: los que existen dentro de sus fechas, el actual mientras la Season está activa y el elegido aunque todavía no exista. `landingQuarter` decide dónde abre el Plan y `quarterToPlan` ofrece "+ Plan" para el siguiente Quarter. `byPriority` separa las Campaigns abiertas de las cerradas, e `inCampaignPriority` ordena el "This week" del Stack según la prioridad de su Campaign.
+- **Página:** `/os/plan?season=…&q=2026-Q4|backlog&col=…`. En el computador muestra las tres columnas, cada una con su propio scroll. En el teléfono muestra una a la vez: `col` dice cuál, y por defecto abre en Campaigns. Los drawers de la Season y del Quarter (`plan-drawers.tsx`) tienen Preview y Edit, como el de los Principles; en el de la Season también se editan las Season Goals. Las Campaigns se reordenan arrastrando del ⠿ (`campaign-priority.tsx`, dnd-kit).
+- **Acciones:** `createCampaign` pide solo el título, crea el Quarter si falta y pone la Campaign de última. Las acciones nuevas son `reorderCampaigns` y `setCampaignStatus`: activar o reactivar una Campaign la pone de última, y la activación desde la página de la Campaign crea el Quarter actual si no existe. El "← Plan" de esa página vuelve a su Quarter o al Backlog.
+- Sin migraciones: el campo `campaigns.position` ya existía. Verificación: 94 tests, typecheck, lint y prueba en el navegador. Se probaron la vista sin scroll de página, el drawer de la Season (leer, editar el título, agregar y borrar una Season Goal), crear Campaigns, reordenar y recargar, el Stack y el Check-in en orden de prioridad, done debajo y reactivada de última, una candidata activada de última, "+ Plan Q1 2027" con título y texto, el Quarter actual seleccionado con Q1 2027 encima, la Season cerrada con Q4 2026 partido, el teléfono (una columna, flechas atrás, drawer a pantalla completa) y la consola sin errores. La base local quedó sin filas de prueba.
+
+## Ronda 21 — ¿El Quarter es hijo de la Season? (2026-11-02)
+
+Origen: Ivan notó que el Quarter no quedaba dentro del colapso de la Season: "creí que los Quarters eran hijos de las Seasons". Su modelo mental del 2026-10-29 lo ponía así ("Temporada └── Capítulo — 3 meses"), pero el glosario lo definió como trimestre del calendario.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q161 | El Quarter es del calendario | ✅ No le pertenece a una Season: la Season lo atraviesa, y un Quarter partido (Q4 2026) sigue siendo uno solo. En palabras de Ivan: un cambio de Season "no cambiará la agenda de un momento para otro… un cambio abrupto de las metas no me sirve". |
+| Q162 | La pantalla muestra el árbol | ✅ En la columna de estrategia, lo elegido va con sangría: Season ▸ Quarter ▸ Campaigns. "All Seasons" es un solo árbol: cada Season se despliega con sus Quarters, y un Quarter partido aparece bajo las dos marcado "split". Campaigns va abierto por defecto y All Seasons cerrado. |
+
+## Estrategia, Campaign y Move en el Plan — construido en local (2026-11-02)
+
+- **Tres columnas:** Estrategia, Campaign y Move. La de estrategia tiene la Season y el Quarter elegidos, cada uno con "Read" y su lista "All…" desplegable; luego Campaigns, abierta, y Backlog, que se abre solo cuando la Campaign elegida es una candidata. La página `/os/campaigns/[id]` ya no existe: es una redirección a `/os/plan?campaign=…`, y el Check-in enlaza directo al Plan.
+- **Qué se abre:** el Plan lee `season`, `q`, `campaign`, `move`, `col` (la columna que se ve en el teléfono) y `fold` (las columnas colapsadas). Sin parámetros abre la Season activa, el Quarter actual, la Campaign #1 no hecha y su primer Move no hecho (`firstOpen`). Una Campaign abierta desde afuera trae su Quarter.
+- **Prioridad de los Moves:** se ordenan con el ⠿ (`reorderMoves`). `PriorityList` y `ClosedList` (`priority-list.tsx`) son la lista reordenable que comparten Campaigns y Moves; los Moves hechos van debajo. `createMove` pone el nuevo de último. El Stack usa `inPriority`, que ordena por Campaign y después por Move.
+- **Drawers:** `plan-drawers.tsx` comparte `DrawerFrame`, `useEditMode` y `SaveForm`. `campaign-drawer.tsx` muestra el GPS y permite editarlo (con Dictate y Coach), además de Season Goal, Block, Infinite Games, el estado y borrar. El selector de Season Goal incluye la Goal que la Campaign ya sirve aunque sea de una Season cerrada, para no borrarla al guardar.
+- **Colapsar:** el « de cada columna y "Collapse all"/"Expand all" en la del Move. Una columna colapsada queda como una franja con "»" y su nombre en vertical.
+- Sin migraciones: `moves.position` ya existía. Verificación: 95 tests, typecheck, lint y prueba en el navegador. Se probaron:
+  - abrir con todo elegido, crear una Campaign y que se abra en su columna, Moves nuevos de últimos, reordenar Moves con el teclado y recargar, y que el Move abierto por defecto sea el #1;
+  - el Stack ordenado por prioridad de Move, el Check-in enlazando al Plan, la redirección de la dirección vieja con su Quarter, y una Task con su Step y su conteo;
+  - un Move hecho debajo, editar el GPS, el Block y los Infinite Games en el drawer, colapsar Estrategia, "Collapse all" y "Expand all", una candidata abierta como #1 con el Backlog desplegado, y borrar una Campaign desde el drawer;
+  - el teléfono (Estrategia → Campaign → Move con "‹"), que la página no hace scroll y la consola sin errores.
+  La base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 

@@ -29,7 +29,7 @@ _Evitar_: Story, Reel, Media, Podcast.
 **Season** (Temporada): un capítulo de vida de duración indefinida, definido por la realidad que se vive (p. ej. "working in microfinance at El Alcaraván"). Tiene un título, un texto libre con el contexto de la vida (carrera, estado emocional, preguntas sobre mí), sus Season Goals y su Radar. Siempre hay exactamente una activa; abrir una nueva cierra la anterior.
 _Evitar_: Season como bloque de 3 meses (uso antiguo del manifiesto).
 
-**Quarter** (Trimestre): un trimestre del calendario (ene–mar, abr–jun, jul–sep, oct–dic). Tiene un título, un texto libre sin versionar y contiene las Campaigns. Si la Season cambia a mitad de camino, el Quarter queda partido.
+**Quarter** (Trimestre): un trimestre del calendario (ene–mar, abr–jun, jul–sep, oct–dic). Tiene un título, un texto libre sin versionar y contiene las Campaigns. No le pertenece a una Season: la Season lo atraviesa. Si la Season cambia a mitad de camino, el Quarter queda partido y sigue siendo uno solo, porque un cambio de Season no cambia de golpe el plan del trimestre.
 _Evitar_: Capítulo, ciclo, mes (no hay nivel Mes; el mes del calendario es solo una forma de mirar los días).
 
 ## Juego
@@ -42,10 +42,10 @@ _Evitar_: Capa.
 **Season Goal** (Objetivo de Temporada): un objetivo estratégico que dura lo que dura la Season (p. ej. "make 30,000"). De él salen las Campaigns.
 _Evitar_: Meta.
 
-**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS.
-_Evitar_: Movimiento, Meta.
+**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS. Ivan ordena las Campaigns de cada Quarter por prioridad, y su trabajo aparece en ese orden. La prioridad no sigue el orden de los Season Goals. Las candidatas del Backlog también tienen prioridad.
+_Evitar_: Movimiento, Meta, Rank.
 
-**Move** (Jugada): un paso concreto de una Campaign que cabe en una semana (p. ej. SSO login). Se elige en la Weekly Review. Si no tiene Tasks, se arrastra directo al calendario.
+**Move** (Jugada): un paso concreto de una Campaign que cabe en una semana (p. ej. SSO login). Se elige en la Weekly Review. Si no tiene Tasks, se arrastra directo al calendario. Ivan ordena los Moves de cada Campaign por prioridad, y su trabajo aparece en ese orden.
 
 **Task** (Tarea): una parte opcional de un Move; es lo que se arrastra al calendario, con duración (p. ej. "Configure Google provider", 1 h). Si no se termina en un día, se vuelve a agendar otro día.
 
