@@ -611,14 +611,9 @@ export async function createTask(fd: FormData) {
 
 export async function updateTask(fd: FormData) {
   await requireIvan();
-  const { id, title, durationMin } = z
-    .object({
-      id: z.uuid(),
-      title: required,
-      durationMin: z.coerce.number().int().min(MIN_SLOT_MIN).max(DAY_END_MIN),
-    })
-    .parse(fields(fd));
-  await db.update(s.tasks).set({ title, durationMin }).where(eq(s.tasks.id, id));
+  // Only the title: a Task's length is set in the calendar.
+  const { id, title } = z.object({ id: z.uuid(), title: required }).parse(fields(fd));
+  await db.update(s.tasks).set({ title }).where(eq(s.tasks.id, id));
   await done();
 }
 

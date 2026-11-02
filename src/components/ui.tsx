@@ -37,6 +37,15 @@ export function Hidden(props: Record<string, string>) {
   );
 }
 
+/** A Move's week. Only this week has color: the color is the priority; any other week is grey. */
+export function WeekChip({ label, now }: { label: string; now: boolean }) {
+  return (
+    <span className={`rounded px-1.5 text-[11px] ${now ? "bg-accent/15 text-accent" : "bg-line text-muted"}`}>
+      {label}
+    </span>
+  );
+}
+
 export function AddIconButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button

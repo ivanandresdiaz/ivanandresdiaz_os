@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { reorderMoves, toggleWorkDone } from "@/server/actions";
 import { ClosedList, PriorityList } from "./priority-list";
+import { WeekChip } from "./ui";
 
 export type MoveCard = {
   id: string;
@@ -12,6 +13,8 @@ export type MoveCard = {
   done: boolean;
   /** "This week", "Next week", "Week of 2026-11-16", or null while not chosen. */
   week: string | null;
+  /** Chosen for this week: the only week shown in color. */
+  thisWeek: boolean;
   tasksDone: number;
   tasksTotal: number;
   /** Opens the Move in its column. */
@@ -83,7 +86,7 @@ function MoveLink({ move }: { move: MoveCard }) {
       <span className={`text-sm font-medium group-hover:text-accent ${move.done ? "line-through" : ""}`}>
         {move.title}
       </span>
-      {move.week && <span className="rounded bg-accent/15 px-1.5 text-[11px] text-accent">{move.week}</span>}
+      {move.week && <WeekChip label={move.week} now={move.thisWeek} />}
       {move.tasksTotal > 0 && (
         <span className="text-xs text-muted">
           {move.tasksDone}/{move.tasksTotal} Tasks

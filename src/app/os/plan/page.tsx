@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddSection } from "@/components/add-section";
 import { CampaignReader } from "@/components/campaign-drawer";
 import { type CampaignCard, CampaignPriority } from "@/components/campaign-priority";
 import { type MoveCard, MovePriority } from "@/components/move-priority";
@@ -130,6 +131,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
     title: m.title,
     done: m.doneAt !== null,
     week: weekLabel(m.weekOf),
+    thisWeek: m.weekOf === thisWeek,
     tasksDone: m.tasks.filter((t) => t.doneAt !== null).length,
     tasksTotal: m.tasks.length,
     href: href({ ...here, move: m.id, col: "move" }),
@@ -228,25 +230,34 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                 )}
               </div>
 
-              <details open className="ml-1 flex flex-col border-l-2 border-line pl-3">
-                <summary className="label cursor-pointer py-1">Campaigns</summary>
+              <AddSection
+                fold
+                heading="Campaigns"
+                addLabel={selected ? `Add a Campaign to ${quarterLabel(selected)}` : "Add a Campaign"}
+                form={
+                  selected && (
+                    <NewCampaign
+                      quarter={quarterKey(selected)}
+                      placeholder={`New Campaign in ${quarterLabel(selected)}`}
+                    />
+                  )
+                }
+                closeOnSubmit
+                className="ml-1 flex flex-col border-l-2 border-line pl-3"
+              >
                 {selected ? (
-                  <div className="flex flex-col gap-2">
+                  <>
                     {campaigns.length === 0 && <p className="text-sm text-muted">No Campaigns in this Quarter yet.</p>}
                     <CampaignPriority
                       open={quarterCampaigns.open.map(toCard)}
                       closed={quarterCampaigns.closed.map(toCard)}
                       selectedId={campaign?.id}
                     />
-                    <NewCampaign
-                      quarter={quarterKey(selected)}
-                      placeholder={`New Campaign in ${quarterLabel(selected)}`}
-                    />
-                  </div>
+                  </>
                 ) : (
                   <p className="text-sm text-muted">Pick a Quarter in All Seasons.</p>
                 )}
-              </details>
+              </AddSection>
             </div>
           </div>
 
@@ -314,38 +325,56 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
           <details open={campaign?.status === "candidate"} className="flex flex-col border-t border-line pt-2">
             <summary className="label cursor-pointer py-1">Backlog</summary>
             <div className="flex flex-col gap-2">
-              <div className="text-xs text-muted">Candidate Campaigns</div>
-              {backlog.open.length === 0 && <p className="text-sm text-muted">No candidates yet.</p>}
-              <CampaignPriority open={backlog.open.map(toCard)} selectedId={campaign?.id} />
-              <NewCampaign placeholder="New candidate Campaign" />
-              <div className="mt-2 text-xs text-muted">Loose Tasks</div>
-              <ul className="flex flex-col gap-1 text-sm">
-                {looseTasks.map((t) => (
-                  <li key={t.id} className="flex items-center gap-2">
-                    <form action={toggleWorkDoneForm}>
-                      <Hidden kind="task" id={t.id} />
-                      <button>{t.doneAt ? "☑" : "☐"}</button>
-                    </form>
-                    <span className={t.doneAt ? "line-through opacity-60" : ""}>{t.title}</span>
-                    <span className="text-xs text-muted">{t.durationMin} min</span>
-                    <GameTags games={t.games} />
-                    <form action={deleteTask} className="ml-auto">
-                      <Hidden id={t.id} />
-                      <button className="text-muted hover:text-red-600" aria-label={`Delete ${t.title}`}>
-                        ×
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-              <form action={createTask} className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <input name="title" required placeholder="Loose Task (e.g. renew passport)" className="input" />
-                  <input name="durationMin" type="number" min={15} step={15} defaultValue={30} className="input w-20" />
-                  <button className="btn">Add</button>
-                </div>
-                <GamesPicker />
-              </form>
+              <AddSection
+                heading={<div className="text-xs text-muted">Candidate Campaigns</div>}
+                addLabel="Add a candidate Campaign"
+                form={<NewCampaign placeholder="New candidate Campaign" />}
+                closeOnSubmit
+              >
+                {backlog.open.length === 0 && <p className="text-sm text-muted">No candidates yet.</p>}
+                <CampaignPriority open={backlog.open.map(toCard)} selectedId={campaign?.id} />
+              </AddSection>
+              <AddSection
+                heading={<div className="text-xs text-muted">Loose Tasks</div>}
+                addLabel="Add a Loose Task"
+                className="mt-2 flex flex-col gap-2"
+                form={
+                  // Like any Task, it lasts an hour; its length is set in the calendar.
+                  <form action={createTask} className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        name="title"
+                        required
+                        autoFocus
+                        placeholder="Loose Task (e.g. renew passport)"
+                        aria-label="New Loose Task"
+                        className="input"
+                      />
+                      <button className="btn">Add</button>
+                    </div>
+                    <GamesPicker />
+                  </form>
+                }
+              >
+                <ul className="flex flex-col gap-1 text-sm empty:hidden">
+                  {looseTasks.map((t) => (
+                    <li key={t.id} className="flex items-center gap-2">
+                      <form action={toggleWorkDoneForm}>
+                        <Hidden kind="task" id={t.id} />
+                        <button>{t.doneAt ? "☑" : "☐"}</button>
+                      </form>
+                      <span className={t.doneAt ? "line-through opacity-60" : ""}>{t.title}</span>
+                      <GameTags games={t.games} />
+                      <form action={deleteTask} className="ml-auto">
+                        <Hidden id={t.id} />
+                        <button className="text-muted hover:text-red-600" aria-label={`Delete ${t.title}`}>
+                          ×
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </AddSection>
             </div>
           </details>
         </ColumnFrame>
@@ -414,21 +443,35 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                 ))}
               </dl>
 
-              <div className="label mt-2">Moves</div>
-              {moves.length === 0 && (
-                <p className="text-sm text-muted">No Moves yet. A Move is a step that fits in a week.</p>
-              )}
-              <MovePriority moves={moveCards} selectedId={move?.id} next={href({ ...here, move: undefined })} />
-              <form action={createMove} className="flex flex-wrap gap-2">
-                <Hidden campaignId={campaign.id} />
-                <input name="title" required placeholder="New Move (e.g. SSO login)" className="input min-w-40 flex-1" />
-                <select name="weekOf" className="input w-auto" defaultValue={thisWeek} aria-label="Week">
-                  <option value={thisWeek}>This week</option>
-                  <option value={nextWeek}>Next week</option>
-                  <option value="">Not chosen yet</option>
-                </select>
-                <button className="btn">Add</button>
-              </form>
+              <AddSection
+                heading={<div className="label">Moves</div>}
+                addLabel={`Add a Move to ${campaign.title}`}
+                className="mt-2 flex flex-col gap-2"
+                form={
+                  <form action={createMove} className="flex flex-wrap gap-2">
+                    <Hidden campaignId={campaign.id} />
+                    <input
+                      name="title"
+                      required
+                      autoFocus
+                      placeholder="New Move (e.g. SSO login)"
+                      aria-label="New Move"
+                      className="input min-w-40 flex-1"
+                    />
+                    <select name="weekOf" className="input w-auto" defaultValue={thisWeek} aria-label="Week">
+                      <option value={thisWeek}>This week</option>
+                      <option value={nextWeek}>Next week</option>
+                      <option value="">Not chosen yet</option>
+                    </select>
+                    <button className="btn">Add</button>
+                  </form>
+                }
+              >
+                {moves.length === 0 && (
+                  <p className="text-sm text-muted">No Moves yet. A Move is a step that fits in a week.</p>
+                )}
+                <MovePriority moves={moveCards} selectedId={move?.id} next={href({ ...here, move: undefined })} />
+              </AddSection>
             </>
           ) : (
             <p className="text-sm text-muted">No Campaign open. Pick one in Strategy, or add one.</p>
@@ -556,7 +599,7 @@ function NewCampaign({ quarter, placeholder }: { quarter?: string; placeholder: 
   return (
     <form action={createCampaign} className="flex gap-2">
       {quarter && <Hidden quarter={quarter} />}
-      <input name="title" required placeholder={placeholder} aria-label={placeholder} className="input" />
+      <input name="title" required autoFocus placeholder={placeholder} aria-label={placeholder} className="input" />
       <button className="btn">Add</button>
     </form>
   );

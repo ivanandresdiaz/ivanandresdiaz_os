@@ -1,19 +1,10 @@
-import {
-  createStep,
-  createTask,
-  deleteMove,
-  deleteStep,
-  deleteTask,
-  setMoveWeek,
-  toggleStep,
-  toggleWorkDoneForm,
-  updateMove,
-  updateTask,
-} from "@/server/actions";
-import { Hidden } from "./ui";
+import { createTask, deleteMove, setMoveWeek, updateMove } from "@/server/actions";
+import { AddSection } from "./add-section";
+import { TaskItem, TitleField } from "./plan-task";
+import { Hidden, WeekChip } from "./ui";
 
 type Step = { id: string; title: string; done: boolean };
-type Task = { id: string; title: string; durationMin: number; doneAt: Date | null; steps: Step[] };
+type Task = { id: string; title: string; doneAt: Date | null; steps: Step[] };
 export type MoveDetail = { id: string; title: string; weekOf: string | null; doneAt: Date | null; tasks: Task[] };
 
 /**
@@ -49,14 +40,9 @@ export function MovePanel({
           >
             ✎
           </summary>
-          <form
-            action={updateMove}
-            className="absolute right-0 z-10 mt-1 flex w-72 gap-2 rounded-md border border-line bg-surface p-2 shadow-lg"
-          >
-            <Hidden id={move.id} />
-            <input name="title" defaultValue={move.title} required aria-label="Move title" className="input" />
-            <button className="btn">Save</button>
-          </form>
+          <div className="absolute right-0 z-10 mt-1 flex w-72 rounded-md border border-line bg-surface p-2 shadow-lg">
+            <TitleField id={move.id} title={move.title} label="Move title" action={updateMove} autoFocus />
+          </div>
         </details>
         <form action={deleteMove}>
           <Hidden id={move.id} />
@@ -69,7 +55,7 @@ export function MovePanel({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted">Week:</span>
         {weekLabel ? (
-          <span className="rounded bg-accent/15 px-1.5 text-xs text-accent">{weekLabel}</span>
+          <WeekChip label={weekLabel} now={move.weekOf === thisWeek} />
         ) : (
           <span className="text-xs text-muted">not chosen</span>
         )}
@@ -78,86 +64,30 @@ export function MovePanel({
         {move.weekOf && <WeekButton id={move.id} weekOf="" label="Unchoose" />}
       </div>
 
-      <div className="label">Tasks</div>
-      {move.tasks.length === 0 && (
-        <p className="text-sm text-muted">No Tasks: the Move goes to the calendar as a whole.</p>
-      )}
-      <ul className="flex flex-col gap-2">
-        {move.tasks.map((task) => (
-          <li key={task.id} className="rounded-md border border-line p-2">
-            <div className="flex items-center gap-2">
-              <form action={toggleWorkDoneForm}>
-                <Hidden kind="task" id={task.id} />
-                <button title={task.doneAt ? "Mark not done" : "Mark done"}>{task.doneAt ? "☑" : "☐"}</button>
-              </form>
-              <form action={updateTask} className="flex min-w-0 flex-1 gap-2">
-                <Hidden id={task.id} />
-                <input
-                  name="title"
-                  defaultValue={task.title}
-                  aria-label="Task title"
-                  className={`input ${task.doneAt ? "line-through opacity-60" : ""}`}
-                />
-                <input
-                  name="durationMin"
-                  type="number"
-                  min={15}
-                  step={15}
-                  defaultValue={task.durationMin}
-                  className="input w-20"
-                  title="Duration (min)"
-                  aria-label="Duration (min)"
-                />
-                <button className="btn">Save</button>
-              </form>
-              <form action={deleteTask}>
-                <Hidden id={task.id} />
-                <button className="text-muted hover:text-red-600" title="Delete Task" aria-label={`Delete ${task.title}`}>
-                  ×
-                </button>
-              </form>
-            </div>
-            <ul className="mt-1 ml-6 flex flex-col gap-0.5 text-sm">
-              {task.steps.map((step) => (
-                <li key={step.id} className="flex items-center gap-2">
-                  <form action={toggleStep}>
-                    <Hidden id={step.id} />
-                    <button>{step.done ? "☑" : "☐"}</button>
-                  </form>
-                  <span className={step.done ? "line-through opacity-60" : ""}>{step.title}</span>
-                  <form action={deleteStep} className="ml-auto">
-                    <Hidden id={step.id} />
-                    <button className="text-muted hover:text-red-600" aria-label={`Delete ${step.title}`}>
-                      ×
-                    </button>
-                  </form>
-                </li>
-              ))}
-              <li>
-                <form action={createStep} className="flex gap-2">
-                  <Hidden taskId={task.id} />
-                  <input name="title" required placeholder="Add a Step" className="input text-xs" />
-                </form>
-              </li>
-            </ul>
-          </li>
-        ))}
-      </ul>
-      <form action={createTask} className="flex gap-2">
-        <Hidden moveId={move.id} />
-        <input name="title" required placeholder="Add a Task" className="input" />
-        <input
-          name="durationMin"
-          type="number"
-          min={15}
-          step={15}
-          defaultValue={60}
-          className="input w-20"
-          title="Duration (min)"
-          aria-label="Duration (min)"
-        />
-        <button className="btn">Add</button>
-      </form>
+      <AddSection
+        heading={<div className="label">Tasks</div>}
+        addLabel={`Add a Task to ${move.title}`}
+        form={
+          // A new Task lasts an hour; it is stretched or shortened in the calendar.
+          <form action={createTask} className="flex gap-2">
+            <Hidden moveId={move.id} />
+            <input name="title" required autoFocus placeholder="New Task" aria-label="New Task" className="input" />
+            <button className="btn">Add</button>
+          </form>
+        }
+      >
+        {move.tasks.length === 0 && (
+          <p className="text-sm text-muted">No Tasks: the Move goes to the calendar as a whole.</p>
+        )}
+        <ul className="flex flex-col gap-2 empty:hidden">
+          {move.tasks.map((task) => (
+            <TaskItem
+              key={task.id}
+              task={{ id: task.id, title: task.title, done: task.doneAt !== null, steps: task.steps }}
+            />
+          ))}
+        </ul>
+      </AddSection>
     </div>
   );
 }
