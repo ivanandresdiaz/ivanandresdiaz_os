@@ -4,10 +4,12 @@ import {
   clickedRange,
   drawnRange,
   moveTo,
+  placedOn,
   resizeStartTo,
   resizeTo,
   snap,
   type Slot,
+  unplaced,
 } from "./slots";
 
 const slot = (id: string, date: string, workId: string): Slot => ({
@@ -106,5 +108,32 @@ describe("carriedOver", () => {
       today,
     );
     expect(result).toEqual([]);
+  });
+});
+
+describe("unplaced", () => {
+  it("keeps only unfinished work that was never put on the calendar", () => {
+    const result = unplaced(
+      [
+        { kind: "task", id: "waiting", done: false },
+        { kind: "task", id: "in-two-months", done: false },
+        { kind: "task", id: "carried", done: false },
+        { kind: "task", id: "done", done: true },
+        { kind: "move", id: "in-two-months", done: false },
+      ],
+      [slot("s1", "2027-01-05", "in-two-months"), slot("s2", "2026-10-29", "carried")],
+    );
+    expect(result.map((w) => `${w.kind}:${w.id}`)).toEqual(["task:waiting", "move:in-two-months"]);
+  });
+});
+
+describe("placedOn", () => {
+  it("finds the work with a Slot on that date", () => {
+    const work = [
+      { kind: "task" as const, id: "today" },
+      { kind: "task" as const, id: "later" },
+    ];
+    const slots = [slot("s1", "2026-10-30", "today"), slot("s2", "2027-01-05", "later")];
+    expect(placedOn(work, slots, "2026-10-30")).toEqual([{ kind: "task", id: "today" }]);
   });
 });

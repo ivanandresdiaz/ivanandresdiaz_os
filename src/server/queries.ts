@@ -5,7 +5,7 @@ import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
 import { cyclePhase, focusSpanOn, isComplete, realFocusMin, startDelayMin } from "@/domain/cycles";
 import { normalizeGames, type InfiniteGame } from "@/domain/infinite-games";
-import { carriedOver, type CarriedOver, type WorkKind } from "@/domain/slots";
+import { carriedOver, type CarriedOver, placedOn, unplaced, type WorkKind } from "@/domain/slots";
 import {
   resolveDayBlocks,
   type BlockKind,
@@ -611,7 +611,8 @@ export type StackItem = WorkItem & {
 
 /**
  * The morning stack: this week's Moves (or their Tasks), what was carried
- * over, and loose Tasks from the Backlog.
+ * over, and the loose Tasks from the Backlog still waiting for a place.
+ * `date` is the day (or the week's Monday) being looked at.
  */
 export async function getStack(date: IsoDate) {
   const now = today();
@@ -653,18 +654,33 @@ export async function getStack(date: IsoDate) {
     };
   };
 
+  const isCarried = (item: WorkItem) => carried.some((c) => c.kind === item.kind && c.id === item.id);
+  const loose = work.filter((item) => item.campaignId === null);
+
+  const thisWeekItems = inPriority(
+    work.filter((item) => item.weekOf === week && item.campaignId !== null),
+    (item) => ({ campaignId: item.campaignId, moveId: item.kind === "move" ? item.id : item.moveId }),
+    priority,
+  ).map(toStackItem);
+  const carriedItems = carried.flatMap((c) => {
+    const item = work.find((w) => w.kind === c.kind && w.id === c.id);
+    return item && item.weekOf !== week ? [toStackItem(item)] : [];
+  });
+  // A loose Task waits in the Stack until it is placed; then it lives on the calendar.
+  // Placed and left unfinished, it comes back under Carried over, not twice.
+  const looseItems = unplaced(loose, slots).map(toStackItem);
+  // Loose work placed on this day is out of the Stack, but a Highlight or a Cycle can still pick it.
+  const placedHere = placedOn(loose, slots, date)
+    .filter((item) => !item.done && !isCarried(item))
+    .map(toStackItem);
+
   return {
     week,
-    thisWeek: inPriority(
-      work.filter((item) => item.weekOf === week && item.campaignId !== null),
-      (item) => ({ campaignId: item.campaignId, moveId: item.kind === "move" ? item.id : item.moveId }),
-      priority,
-    ).map(toStackItem),
-    carriedOver: carried.flatMap((c) => {
-      const item = work.find((w) => w.kind === c.kind && w.id === c.id);
-      return item && item.weekOf !== week ? [toStackItem(item)] : [];
-    }),
-    loose: work.filter((item) => item.campaignId === null && !item.done).map(toStackItem),
+    thisWeek: thisWeekItems,
+    carriedOver: carriedItems,
+    loose: looseItems,
+    /** What a Highlight or a Cycle can pick on this day: the open work of the Stack and the loose work placed on it. */
+    pickable: [...carriedItems, ...thisWeekItems, ...looseItems, ...placedHere].filter((item) => !item.done),
   };
 }
 

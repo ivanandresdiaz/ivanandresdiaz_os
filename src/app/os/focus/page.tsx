@@ -17,7 +17,7 @@ export default async function FocusPage() {
 
   const date = today();
   const [stack, history] = await Promise.all([getStack(date), getCycleHistory(date, date)]);
-  const work = [...stack.carriedOver, ...stack.thisWeek, ...stack.loose].filter((i) => !i.done);
+  const work = stack.pickable;
   const total = history.reduce((sum, c) => sum + c.realFocusMin, 0);
 
   return (

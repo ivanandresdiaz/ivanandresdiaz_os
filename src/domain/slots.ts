@@ -115,3 +115,20 @@ export function carriedOver(
   }
   return result.sort((a, b) => b.times - a.times);
 }
+
+/**
+ * Work still waiting for a place: not done and never put on the calendar.
+ * Once placed it lives on the calendar; placed and left unfinished, it comes back as carried over.
+ */
+export function unplaced<T extends WorkStatus>(work: readonly T[], slots: readonly Slot[]): T[] {
+  return work.filter((item) => !item.done && !slots.some((s) => isSlotOf(s, item)));
+}
+
+/** Work with a Slot on `date`. */
+export function placedOn<T extends WorkRef>(work: readonly T[], slots: readonly Slot[], date: IsoDate): T[] {
+  return work.filter((item) => slots.some((s) => s.date === date && isSlotOf(s, item)));
+}
+
+function isSlotOf(slot: Slot, work: WorkRef): boolean {
+  return slot.work.kind === work.kind && slot.work.id === work.id;
+}

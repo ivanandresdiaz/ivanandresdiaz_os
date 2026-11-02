@@ -51,7 +51,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
     date === now ? getFeedProgress(date) : null,
   ]);
   const realFocus = cycles.reduce((sum, c) => sum + c.realFocusMin, 0);
-  const stackItems = [...stack.carriedOver, ...stack.thisWeek, ...stack.loose].filter((i) => !i.done);
+  const stackItems = stack.pickable;
 
   return (
     <>

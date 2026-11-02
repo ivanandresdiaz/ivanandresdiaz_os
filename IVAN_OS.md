@@ -443,6 +443,15 @@ Origen: Ivan preguntó cómo funcionaba el Backlog. Al revisarlo apareció un hu
 | Q163 | La candidata no toca la semana | ✅ Una candidata es solo una idea. Sus Moves no tienen semana, el formulario no la ofrece y la columna del Move dice que se elige al activarla. A la semana (el Stack) solo llega el trabajo suelto y el de Campaigns activas; lo de una Campaign hecha o descartada tampoco. Al activar una candidata, sus Moves quedan sin semana y se eligen en la Weekly Review. |
 | Q164 | Activar a la vista | ✅ Una candidata muestra en la columna Campaign un botón primario "Activate", que la lleva al Quarter actual de última en la prioridad. Antes solo estaba dentro del drawer. Pide confirmación: abre una tarjeta "Play … in Q4 2026?" con Cancel y Activate; Escape o un clic afuera la cierran. |
 
+## Ronda 23 — La Task suelta agendada sale del Stack (2026-11-02)
+
+Origen: Ivan agendó una Task suelta para dentro de dos meses y le seguía apareciendo en el Stack de hoy: "me hace ruido tenerla ahí". El Stack mostraba toda Task suelta sin hacer, agendada o no. Además, una Task suelta que se quedaba sin hacer aparecía dos veces: en Carried over y en Loose Tasks.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q165 | La Task suelta agendada sale del Stack | ✅ En Loose Tasks del Stack solo está la Task suelta que nunca se ha agendado. Agendada, para hoy o para cualquier fecha, vive en el calendario. Si se queda sin hacer, vuelve una sola vez, en Carried over. Los Moves de la semana no cambian: siguen en el Stack con su "on Wed 10:00". |
+| Q166 | Lo agendado hoy se puede elegir | ✅ El Highlight y el Cycle eligen entre el trabajo del Stack y las Tasks sueltas agendadas ese día. Una agendada para otra fecha no se ofrece. |
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
