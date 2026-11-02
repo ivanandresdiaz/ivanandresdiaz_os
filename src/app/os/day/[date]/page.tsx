@@ -14,6 +14,7 @@ import {
   formatMinutes,
   isIsoDate,
   localMoment,
+  monthOf,
   quarterLabel,
   startOfWeek,
   WEEKDAY_NAMES,
@@ -72,6 +73,9 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
         )}
         <Link className="btn" href={`/os/week/${startOfWeek(date)}`}>
           Week view
+        </Link>
+        <Link className="btn" href={`/os/month/${monthOf(date)}`}>
+          Month view
         </Link>
         {feed && (
           // Optional: no checkbox, no XP, no nudge when skipped.

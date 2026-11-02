@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Calendar } from "@/components/calendar";
 import { Stack } from "@/components/stack";
-import { addDays, isIsoDate, startOfWeek, weekDates } from "@/domain/dates";
+import { addDays, isIsoDate, monthOf, startOfWeek, weekDates } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
 import { getBlockTypes, getCalendar, getStack } from "@/server/queries";
@@ -35,6 +35,9 @@ export default async function WeekPage({ params }: PageProps<"/os/week/[date]">)
             This week
           </Link>
         )}
+        <Link className="btn" href={`/os/month/${monthOf(monday)}`}>
+          Month view
+        </Link>
       </div>
       <p className="-mt-2 text-xs text-muted">
         With the mouse, change a day&apos;s Blocks from today on: draw to add one, click one to reassign it, × to

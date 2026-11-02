@@ -6,7 +6,7 @@ import { Suspense, useEffect, useRef } from "react";
 
 const NAV = [
   { href: "/os", label: "Today", also: ["/os/day"] },
-  { href: "/os/week", label: "Week", also: [] },
+  { href: "/os/week", label: "Week", also: ["/os/month"] },
   { href: "/os/focus", label: "Focus", also: [] },
   { href: "/os/feed", label: "Feed", also: [] },
   { href: "/os/plan", label: "Plan", also: ["/os/campaigns"] },
