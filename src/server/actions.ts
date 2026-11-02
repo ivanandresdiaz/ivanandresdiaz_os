@@ -21,7 +21,15 @@ import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
-import { planStructureEdit, planStructureRemoval, type StructureBlock } from "@/domain/structure";
+import {
+  type DayBlockChange,
+  type DayBlockRef,
+  isDayEditable,
+  planDayBlockChange,
+  planStructureEdit,
+  planStructureRemoval,
+  type StructureBlock,
+} from "@/domain/structure";
 import { aiAvailability, CoachError, reviewEnglish, transcribe } from "@/lib/ai";
 import { deleteObject, getObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
@@ -719,75 +727,77 @@ export async function removeStructureBlock(fd: FormData) {
 }
 
 // ─── Exceptions ──────────────────────────────────────────────────────────────
+// They change one date's Blocks without touching the Structure, and only for
+// today or later (isDayEditable).
 
-/** Overrides, removes or adds a Block on one date, without touching the Structure. */
-export async function setException(input: {
-  date: string;
-  structureBlockId: string | null;
-  removed: boolean;
-  startMin: number;
-  endMin: number;
-  blockTypeId: string;
-}) {
+function editableDay(date: string) {
+  if (!isDayEditable(date, today())) throw new Error("Past days keep the plan they had");
+}
+
+const dayBlockRef = z.object({
+  date: isoDate,
+  startMin: minute,
+  endMin: minute,
+  blockTypeId: z.uuid(),
+  structureBlockId: z.uuid().nullable(),
+  exceptionId: z.uuid().nullable(),
+});
+
+const dayBlockChange = z.union([
+  z.literal("remove"),
+  z.object({ startMin: minute, endMin: minute, blockTypeId: z.uuid() }).partial(),
+]);
+
+/** Moves, resizes, reassigns or removes one Block on one date. */
+export async function changeDayBlock(block: DayBlockRef, change: DayBlockChange) {
   await requireIvan();
-  const values = z
-    .object({
-      date: isoDate,
-      structureBlockId: z.uuid().nullable(),
-      removed: z.boolean(),
-      startMin: minute,
-      endMin: minute,
-      blockTypeId: z.uuid(),
-    })
-    .parse(input);
-  if (!values.removed) timeRange(values);
-  if (values.structureBlockId) {
+  const ref = dayBlockRef.parse(block);
+  editableDay(ref.date);
+  const plan = planDayBlockChange(ref, dayBlockChange.parse(change));
+  const sameDay = (id: string) =>
+    and(eq(s.structureExceptions.id, id), eq(s.structureExceptions.date, ref.date));
+  if (plan.kind === "upsert") {
+    if (!plan.values.removed) timeRange(plan.values);
     await db
       .insert(s.structureExceptions)
-      .values(values)
+      .values(plan.values)
       .onConflictDoUpdate({
         target: [s.structureExceptions.date, s.structureExceptions.structureBlockId],
-        set: values,
+        set: plan.values,
       });
+  } else if (plan.kind === "update") {
+    await db.update(s.structureExceptions).set(timeRange(plan.values)).where(sameDay(plan.id));
   } else {
-    await db.insert(s.structureExceptions).values(values);
+    await db.delete(s.structureExceptions).where(sameDay(plan.id));
   }
   await done();
 }
 
-export async function updateExceptionTimes(input: {
-  id: string;
-  startMin: number;
-  endMin: number;
-}) {
+/** Adds a Block on one date only. */
+export async function addDayBlock(input: { date: string; startMin: number; endMin: number; blockTypeId: string }) {
   await requireIvan();
-  const { id, ...times } = z
-    .object({ id: z.uuid(), startMin: minute, endMin: minute })
+  const values = z
+    .object({ date: isoDate, startMin: minute, endMin: minute, blockTypeId: z.uuid() })
     .parse(input);
-  timeRange(times);
-  await db.update(s.structureExceptions).set(times).where(eq(s.structureExceptions.id, id));
+  editableDay(values.date);
+  timeRange(values);
+  await db.insert(s.structureExceptions).values({ ...values, structureBlockId: null, removed: false });
   await done();
 }
 
-export async function setExceptionForm(fd: FormData) {
-  const v = z
-    .object({
-      date: isoDate,
-      structureBlockId: optionalId,
-      removed: z.enum(["true", "false"]).transform((x) => x === "true"),
-      startMin: hhmm,
-      endMin: hhmm,
-      blockTypeId: z.uuid(),
-    })
-    .parse(fields(fd));
-  await setException(v);
-}
-
-/** Back to the Structure for that date. */
-export async function deleteException(fd: FormData) {
+/** Returns one Block (its Exception), or the whole date, to the Structure. */
+export async function backToStructure(input: { date: string; exceptionId?: string }) {
   await requireIvan();
-  const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
-  await db.delete(s.structureExceptions).where(eq(s.structureExceptions.id, id));
+  const { date, exceptionId } = z.object({ date: isoDate, exceptionId: z.uuid().optional() }).parse(input);
+  editableDay(date);
+  await db
+    .delete(s.structureExceptions)
+    .where(
+      and(
+        eq(s.structureExceptions.date, date),
+        exceptionId ? eq(s.structureExceptions.id, exceptionId) : undefined,
+      ),
+    );
   await done();
 }
 

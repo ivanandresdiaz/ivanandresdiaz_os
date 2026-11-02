@@ -434,6 +434,8 @@ export type CalendarDay = {
   slots: CalendarSlot[];
   habitsDone: string[];
   focus: CalendarFocus[];
+  /** Whether the date has Exceptions, including Blocks removed from it. */
+  changed: boolean;
 };
 
 export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
@@ -485,6 +487,7 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
           : [];
       }),
     habitsDone: checks.filter((c) => c.date === date).map((c) => c.blockTypeId),
+    changed: exceptions.some((e) => e.date === date),
     focus: cycleRows.flatMap((cycle) => {
       const span = focusSpanOn(cycle, date, now, APP_TIMEZONE);
       if (!span) return [];
