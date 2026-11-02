@@ -232,6 +232,32 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 | Q113 | Day | ✅ Se quita la sección "This day's Blocks" (skip today, reset, Add a Block for this day); queda un enlace "Change this day's Blocks in the Week". |
 | Q114 | ADR 0002 | ✅ Nota con fecha: ~90% desde el computador. Planear desde la Structure es solo en el computador; en el iPhone, leer y quizá agendar trabajo. Optimizar el Pareto, no la excepción. |
 
+## Ronda 16 — Agendar a futuro (2026-11-02)
+
+Origen: mañana a las 9:00, reunión con el jefe para instalar Claude Work. Ya se podía agendar desde el Day de mañana (una Secondary Task toma la fecha del Day donde se escribe).
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q115 | Reuniones | ✅ No hay Meeting, Event ni Appointment. Una reunión o cita es una Task si sirve a una Campaign, o una Secondary Task con su Slot si no: "las agendas normalmente no responden a un Alignment". |
+| Q116 | El día de una Secondary Task | ✅ Aparece en el Check-in desde su día, nunca antes, y el ×N cuenta desde ahí. Se crea en el Day de esa fecha, como ya funciona; sin campo de fecha en el quick-add. |
+| Q117 | Posponer y adelantar | ✅ Agendarla en un día futuro la pasa a ese día, "como si la Secondary no hubiera existido" antes. Agendarla hoy la trae a hoy si su día no había llegado; una arrastrada que se agenda hoy conserva su ×N. |
+| Q118 | Cumpleaños | ⏸ Pendiente, para más adelante (el cumpleaños es de la Person). |
+| Q119 | Antes de su día | ✅ Sin lista "Upcoming" en el Check-in: sería ruido todos los días. Mirar hacia adelante es trabajo de la vista Month. |
+| Q120 | Recordatorio | ✅ Sin recordatorio por ahora. |
+| Q121 | Google Calendar | ❌ No. Sin sincronización. |
+
+## Ronda 17 — La vista Month (2026-11-02)
+
+Origen: Ivan quiere agendar cosas en los próximos 3 meses sin avanzar día por día.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q122 | Vista, no nivel | ✅ El Month es una vista del calendario como el Day y la Week: sin metas, texto ni review del mes. Sigue sin haber nivel Mes en el plan. |
+| Q123 | Qué muestra | ✅ Solo lo agendado: Slots de Tasks, Moves y Secondary Tasks con su hora, y las Secondary Tasks del día sin Slot. Sin Blocks, Exceptions, Habits, Highlights ni Cycles. Una pendiente aparece solo en su día; una hecha, tachada en el día en que se hizo. Días pasados en solo lectura. |
+| Q124 | Crear | ✅ El Month solo mira y navega: un clic en un día abre su Day, donde se agrega y se arrastra como ya funciona. |
+| Q125 | Navegación | ✅ `/os/month/YYYY-MM`, ← →, "This month", semanas de lunes a domingo, días de otros meses tenues. Botón "Month" junto a "Week" en el Day y la Week; no entra a la barra de navegación. En el teléfono, la misma cuadrícula con el texto recortado. |
+| Q126 | Posponer una arrastrada | ✅ Desaparece de los Check-ins y del Month en sus días anteriores, como si no hubiera existido; sus Slots pasados quedan como historial. |
+
 ## Resumen del diseño (v1) — ✅ confirmado 2026-10-30
 
 **Qué es.** ivanandresdiaz.com: un solo usuario, interfaz toda en inglés. Ivan OS ejecuta; Obsidian sabe.
@@ -243,7 +269,7 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 - Infinite Games: las 8 del manifiesto, fijas, como etiquetas múltiples; los Forks cuentan completo en cada juego. Backlog = Tasks sueltas + Campaigns candidatas.
 - Habit = Habit Block de la Structure; se cumple o no, nunca se cronometra.
 
-**Calendario.** Structure semanal de Blocks (Habit / Container) + Exceptions por fecha. Drag y resize. Vistas día y semana (mes después). Warnings no bloqueantes. Lo no hecho vuelve al stack como carried over ×N.
+**Calendario.** Structure semanal de Blocks (Habit / Container) + Exceptions por fecha. Drag y resize. Vistas día, semana y mes (el mes solo mira lo agendado y navega; construido el 2026-11-02). Warnings no bloqueantes. Lo no hecho vuelve al stack como carried over ×N.
 
 **Rituales.** Daily Note = Check-in (Principles, objetivos, 1–3 Highlights con why, Secondary Tasks con carry over y agenda opcional, eliminar, agendar) + Learning Log + Journal (plantilla de preguntas versionada; navegación entre días). Weekly Review el domingo o el lunes: Learning Log, lo que pasó, elegir Moves.
 
@@ -317,6 +343,12 @@ Decisiones tomadas al construir (revisables):
 - **Solo lectura:** días pasados, pantallas táctiles y el Day. El Day perdió "This day's Blocks"; queda el enlace "Change this day's Blocks in the Week".
 - **Dominio:** `isDayEditable` y `planDayBlockChange` en `src/domain/structure.ts`. Acciones `changeDayBlock`, `addDayBlock` y `backToStructure` (rechazan fechas pasadas); se fueron `setException`, `updateExceptionTimes`, `setExceptionForm` y `deleteException`. El modal comparte `BlockDialog` y `BlockTypeChoices` con la Structure.
 - Sin migraciones. Verificación: 76 tests, typecheck, lint y prueba en el navegador (reasignar, ×, dibujar, mover, superposición, Back to Structure, ↺, pasado y táctil en solo lectura, Day y Structure); la base local quedó sin filas de prueba.
+
+## Agendar a futuro y vista Month — construido en local (2026-11-02)
+
+- **El día de una Secondary Task:** el campo `createdOn` pasa a llamarse `day` (la columna sigue siendo `created_on`, sin migración). `dayAfterScheduling` en `src/domain/secondary-tasks.ts`: agendarla en un día futuro la pospone allí, agendarla hoy la adelanta si su día no había llegado, una arrastrada agendada hoy conserva su ×N y un Slot en un día pasado no cambia nada. `scheduleWork` y `updateSlot` lo aplican a las pendientes (soltar en el calendario y mover el Slot en la Week).
+- **Month:** `/os/month/YYYY-MM` (y `/os/month` lleva al mes actual). Semanas de lunes a domingo, ← →, "This month", días de otros meses tenues, hoy resaltado; cada día es un enlace a su Day. `getMonth` trae solo lo agendado: Slots con su hora y las Secondary Tasks del día sin Slot (`secondaryTaskDate`: pendiente en su día, hecha en el día en que se hizo, tachada). En el teléfono se oculta la hora para que se lea el título. Botón "Month view" en el Day y la Week; en la navegación, Month marca "Week".
+- Sin migraciones. Verificación: 84 tests, typecheck, lint y prueba en el navegador (agendar mañana a las 9:00, mover el Slot martes → jueves y jueves → hoy, posponer una arrastrada, conservar ×N al agendarla hoy, Month con pendientes, hechas y sin hora, navegación, clic a un Day, 404 con un mes inválido, ancho de teléfono); la base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 

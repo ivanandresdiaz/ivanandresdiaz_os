@@ -30,7 +30,7 @@ _Evitar_: Story, Reel, Media, Podcast.
 _Evitar_: Season como bloque de 3 meses (uso antiguo del manifiesto).
 
 **Quarter** (Trimestre): un trimestre del calendario (ene–mar, abr–jun, jul–sep, oct–dic). Tiene un título, un texto libre sin versionar y contiene las Campaigns. Si la Season cambia a mitad de camino, el Quarter queda partido.
-_Evitar_: Capítulo, ciclo, mes (no hay nivel Mes).
+_Evitar_: Capítulo, ciclo, mes (no hay nivel Mes; el mes del calendario es solo una forma de mirar los días).
 
 ## Juego
 
@@ -95,7 +95,8 @@ _Evitar_: 9/10.
 
 **Carried over** (Arrastrada): una Task, un Move agendado o una Secondary Task que no quedó hecho y vuelve a la mañana siguiente, marcado con cuántas veces ha pasado (×N). Las Tasks y Moves vuelven al Stack; las Secondary Tasks vuelven a su sección del Check-in hasta completarlas o eliminarlas.
 
-**Secondary Task** (Tarea secundaria): una acción única y válida que quiero hacer, pero que no tiene jerarquía estratégica: no aporta Alignment ni XP, no cuenta para Day Won, no necesita un por qué y no puede ser Highlight. No tiene recurrencia, Steps, Infinite Games, Backlog ni relación con Campaigns o Moves. Tampoco es Noise, porque no es algo que quiera eliminar. Puede agendarse o no y se marca como hecha; si queda pendiente, vuelve al día siguiente como carried over hasta completarla o eliminarla.
+**Secondary Task** (Tarea secundaria): una acción única y válida que quiero hacer, pero que no tiene jerarquía estratégica: no aporta Alignment ni XP, no cuenta para Day Won, no necesita un por qué y no puede ser Highlight. No tiene recurrencia, Steps, Infinite Games, Backlog ni relación con Campaigns o Moves. Tampoco es Noise, porque no es algo que quiera eliminar. Una reunión o una cita que no sirve a una Campaign es una Secondary Task con su Slot. Tiene un día: aparece en el Check-in desde ese día, nunca antes. Puede agendarse o no y se marca como hecha; si queda pendiente, vuelve al día siguiente como carried over hasta completarla o eliminarla. Agendarla en un día futuro la pasa a ese día, como si naciera ahí; agendarla hoy la trae a hoy si su día no había llegado, y si ya venía arrastrada conserva su ×N.
+_Evitar_: Meeting, Event, Appointment.
 
 **Learning Log** (¿Qué estoy aprendiendo?): la captura rápida durante el día de ideas, reflexiones y aprendizajes.
 
