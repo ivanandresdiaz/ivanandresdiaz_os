@@ -6,3 +6,7 @@ Ivan usa Ivan OS sobre todo en el iPhone, y la API nativa de arrastre del navega
 
 - **use-gesture**: detecta gestos (movimiento, velocidad, swipe, pinch), pero no sabe de listas ni de dónde se suelta algo; el ordenamiento, las animaciones, el auto-scroll y la accesibilidad habría que escribirlos a mano. Sigue siendo la opción para gestos que no son arrastrar y soltar (p. ej. deslizar para marcar hecho), y convive con dnd-kit.
 - **dnd-kit clásico** (`@dnd-kit/core` + `@dnd-kit/sortable`): estable, pero sin versiones nuevas desde diciembre de 2024. Se eligió la versión nueva (`@dnd-kit/react`, 0.x) porque es la que se mantiene; al ser una app de un solo usuario, un cambio de API antes de la 1.0 cuesta poco.
+
+## Actualización (2026-11-02)
+
+El contexto cambió: Ivan usa Ivan OS cerca del 90 % del tiempo desde el computador. En el iPhone y la tablet sobre todo lee y, a veces, agenda trabajo. Planear el día desde la Structure (las Exceptions en la Week) es solo con mouse, y no se invierte en edición táctil más allá de lo que ya existe. La decisión de usar dnd-kit no cambia.

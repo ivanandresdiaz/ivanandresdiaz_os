@@ -213,6 +213,25 @@ Todo aceptado: Q51 (rebanada 1 = loop de la mañana), Q52 (orden de rebanadas), 
 | Q99 | Dónde aplica el borde superior | ✅ En toda la grilla compartida (Structure, día y semana; Blocks y Slots). |
 | Q100 | Calendario del día | ✅ Fuera de eso, sin cambios: conserva su formulario, sin drag-to-create ni Warning de superposición, hasta su propia ronda. |
 
+## Ronda 15 — Editar un día en la Week (2026-11-02, festivo)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q101 | Festivo | ✅ No existe "Holiday": un festivo es una fecha con Exceptions. Sin calendario de festivos precargado. En la Week cada Block lleva una × pequeña para quitarlo de esa fecha, y se puede arrastrar y reasignar. Solo en la Week. |
+| Q102 | Usar los Blocks de otro día | ❌ Descartado. La idea de Ivan es la × y reasignar (Q101): Pareto, no la excepción. |
+| Q103 | Gestos en la Week | ✅ Los de la Structure: dibujar en vacío abre el modal de Block types para esa fecha (sin toggles de días); un clic en un Block abre el mismo modal. |
+| Q104 | iPhone y tablet | ✅ La Week sigue siendo de solo lectura en pantallas táctiles. Ivan trabaja ~90% desde el computador; el teléfono y la tablet son para leer. |
+| Q105 | Day | ✅ El Day no edita los Blocks. La Structure define el default; la Week cambia los días que Ivan quiera. |
+| Q106 | Slots | ✅ Un Slot se queda en su fecha y horario si una Exception quita o cambia el Block de debajo. |
+| Q107 | Plan real | ✅ Las Exceptions son el plan del día: un Habit quitado no es fallo de Streak, y las horas de Container Blocks del Alignment salen de los Blocks con Exceptions. |
+| Q108 | Reasignar | ✅ Es cambiar el Block type con un clic (modal). Arrastrar un Block es solo dentro de su día. |
+| Q109 | Deshacer | ✅ La × aparece al pasar el mouse (como en los Slots) y no pide confirmación. Si la fecha tiene Exceptions, su encabezado en la Week muestra ↺, que devuelve todo el día a la Structure. |
+| Q110 | Modal de la Week | ✅ Lista de Block types (el actual marcado) y "Back to Structure" si el Block tiene Exception. Sin "Skip this day"; horas de solo lectura. |
+| Q111 | Días pasados | ✅ Solo hoy y los días futuros se editan; los pasados quedan de solo lectura para no reescribir el plan ya vivido. |
+| Q112 | Superposición | ✅ Borde ámbar con tooltip, como en la Structure, sin la línea de resumen. |
+| Q113 | Day | ✅ Se quita la sección "This day's Blocks" (skip today, reset, Add a Block for this day); queda un enlace "Change this day's Blocks in the Week". |
+| Q114 | ADR 0002 | ✅ Nota con fecha: ~90% desde el computador. Planear desde la Structure es solo en el computador; en el iPhone, leer y quizá agendar trabajo. Optimizar el Pareto, no la excepción. |
+
 ## Resumen del diseño (v1) — ✅ confirmado 2026-10-30
 
 **Qué es.** ivanandresdiaz.com: un solo usuario, interfaz toda en inglés. Ivan OS ejecuta; Obsidian sabe.
@@ -291,6 +310,13 @@ Decisiones tomadas al construir (revisables):
 - Sección **Eliminate (the noise for today)**: los cuatro criterios en una línea tenue, los Noise items del día con × para borrar, y "+ Add noise", que abre el input ("What noise do I eliminate today?"). El input queda abierto para agregar varios; Escape o "Done" lo cierran.
 - Migración `0004_noise_items`: cada línea no vacía del Eliminate guardado pasa a ser un Noise item de su fecha, en el mismo orden y sin viñetas (`-`, `*`, `•`); luego se elimina la columna. Probada en local ("facebook" del 2026-10-31 quedó como Noise item).
 - Verificación: 39 tests, typecheck, lint, build de producción y prueba en el navegador (agregar, borrar, el día siguiente vacío). Pendiente aplicar `0002`–`0004` en Neon y desplegar.
+
+## Editar un día en la Week — construido en local (2026-11-02)
+
+- **Week, solo con mouse y solo hoy o días futuros:** clic en un Block abre el modal (Block types y "Back to Structure" si tiene Exception); dibujar en vacío agrega un Block a esa fecha; × al pasar el mouse lo quita; arrastrar y redimensionar dentro del día; ↺ en el encabezado devuelve el día a la Structure; superposición con borde ámbar y tooltip.
+- **Solo lectura:** días pasados, pantallas táctiles y el Day. El Day perdió "This day's Blocks"; queda el enlace "Change this day's Blocks in the Week".
+- **Dominio:** `isDayEditable` y `planDayBlockChange` en `src/domain/structure.ts`. Acciones `changeDayBlock`, `addDayBlock` y `backToStructure` (rechazan fechas pasadas); se fueron `setException`, `updateExceptionTimes`, `setExceptionForm` y `deleteException`. El modal comparte `BlockDialog` y `BlockTypeChoices` con la Structure.
+- Sin migraciones. Verificación: 76 tests, typecheck, lint y prueba en el navegador (reasignar, ×, dibujar, mover, superposición, Back to Structure, ↺, pasado y táctil en solo lectura, Day y Structure); la base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 

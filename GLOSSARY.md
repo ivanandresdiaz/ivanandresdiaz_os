@@ -61,9 +61,10 @@ _Evitar_: Movimiento, Meta.
 
 **Block type** (Tipo de bloque): la clase de un Block (Gym, Reading, Deep work for the company…). Es Habit o Container, tiene un color y sus Infinite Games. Una Campaign declara en qué Block type de tipo Container se juega.
 
-**Slot**: una Task (o un Move sin Tasks) o una Secondary Task puesta en el calendario en una fecha y un horario. Una Task puede tener varios Slots en días distintos. Si quedan Slots en días pasados y el trabajo no está hecho, vuelve como carried over ×N. Una Secondary Task agendada que queda pendiente conserva su Slot pasado como historial y vuelve al día siguiente sin horario; puede completarse desde el checklist sin volver a agendarla.
+**Slot**: una Task (o un Move sin Tasks) o una Secondary Task puesta en el calendario en una fecha y un horario. Una Task puede tener varios Slots en días distintos. No depende del Block que tiene debajo: si una Exception quita o cambia ese Block, el Slot se queda donde está. Si quedan Slots en días pasados y el trabajo no está hecho, vuelve como carried over ×N. Una Secondary Task agendada que queda pendiente conserva su Slot pasado como historial y vuelve al día siguiente sin horario; puede completarse desde el checklist sin volver a agendarla.
 
-**Exception** (Excepción): un cambio a la Structure en una sola fecha; no toca la plantilla.
+**Exception** (Excepción): un cambio a la Structure en una sola fecha: mover, redimensionar, cambiar de Block type, quitar o agregar un Block. No toca la plantilla. Es el plan real de ese día, así que solo se hace para hoy o fechas futuras: el plan de un día ya vivido no se reescribe. Un festivo es solo una fecha con Exceptions.
+_Evitar_: Holiday.
 
 **Habit Block** (Bloque-hábito): un Block cuyo contenido es el input mismo; se marca cumplido o no (gym, Reading, Nap).
 
@@ -71,7 +72,7 @@ _Evitar_: Movimiento, Meta.
 
 **Cycle** (Ciclo de trabajo): un tramo de foco con duración configurable (p. ej. 90 min y luego 5 de descanso). Al entrar se muestra una animación de enfoque para evitar distracciones. Se puede cerrar en cualquier momento (tomo un café y reinicio). Mide el tiempo real como ayuda de foco y de juego, no como estructura que haya que vigilar. Su ritmo sale de un **preset** (p. ej. Deep work 90 + 15); el primero es el predeterminado. Está **completo** si el foco llegó a su duración (cerrarlo en el descanso, o hasta un minuto antes, cuenta como completo); cerrarlo antes guarda el tiempo real y queda incompleto.
 
-**Warning**: un aviso que no bloquea. Salta cuando algo cae en un Block de otro tipo o en un Habit Block, cuando un Block se sobrecarga, cuando algo queda fuera de los Blocks o cuando dos Blocks de la Structure se superponen.
+**Warning**: un aviso que no bloquea. Salta cuando algo cae en un Block de otro tipo o en un Habit Block, cuando un Block se sobrecarga, cuando algo queda fuera de los Blocks o cuando dos Blocks se superponen, en la Structure o en una fecha.
 
 ## Personas
 
@@ -102,7 +103,7 @@ _Evitar_: 9/10.
 
 **Weekly Review** (Revisión semanal): el domingo, o el lunes si quedó pendiente. Reviso el Learning Log de la semana y lo que pasó, y elijo los Moves de la semana que viene.
 
-**Alignment** (Alineamiento): qué tanto de mi tiempo va a lo que persigo. Se calcula como la parte del tiempo de los Container Blocks de la semana que fue a Campaigns activas, y se contrasta con un puntaje sentido del 1 al 10 en la Weekly Review. Se mide sobre lo planeado y lo logrado; el tiempo real de los Cycles es una métrica adicional, no la base.
+**Alignment** (Alineamiento): qué tanto de mi tiempo va a lo que persigo. Se calcula como la parte del tiempo de los Container Blocks de la semana (ya con sus Exceptions) que fue a Campaigns activas, y se contrasta con un puntaje sentido del 1 al 10 en la Weekly Review. Se mide sobre lo planeado y lo logrado; el tiempo real de los Cycles es una métrica adicional, no la base.
 
 **Signal / Noise** (Señal / Ruido): el filtro maestro. Signal es lo que me acerca a lo que persigo y me mantiene alineado; Noise es lo que decido eliminar porque tiene bajo ROI, no mueve la aguja, me aleja de mis metas o es irrelevante. Una Secondary Task puede quedar fuera de Signal sin ser Noise.
 
@@ -113,7 +114,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 **XP**: los puntos que dan los inputs que son señal: un Habit cumplido, un Highlight hecho, un Day Won, el Check-in y la Weekly Review hechos, y un Cycle completo sobre trabajo de una Campaign. Cada Infinite Game tiene su propio XP y su nivel; un Fork da XP completa a cada juego. Los outputs y los Cycles sobre ruido nunca dan XP.
 
-**Streak** (Racha): días seguidos cumpliendo un input; hay una por cada Habit y una por elegir el Highlight del día. Regla "never miss twice": un fallo no rompe la racha, dos seguidos sí.
+**Streak** (Racha): días seguidos cumpliendo un input; hay una por cada Habit y una por elegir el Highlight del día. Regla "never miss twice": un fallo no rompe la racha, dos seguidos sí. Un Habit que una Exception quita ese día no cuenta como fallo.
 
 ## Herramientas
 
