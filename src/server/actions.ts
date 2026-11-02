@@ -509,7 +509,7 @@ export async function setCampaignStatus(fd: FormData) {
     .parse(fields(fd));
   await db.transaction(async (tx) => {
     const [campaign] = await tx
-      .select({ quarterId: s.campaigns.quarterId })
+      .select({ quarterId: s.campaigns.quarterId, status: s.campaigns.status })
       .from(s.campaigns)
       .where(eq(s.campaigns.id, id));
     if (!campaign) return;
@@ -522,6 +522,10 @@ export async function setCampaignStatus(fd: FormData) {
         ...(status === "active" && quarterId ? { position: await lastPriority(tx, quarterId) } : {}),
       })
       .where(eq(s.campaigns.id, id));
+    // An idea that starts being played: its Moves get their week in the Weekly Review, not before.
+    if (campaign.status === "candidate" && status === "active") {
+      await tx.update(s.moves).set({ weekOf: null }).where(eq(s.moves.campaignId, id));
+    }
   });
   await done();
 }
@@ -545,11 +549,14 @@ export async function createMove(fd: FormData) {
     })
     .parse(fields(fd));
   // A new Move goes last in its Campaign's priority.
-  const [{ last }] = await db
-    .select({ last: max(s.moves.position) })
-    .from(s.moves)
-    .where(eq(s.moves.campaignId, campaignId));
-  await db.insert(s.moves).values({ campaignId, title, weekOf: weekOf ?? null, position: (last ?? -1) + 1 });
+  const [[{ last }], [campaign]] = await Promise.all([
+    db.select({ last: max(s.moves.position) }).from(s.moves).where(eq(s.moves.campaignId, campaignId)),
+    db.select({ status: s.campaigns.status }).from(s.campaigns).where(eq(s.campaigns.id, campaignId)),
+  ]);
+  if (!campaign) return;
+  // Only a Campaign being played takes a week; a candidate's Moves wait for it to be activated.
+  const week = campaign.status === "active" ? (weekOf ?? null) : null;
+  await db.insert(s.moves).values({ campaignId, title, weekOf: week, position: (last ?? -1) + 1 });
   await done();
 }
 
@@ -585,6 +592,16 @@ export async function setMoveWeek(fd: FormData) {
   const { id, weekOf } = z
     .object({ id: z.uuid(), weekOf: isoDate.or(z.literal("").transform(() => null)) })
     .parse(fields(fd));
+  if (weekOf !== null) {
+    // Only a Move of a Campaign being played is chosen for a week.
+    const [row] = await db
+      .select({ status: s.campaigns.status })
+      .from(s.moves)
+      .innerJoin(s.campaigns, eq(s.moves.campaignId, s.campaigns.id))
+      .where(eq(s.moves.id, id));
+    // Refused: the page refreshes to show why (the Move no longer offers a week).
+    if (row?.status !== "active") return done();
+  }
   await db.update(s.moves).set({ weekOf }).where(eq(s.moves.id, id));
   await done();
 }

@@ -15,7 +15,7 @@ import {
 } from "@/domain/structure";
 import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
-import { inPriority } from "@/domain/plan";
+import { inPlay, inPriority } from "@/domain/plan";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
 import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/domain/secondary-tasks";
 import { presignView } from "@/lib/r2";
@@ -621,7 +621,7 @@ export async function getStack(date: IsoDate) {
     db.select().from(s.slots).orderBy(asc(s.slots.date), asc(s.slots.startMin)),
     // Priority is per Quarter; in a week that straddles two Quarters, ties fall back to creation order.
     db
-      .select({ id: s.campaigns.id })
+      .select({ id: s.campaigns.id, status: s.campaigns.status })
       .from(s.campaigns)
       .orderBy(asc(s.campaigns.position), asc(s.campaigns.createdAt)),
     db.select({ id: s.moves.id }).from(s.moves).orderBy(asc(s.moves.position), asc(s.moves.createdAt)),
@@ -637,7 +637,8 @@ export async function getStack(date: IsoDate) {
           work: { kind: row.workKind, id: slotWorkId(row) },
         }],
   );
-  const work = schedulableWork(index);
+  // Only loose work and the work of active Campaigns: a candidate's Moves wait until it is activated.
+  const work = inPlay(schedulableWork(index), new Map(campaignRows.map((c) => [c.id, c.status])));
   const carried = carriedOver(work, slots, now);
   const priority = { campaigns: campaignRows.map((c) => c.id), moves: moveRows.map((m) => m.id) };
 

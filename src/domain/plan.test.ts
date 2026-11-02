@@ -3,6 +3,7 @@ import {
   addQuarters,
   byPriority,
   firstOpen,
+  inPlay,
   inPriority,
   landingQuarter,
   parseQuarterKey,
@@ -90,6 +91,21 @@ describe("Campaign priority", () => {
     ];
     const ordered = inPriority(work, (w) => w, { campaigns: ["ship", "raise"], moves: ["auth", "ui", "cartera", "api"] });
     expect(ordered.map((w) => w.id)).toEqual(["login", "nav", "plan", "cartera", "whatsapp", "passport"]);
+  });
+
+  it("lets only loose work and the work of active Campaigns reach the week", () => {
+    const work = [
+      { id: "login", campaignId: "ship" },
+      { id: "someday", campaignId: "idea" },
+      { id: "passport", campaignId: null },
+      { id: "leftover", campaignId: "old" },
+    ];
+    const statuses = new Map([
+      ["ship", "active"],
+      ["idea", "candidate"],
+      ["old", "dropped"],
+    ] as const);
+    expect(inPlay(work, statuses).map((w) => w.id)).toEqual(["login", "passport"]);
   });
 
   it("opens on the first one not done", () => {

@@ -13,11 +13,14 @@ export type MoveDetail = { id: string; title: string; weekOf: string | null; don
  */
 export function MovePanel({
   move,
+  playing,
   thisWeek,
   nextWeek,
   weekLabel,
 }: {
   move: MoveDetail;
+  /** Its Campaign is active. A candidate's Moves get no week until it is activated. */
+  playing: boolean;
   thisWeek: string;
   nextWeek: string;
   weekLabel: string | null;
@@ -52,17 +55,21 @@ export function MovePanel({
         </form>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted">Week:</span>
-        {weekLabel ? (
-          <WeekChip label={weekLabel} now={move.weekOf === thisWeek} />
-        ) : (
-          <span className="text-xs text-muted">not chosen</span>
-        )}
-        {move.weekOf !== thisWeek && <WeekButton id={move.id} weekOf={thisWeek} label="This week" />}
-        {move.weekOf !== nextWeek && <WeekButton id={move.id} weekOf={nextWeek} label="Next week" />}
-        {move.weekOf && <WeekButton id={move.id} weekOf="" label="Unchoose" />}
-      </div>
+      {playing ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted">Week:</span>
+          {weekLabel ? (
+            <WeekChip label={weekLabel} now={move.weekOf === thisWeek} />
+          ) : (
+            <span className="text-xs text-muted">not chosen</span>
+          )}
+          {move.weekOf !== thisWeek && <WeekButton id={move.id} weekOf={thisWeek} label="This week" />}
+          {move.weekOf !== nextWeek && <WeekButton id={move.id} weekOf={nextWeek} label="Next week" />}
+          {move.weekOf && <WeekButton id={move.id} weekOf="" label="Unchoose" />}
+        </div>
+      ) : (
+        <p className="text-xs text-muted">Its week is chosen once the Campaign is active.</p>
+      )}
 
       <AddSection
         heading={<div className="label">Tasks</div>}

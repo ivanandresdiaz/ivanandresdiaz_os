@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActivateCampaign } from "@/components/activate-campaign";
 import { AddSection } from "@/components/add-section";
 import { CampaignReader } from "@/components/campaign-drawer";
 import { type CampaignCard, CampaignPriority } from "@/components/campaign-priority";
@@ -19,7 +20,14 @@ import {
 } from "@/domain/plan";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
-import { createCampaign, createMove, createTask, deleteTask, startSeason, toggleWorkDoneForm } from "@/server/actions";
+import {
+  createCampaign,
+  createMove,
+  createTask,
+  deleteTask,
+  startSeason,
+  toggleWorkDoneForm,
+} from "@/server/actions";
 import {
   getBlockTypes,
   getCampaignDetail,
@@ -84,6 +92,8 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
   const campaign = detail?.campaign ?? null;
   const moves = detail?.moves ?? [];
   const move = moves.find((m) => m.id === one(params.move)) ?? firstOpen(moves, (m) => m.doneAt === null);
+  // Only a Campaign being played touches the week; a candidate is still an idea.
+  const playing = campaign?.status === "active";
 
   // ── Links keep everything chosen, and what Ivan folded ──
   const fold = new Set((one(params.fold) ?? "").split(",").filter((f): f is Foldable => f === "strategy" || f === "campaign"));
@@ -130,8 +140,8 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
     id: m.id,
     title: m.title,
     done: m.doneAt !== null,
-    week: weekLabel(m.weekOf),
-    thisWeek: m.weekOf === thisWeek,
+    week: playing ? weekLabel(m.weekOf) : null,
+    thisWeek: playing && m.weekOf === thisWeek,
     tasksDone: m.tasks.filter((t) => t.doneAt !== null).length,
     tasksTotal: m.tasks.length,
     href: href({ ...here, move: m.id, col: "move" }),
@@ -409,6 +419,14 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                     <GameTags games={campaign.games} />
                   </div>
                 </div>
+                {campaign.status === "candidate" && (
+                  <ActivateCampaign
+                    id={campaign.id}
+                    title={campaign.title}
+                    quarter={quarterKey(current)}
+                    quarterLabel={quarterLabel(current)}
+                  />
+                )}
                 <CampaignReader
                   campaign={{
                     id: campaign.id,
@@ -458,11 +476,13 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                       aria-label="New Move"
                       className="input min-w-40 flex-1"
                     />
-                    <select name="weekOf" className="input w-auto" defaultValue={thisWeek} aria-label="Week">
-                      <option value={thisWeek}>This week</option>
-                      <option value={nextWeek}>Next week</option>
-                      <option value="">Not chosen yet</option>
-                    </select>
+                    {playing && (
+                      <select name="weekOf" className="input w-auto" defaultValue={thisWeek} aria-label="Week">
+                        <option value={thisWeek}>This week</option>
+                        <option value={nextWeek}>Next week</option>
+                        <option value="">Not chosen yet</option>
+                      </select>
+                    )}
                     <button className="btn">Add</button>
                   </form>
                 }
@@ -498,6 +518,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
             <MovePanel
               key={move.id}
               move={move}
+              playing={playing}
               thisWeek={thisWeek}
               nextWeek={nextWeek}
               weekLabel={weekLabel(move.weekOf)}

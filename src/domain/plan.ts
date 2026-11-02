@@ -68,6 +68,17 @@ export function firstOpen<T>(items: T[], isOpen: (item: T) => boolean): T | null
 }
 
 /**
+ * The work that reaches the week: loose work, and the work of the Campaigns being played. A candidate
+ * is only an idea, and a done or dropped Campaign is over, so their Moves stay out of the week.
+ */
+export function inPlay<T extends { campaignId: string | null }>(
+  items: T[],
+  statusOf: ReadonlyMap<string, CampaignStatus>,
+): T[] {
+  return items.filter((item) => item.campaignId === null || statusOf.get(item.campaignId) === "active");
+}
+
+/**
  * Work in the order of its Campaign's priority, then of its Move's (`campaigns` and `moves` list
  * ids, highest first). Tasks of one Move keep their own order; work outside any listed Campaign goes last.
  */

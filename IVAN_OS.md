@@ -434,6 +434,15 @@ Origen: Ivan notó que el Quarter no quedaba dentro del colapso de la Season: "c
   - el teléfono (Estrategia → Campaign → Move con "‹"), que la página no hace scroll y la consola sin errores.
   La base local quedó sin filas de prueba.
 
+## Ronda 22 — La candidata no toca la semana (2026-11-02)
+
+Origen: Ivan preguntó cómo funcionaba el Backlog. Al revisarlo apareció un hueco: el Stack tomaba los Moves por su semana sin mirar si la Campaign era candidata, y el formulario de nuevo Move traía "This week" por defecto. Una idea de "algún día" podía meterse en la semana.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q163 | La candidata no toca la semana | ✅ Una candidata es solo una idea. Sus Moves no tienen semana, el formulario no la ofrece y la columna del Move dice que se elige al activarla. A la semana (el Stack) solo llega el trabajo suelto y el de Campaigns activas; lo de una Campaign hecha o descartada tampoco. Al activar una candidata, sus Moves quedan sin semana y se eligen en la Weekly Review. |
+| Q164 | Activar a la vista | ✅ Una candidata muestra en la columna Campaign un botón primario "Activate", que la lleva al Quarter actual de última en la prioridad. Antes solo estaba dentro del drawer. Pide confirmación: abre una tarjeta "Play … in Q4 2026?" con Cancel y Activate; Escape o un clic afuera la cierran. |
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
