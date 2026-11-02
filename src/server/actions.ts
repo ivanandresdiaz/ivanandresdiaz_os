@@ -1,13 +1,13 @@
 "use server";
 
-import { and, asc, eq, gt, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, max, sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { closeAt } from "@/domain/cycles";
-import { addDays, isIsoDate, parseMinutes } from "@/domain/dates";
+import { addDays, isIsoDate, parseMinutes, type QuarterRef } from "@/domain/dates";
 import {
   type CoachReview,
   dictationExtension,
@@ -20,6 +20,7 @@ import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
+import { parseQuarterKey } from "@/domain/plan";
 import { dayAfterScheduling } from "@/domain/secondary-tasks";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import {
@@ -414,20 +415,76 @@ const campaignFields = z.object({
   blockTypeId: optionalId,
 });
 
+/** "2026-Q4", or nothing. */
+const quarterKeyField = z
+  .string()
+  .optional()
+  .transform((v, ctx) => {
+    if (!v) return null;
+    const ref = parseQuarterKey(v);
+    if (!ref) ctx.addIssue({ code: "custom", message: "Invalid Quarter" });
+    return ref;
+  });
+
+/** A Quarter exists once it holds something: writing in it or giving it a Campaign creates it. */
+async function ensureQuarter(tx: Tx, ref: QuarterRef): Promise<string> {
+  await tx.insert(s.quarters).values(ref).onConflictDoNothing();
+  const [row] = await tx
+    .select({ id: s.quarters.id })
+    .from(s.quarters)
+    .where(and(eq(s.quarters.year, ref.year), eq(s.quarters.quarter, ref.quarter)));
+  return row.id;
+}
+
+/** The place after the last Campaign of a Quarter, or of the Backlog's candidates. */
+async function lastPriority(tx: Tx, quarterId: string | null): Promise<number> {
+  const [{ last }] = await tx
+    .select({ last: max(s.campaigns.position) })
+    .from(s.campaigns)
+    .where(quarterId ? eq(s.campaigns.quarterId, quarterId) : eq(s.campaigns.status, "candidate"));
+  return (last ?? -1) + 1;
+}
+
+/** Only the title: the GPS, Season Goal, Block and Infinite Games are written in the Campaign's drawer. */
 export async function createCampaign(fd: FormData) {
   await requireIvan();
-  const values = campaignFields
-    .extend({ quarterId: optionalId })
-    .parse(fields(fd));
-  const [campaign] = await db
-    .insert(s.campaigns)
-    .values({
-      ...values,
-      games: games(fd),
-      status: values.quarterId ? "active" : "candidate",
-    })
-    .returning({ id: s.campaigns.id });
-  redirect(`/os/campaigns/${campaign.id}`);
+  const { title, quarter } = z.object({ title: required, quarter: quarterKeyField }).parse(fields(fd));
+  const id = await db.transaction(async (tx) => {
+    const quarterId = quarter ? await ensureQuarter(tx, quarter) : null;
+    const [campaign] = await tx
+      .insert(s.campaigns)
+      .values({
+        title,
+        quarterId,
+        status: quarterId ? "active" : "candidate",
+        position: await lastPriority(tx, quarterId),
+      })
+      .returning({ id: s.campaigns.id });
+    return campaign.id;
+  });
+  // It opens in the Plan, next to its Quarter, to write its GPS there.
+  redirect(`/os/plan?${quarter ? `q=${quarter.year}-Q${quarter.quarter}&` : ""}campaign=${id}&col=campaign`);
+}
+
+/** Saves the priority Ivan dragged a Quarter's open Campaigns (or the candidates) into. */
+export async function reorderCampaigns(input: { ids: string[] }) {
+  await requireIvan();
+  const { ids } = z.object({ ids: z.array(z.uuid()).min(1) }).parse(input);
+  const rows = await db
+    .select({ id: s.campaigns.id, quarterId: s.campaigns.quarterId, status: s.campaigns.status })
+    .from(s.campaigns)
+    .where(inArray(s.campaigns.id, ids));
+  const sameList =
+    rows.length === ids.length &&
+    new Set(ids).size === ids.length &&
+    rows.every((r) => r.quarterId === rows[0].quarterId && (r.status === "active" || r.status === "candidate"));
+  if (!sameList) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.campaigns).set({ position }).where(eq(s.campaigns.id, id));
+    }
+  });
+  await done();
 }
 
 export async function updateCampaign(fd: FormData) {
@@ -440,19 +497,32 @@ export async function updateCampaign(fd: FormData) {
   await done();
 }
 
+/** Activating a candidate, or reactivating a closed Campaign, puts it last in its Quarter's priority. */
 export async function setCampaignStatus(fd: FormData) {
   await requireIvan();
-  const { id, status, quarterId } = z
+  const { id, status, quarter } = z
     .object({
       id: z.uuid(),
       status: z.enum(["candidate", "active", "done", "dropped"]),
-      quarterId: optionalId,
+      quarter: quarterKeyField,
     })
     .parse(fields(fd));
-  await db
-    .update(s.campaigns)
-    .set(quarterId ? { status, quarterId } : { status })
-    .where(eq(s.campaigns.id, id));
+  await db.transaction(async (tx) => {
+    const [campaign] = await tx
+      .select({ quarterId: s.campaigns.quarterId })
+      .from(s.campaigns)
+      .where(eq(s.campaigns.id, id));
+    if (!campaign) return;
+    const quarterId = quarter ? await ensureQuarter(tx, quarter) : campaign.quarterId;
+    await tx
+      .update(s.campaigns)
+      .set({
+        status,
+        quarterId,
+        ...(status === "active" && quarterId ? { position: await lastPriority(tx, quarterId) } : {}),
+      })
+      .where(eq(s.campaigns.id, id));
+  });
   await done();
 }
 
@@ -474,7 +544,31 @@ export async function createMove(fd: FormData) {
       weekOf: isoDate.optional().or(z.literal("").transform(() => undefined)),
     })
     .parse(fields(fd));
-  await db.insert(s.moves).values({ campaignId, title, weekOf: weekOf ?? null });
+  // A new Move goes last in its Campaign's priority.
+  const [{ last }] = await db
+    .select({ last: max(s.moves.position) })
+    .from(s.moves)
+    .where(eq(s.moves.campaignId, campaignId));
+  await db.insert(s.moves).values({ campaignId, title, weekOf: weekOf ?? null, position: (last ?? -1) + 1 });
+  await done();
+}
+
+/** Saves the priority Ivan dragged a Campaign's open Moves into. */
+export async function reorderMoves(input: { ids: string[] }) {
+  await requireIvan();
+  const { ids } = z.object({ ids: z.array(z.uuid()).min(1) }).parse(input);
+  const rows = await db
+    .select({ id: s.moves.id, campaignId: s.moves.campaignId })
+    .from(s.moves)
+    .where(inArray(s.moves.id, ids));
+  const sameCampaign =
+    rows.length === ids.length && new Set(ids).size === ids.length && rows.every((r) => r.campaignId === rows[0].campaignId);
+  if (!sameCampaign) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.moves).set({ position }).where(eq(s.moves.id, id));
+    }
+  });
   await done();
 }
 

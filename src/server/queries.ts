@@ -15,6 +15,7 @@ import {
 } from "@/domain/structure";
 import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
+import { inPriority } from "@/domain/plan";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
 import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/domain/secondary-tasks";
 import { presignView } from "@/lib/r2";
@@ -208,6 +209,23 @@ export async function getActiveSeason() {
     .where(eq(s.seasonGoals.seasonId, season.id))
     .orderBy(asc(s.seasonGoals.position));
   return { ...season, goals };
+}
+
+/** Every Season with its Goals, the newest first: the active one, then the closed ones. */
+export async function getSeasons() {
+  const [seasons, goals] = await Promise.all([
+    db.select().from(s.seasons).orderBy(desc(s.seasons.startedOn), desc(s.seasons.createdAt)),
+    db.select().from(s.seasonGoals).orderBy(asc(s.seasonGoals.position)),
+  ]);
+  return seasons.map((season) => ({ ...season, goals: goals.filter((g) => g.seasonId === season.id) }));
+}
+
+export type SeasonView = Awaited<ReturnType<typeof getSeasons>>[number];
+
+/** The Quarters that exist: the ones Ivan wrote in or gave a Campaign. */
+export async function getQuarters() {
+  const rows = await db.select().from(s.quarters);
+  return rows.map((row) => ({ ...row, ref: { year: row.year, quarter: row.quarter } as QuarterRef }));
 }
 
 export async function getQuarter(ref: QuarterRef) {
@@ -598,9 +616,15 @@ export type StackItem = WorkItem & {
 export async function getStack(date: IsoDate) {
   const now = today();
   const week = startOfWeek(date);
-  const [index, slotRows] = await Promise.all([
+  const [index, slotRows, campaignRows, moveRows] = await Promise.all([
     getWorkIndex(),
     db.select().from(s.slots).orderBy(asc(s.slots.date), asc(s.slots.startMin)),
+    // Priority is per Quarter; in a week that straddles two Quarters, ties fall back to creation order.
+    db
+      .select({ id: s.campaigns.id })
+      .from(s.campaigns)
+      .orderBy(asc(s.campaigns.position), asc(s.campaigns.createdAt)),
+    db.select({ id: s.moves.id }).from(s.moves).orderBy(asc(s.moves.position), asc(s.moves.createdAt)),
   ]);
   const slots = slotRows.flatMap((row) =>
     row.workKind === "secondary"
@@ -615,6 +639,7 @@ export async function getStack(date: IsoDate) {
   );
   const work = schedulableWork(index);
   const carried = carriedOver(work, slots, now);
+  const priority = { campaigns: campaignRows.map((c) => c.id), moves: moveRows.map((m) => m.id) };
 
   const toStackItem = (item: WorkItem): StackItem => {
     const next = slots.find(
@@ -629,9 +654,11 @@ export async function getStack(date: IsoDate) {
 
   return {
     week,
-    thisWeek: work
-      .filter((item) => item.weekOf === week && item.campaignId !== null)
-      .map(toStackItem),
+    thisWeek: inPriority(
+      work.filter((item) => item.weekOf === week && item.campaignId !== null),
+      (item) => ({ campaignId: item.campaignId, moveId: item.kind === "move" ? item.id : item.moveId }),
+      priority,
+    ).map(toStackItem),
     carriedOver: carried.flatMap((c) => {
       const item = work.find((w) => w.kind === c.kind && w.id === c.id);
       return item && item.weekOf !== week ? [toStackItem(item)] : [];
