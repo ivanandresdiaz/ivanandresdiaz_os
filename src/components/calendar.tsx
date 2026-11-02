@@ -3,21 +3,31 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatMinutes, WEEKDAY_NAMES, weekdayOf, type IsoDate } from "@/domain/dates";
+import { type DayBlockRef, isDayEditable, structureOverlaps } from "@/domain/structure";
 import {
+  backToStructure,
+  changeDayBlock,
   deleteSlot,
   scheduleWork,
-  setException,
   toggleHabit,
   toggleWorkDone,
-  updateExceptionTimes,
   updateSlot,
 } from "@/server/actions";
-import type { CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
+import type { BlockType, CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
+import { DayBlockDialog, type DayBlockDraft } from "./day-block-dialog";
 import { StartCycleButton } from "./start-cycle-button";
 import { TimeGrid, type GridItem } from "./time-grid";
 
+type BlockItem = GridItem & {
+  layer: "block";
+  block: CalendarBlock;
+  habitDone: boolean;
+  editable: boolean;
+  overlaps: CalendarBlock[];
+};
+
 type Item =
-  | (GridItem & { layer: "block"; block: CalendarBlock; habitDone: boolean })
+  | BlockItem
   | (GridItem & { layer: "work"; slot: CalendarSlot })
   | (GridItem & { layer: "focus"; focus: CalendarFocus });
 
@@ -34,14 +44,37 @@ function nowMinute(timeZone: string) {
   return get("hour") * 60 + get("minute");
 }
 
+function refOf(block: CalendarBlock): DayBlockRef {
+  const { date, startMin, endMin, blockTypeId, structureBlockId, exceptionId } = block;
+  return { date, startMin, endMin, blockTypeId, structureBlockId, exceptionId };
+}
+
+/** The Blocks each Block of the day overlaps, by Block key (a Warning, never a rule). */
+function overlapsByKey(blocks: CalendarBlock[]) {
+  const found = new Map<string, CalendarBlock[]>();
+  const placed = blocks.map((b) => ({ ...b, id: b.key, weekday: weekdayOf(b.date) }));
+  for (const [a, b] of structureOverlaps(placed)) {
+    found.set(a.key, [...(found.get(a.key) ?? []), b]);
+    found.set(b.key, [...(found.get(b.key) ?? []), a]);
+  }
+  return found;
+}
+
 export function Calendar({
   days,
   today,
   timeZone,
+  blockTypes,
 }: {
   days: CalendarDay[];
   today: IsoDate;
   timeZone: string;
+  /**
+   * Only the Week passes them: there, with a mouse, the Blocks of today and
+   * later dates change for that date only (Exceptions). The Day just shows them,
+   * and a touch screen only reads.
+   */
+  blockTypes?: BlockType[];
 }) {
   const [minute, setMinute] = useState<number | null>(null);
   useEffect(() => {
@@ -50,101 +83,125 @@ export function Calendar({
     const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
   }, [timeZone]);
+  const [draft, setDraft] = useState<DayBlockDraft | null>(null);
 
-  // The Day shows the Blocks as they are; only the Week (with a mouse) changes
-  // one date of them. On a touch screen the Week is read-only: too small to drag.
   const single = days.length === 1;
-  const items: Item[] = days.flatMap((day) => [
-    ...day.blocks.map(
-      (block): Item => ({
-        id: block.key,
-        column: day.date,
-        startMin: block.startMin,
-        endMin: block.endMin,
-        layer: "block",
-        // Dragging a Block changes that date only (an Exception).
-        drag: single ? "none" : "mouse",
-        crossColumn: false,
-        block,
-        habitDone: day.habitsDone.includes(block.blockTypeId),
-      }),
-    ),
-    ...day.slots.map(
-      (slot): Item => ({
-        id: slot.id,
-        column: day.date,
-        startMin: slot.startMin,
-        endMin: slot.endMin,
-        layer: "work",
-        drag: single ? "any" : "mouse",
-        crossColumn: true,
-        slot,
-      }),
-    ),
-    ...day.focus.map(
-      (focus): Item => ({
-        id: `f:${focus.id}`,
-        column: day.date,
-        startMin: focus.startMin,
-        endMin: focus.endMin,
-        layer: "focus",
-        drag: "none",
-        crossColumn: false,
-        focus,
-      }),
-    ),
-  ]);
+  const editable = (date: IsoDate) => blockTypes !== undefined && isDayEditable(date, today);
+  const items: Item[] = days.flatMap((day) => {
+    const overlaps = blockTypes ? overlapsByKey(day.blocks) : new Map<string, CalendarBlock[]>();
+    return [
+      ...day.blocks.map(
+        (block): Item => ({
+          id: block.key,
+          column: day.date,
+          startMin: block.startMin,
+          endMin: block.endMin,
+          layer: "block",
+          drag: editable(day.date) ? "mouse" : "none",
+          crossColumn: false,
+          block,
+          habitDone: day.habitsDone.includes(block.blockTypeId),
+          editable: editable(day.date),
+          overlaps: overlaps.get(block.key) ?? [],
+        }),
+      ),
+      ...day.slots.map(
+        (slot): Item => ({
+          id: slot.id,
+          column: day.date,
+          startMin: slot.startMin,
+          endMin: slot.endMin,
+          layer: "work",
+          drag: single ? "any" : "mouse",
+          crossColumn: true,
+          slot,
+        }),
+      ),
+      ...day.focus.map(
+        (focus): Item => ({
+          id: `f:${focus.id}`,
+          column: day.date,
+          startMin: focus.startMin,
+          endMin: focus.endMin,
+          layer: "focus",
+          drag: "none",
+          crossColumn: false,
+          focus,
+        }),
+      ),
+    ];
+  });
 
   return (
-    <TimeGrid<Item>
-      columns={days.map((day) => ({
-        key: day.date,
-        highlight: day.date === today,
-        label: single ? (
-          WEEKDAY_NAMES[weekdayOf(day.date)]
-        ) : (
-          <Link href={`/os/day/${day.date}`} className="hover:underline">
-            {WEEKDAY_NAMES[weekdayOf(day.date)].slice(0, 3)} {day.date.slice(8)}
-          </Link>
-        ),
-      }))}
-      items={items}
-      now={minute !== null && days.some((d) => d.date === today) ? { column: today, minute } : undefined}
-      onChange={async (item, next) => {
-        if (item.layer === "focus") return;
-        if (item.layer === "work") {
-          await updateSlot({ id: item.slot.id, date: next.column, ...pick(next) });
-        } else if (item.block.structureBlockId === null && item.block.exceptionId) {
-          await updateExceptionTimes({ id: item.block.exceptionId, ...pick(next) });
-        } else {
-          await setException({
-            date: item.block.date,
-            structureBlockId: item.block.structureBlockId,
-            removed: false,
-            blockTypeId: item.block.blockTypeId,
-            ...pick(next),
-          });
+    <>
+      <TimeGrid<Item>
+        columns={days.map((day) => ({
+          key: day.date,
+          highlight: day.date === today,
+          locked: !editable(day.date),
+          label: single ? (
+            WEEKDAY_NAMES[weekdayOf(day.date)]
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <Link href={`/os/day/${day.date}`} className="hover:underline">
+                {WEEKDAY_NAMES[weekdayOf(day.date)].slice(0, 3)} {day.date.slice(8)}
+              </Link>
+              {day.changed && editable(day.date) && (
+                <button
+                  type="button"
+                  className="text-muted hover:text-accent"
+                  onClick={() => backToStructure({ date: day.date })}
+                  title="Back to the Structure for this day"
+                  aria-label={`Back to the Structure for ${day.date}`}
+                >
+                  ↺
+                </button>
+              )}
+            </span>
+          ),
+        }))}
+        items={items}
+        now={minute !== null && days.some((d) => d.date === today) ? { column: today, minute } : undefined}
+        touchTaps={false}
+        ghosts={draft?.kind === "create" ? [{ column: draft.date, startMin: draft.startMin, endMin: draft.endMin }] : []}
+        onCreate={
+          blockTypes &&
+          ((range) => {
+            if (editable(range.column)) setDraft({ kind: "create", date: range.column, ...pick(range) });
+          })
         }
-      }}
-      onDropWork={async (column, startMin, work) => {
-        await scheduleWork({
-          kind: work.kind,
-          id: work.id,
-          date: column,
-          startMin,
-          endMin: Math.min(startMin + work.durationMin, 24 * 60),
-        });
-      }}
-      renderItem={(item, pos) =>
-        item.layer === "focus" ? (
-          <FocusBar focus={item.focus} />
-        ) : item.layer === "block" ? (
-          <BlockView item={item} startMin={pos.startMin} endMin={pos.endMin} />
-        ) : (
-          <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} />
-        )
-      }
-    />
+        onItemClick={(item) => {
+          if (item.layer === "block" && item.editable) setDraft({ kind: "edit", block: refOf(item.block) });
+        }}
+        onChange={async (item, next) => {
+          if (item.layer === "focus") return;
+          if (item.layer === "work") {
+            await updateSlot({ id: item.slot.id, date: next.column, ...pick(next) });
+          } else {
+            await changeDayBlock(refOf(item.block), pick(next));
+          }
+        }}
+        onDropWork={async (column, startMin, work) => {
+          await scheduleWork({
+            kind: work.kind,
+            id: work.id,
+            date: column,
+            startMin,
+            endMin: Math.min(startMin + work.durationMin, 24 * 60),
+          });
+        }}
+        renderItem={(item, pos) =>
+          item.layer === "focus" ? (
+            <FocusBar focus={item.focus} />
+          ) : item.layer === "block" ? (
+            <BlockView item={item} startMin={pos.startMin} endMin={pos.endMin} />
+          ) : (
+            <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} />
+          )
+        }
+      />
+      {draft && blockTypes && <DayBlockDialog draft={draft} types={blockTypes} onClose={() => setDraft(null)} />}
+    </>
   );
 }
 
@@ -152,27 +209,24 @@ function pick(p: { startMin: number; endMin: number }) {
   return { startMin: p.startMin, endMin: p.endMin };
 }
 
-function BlockView({
-  item,
-  startMin,
-  endMin,
-}: {
-  item: Extract<Item, { layer: "block" }>;
-  startMin: number;
-  endMin: number;
-}) {
-  const { block, habitDone } = item;
+function BlockView({ item, startMin, endMin }: { item: BlockItem; startMin: number; endMin: number }) {
+  const { block, habitDone, editable, overlaps } = item;
   const habit = block.type.kind === "habit";
+  const warning = overlaps
+    .map((o) => `${o.type.name} ${formatMinutes(o.startMin)}–${formatMinutes(o.endMin)}`)
+    .join(", ");
   return (
     <div
-      className="h-full overflow-hidden rounded-sm border-l-4 px-1 text-[11px] leading-tight"
+      className={`group h-full overflow-hidden rounded-sm border-l-4 px-1 text-[11px] leading-tight ${
+        warning ? "outline-2 outline-amber-500" : ""
+      }`}
       style={{
         borderColor: block.type.color,
         background: `${block.type.color}${habit && habitDone ? "55" : "22"}`,
       }}
       title={`${block.type.name} ${formatMinutes(startMin)}–${formatMinutes(endMin)}${
         block.exceptionId ? " (changed for this day)" : ""
-      }`}
+      }${warning ? `\n⚠ Overlaps ${warning}` : ""}`}
     >
       <div className="flex items-start gap-1">
         {habit && (
@@ -185,8 +239,22 @@ function BlockView({
             aria-label={`${block.type.name} done`}
           />
         )}
-        <span className="truncate font-medium">{block.type.name}</span>
+        <span className="truncate font-medium">
+          {warning && <span className="text-amber-600 dark:text-amber-400">⚠ </span>}
+          {block.type.name}
+        </span>
         {block.exceptionId && <span className="text-muted">*</span>}
+        {editable && (
+          <button
+            type="button"
+            className="ml-auto hidden text-muted hover:text-red-600 group-hover:block"
+            {...stop}
+            onClick={() => changeDayBlock(refOf(block), "remove")}
+            title="Remove for this day"
+          >
+            ×
+          </button>
+        )}
       </div>
       {endMin - startMin >= 45 && (
         <div className="text-muted">

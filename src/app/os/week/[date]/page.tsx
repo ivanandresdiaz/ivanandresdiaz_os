@@ -5,7 +5,7 @@ import { Stack } from "@/components/stack";
 import { addDays, isIsoDate, startOfWeek, weekDates } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
-import { getCalendar, getStack } from "@/server/queries";
+import { getBlockTypes, getCalendar, getStack } from "@/server/queries";
 
 export default async function WeekPage({ params }: PageProps<"/os/week/[date]">) {
   await requireIvan();
@@ -16,7 +16,7 @@ export default async function WeekPage({ params }: PageProps<"/os/week/[date]">)
 
   const now = today();
   const dates = weekDates(monday);
-  const [days, stack] = await Promise.all([getCalendar(dates), getStack(monday)]);
+  const [days, stack, blockTypes] = await Promise.all([getCalendar(dates), getStack(monday), getBlockTypes()]);
 
   return (
     <>
@@ -36,8 +36,12 @@ export default async function WeekPage({ params }: PageProps<"/os/week/[date]">)
           </Link>
         )}
       </div>
+      <p className="-mt-2 text-xs text-muted">
+        With the mouse, change a day&apos;s Blocks from today on: draw to add one, click one to reassign it, × to
+        remove it, ↺ to return the day to the Structure.
+      </p>
       <div className="grid gap-4 xl:grid-cols-[1fr_minmax(260px,300px)]">
-        <Calendar days={days} today={now} timeZone={APP_TIMEZONE} />
+        <Calendar days={days} today={now} timeZone={APP_TIMEZONE} blockTypes={blockTypes} />
         <aside className="flex flex-col gap-2">
           <h2 className="font-semibold">Stack</h2>
           <p className="text-xs text-muted">Drag work onto a day.</p>

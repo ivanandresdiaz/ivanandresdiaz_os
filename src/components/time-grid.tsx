@@ -16,7 +16,13 @@ export const PX_PER_MIN = 1;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const CLICK_TOLERANCE_PX = 3;
 
-export type GridColumn = { key: string; label: ReactNode; highlight?: boolean };
+export type GridColumn = {
+  key: string;
+  label: ReactNode;
+  highlight?: boolean;
+  /** Nothing is drawn on it, e.g. a past day. */
+  locked?: boolean;
+};
 
 export type GridItem = {
   id: string;
@@ -72,6 +78,8 @@ type Props<T extends GridItem> = {
   onItemClick?: (item: T) => void;
   /** Drawing (or tapping) on empty space; omit to disable it. */
   onCreate?: (range: GridPosition) => void;
+  /** Whether a finger's tap creates or clicks; off keeps a touch screen read-only. */
+  touchTaps?: boolean;
   /** Dashed placeholders, e.g. the range waiting for its Block type. */
   ghosts?: GridPosition[];
   onDropWork?: (column: string, startMin: number, work: WorkDrop) => Promise<void>;
@@ -122,6 +130,7 @@ export function TimeGrid<T extends GridItem>({
   onChange,
   onItemClick,
   onCreate,
+  touchTaps = true,
   ghosts = [],
   onDropWork,
   now,
@@ -177,7 +186,7 @@ export function TimeGrid<T extends GridItem>({
   const startDrag = (event: React.PointerEvent, item: T, mode: Drag<T>["mode"]) => {
     if (event.button !== 0) return;
     if (!canDrag(item, event.pointerType)) {
-      if (mode === "move" && event.pointerType === "touch") {
+      if (mode === "move" && event.pointerType === "touch" && touchTaps) {
         itemTap.current = { id: item.id, x: event.clientX, y: event.clientY };
       }
       return;
@@ -266,11 +275,11 @@ export function TimeGrid<T extends GridItem>({
     onCreate?.({ column, ...clickedRange(minute, busyIn(column)) });
   };
 
-  const startDrawing = (event: React.PointerEvent, column: string) => {
-    if (!onCreate || event.button !== 0 || event.target !== event.currentTarget) return;
+  const startDrawing = (event: React.PointerEvent, { key: column, locked }: GridColumn) => {
+    if (!onCreate || locked || event.button !== 0 || event.target !== event.currentTarget) return;
     const minute = minuteAt(column, event.clientY);
     if (event.pointerType === "touch") {
-      tap.current = { column, minute, x: event.clientX, y: event.clientY };
+      if (touchTaps) tap.current = { column, minute, x: event.clientX, y: event.clientY };
       return;
     }
     event.preventDefault();
@@ -419,8 +428,8 @@ export function TimeGrid<T extends GridItem>({
                 if (el) columnRefs.current.set(col.key, el);
                 else columnRefs.current.delete(col.key);
               }}
-              className={`relative flex-1 border-l border-line ${onCreate ? "cursor-crosshair" : ""}`}
-              onPointerDown={(event) => startDrawing(event, col.key)}
+              className={`relative flex-1 border-l border-line ${onCreate && !col.locked ? "cursor-crosshair" : ""}`}
+              onPointerDown={(event) => startDrawing(event, col)}
               onPointerUp={endTap}
               onPointerCancel={() => {
                 tap.current = null;

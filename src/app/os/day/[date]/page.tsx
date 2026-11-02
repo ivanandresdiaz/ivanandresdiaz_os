@@ -21,10 +21,9 @@ import {
 } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
-import { completeCheckIn, deleteException, setExceptionForm } from "@/server/actions";
+import { completeCheckIn } from "@/server/actions";
 import {
   getActiveCycle,
-  getBlockTypes,
   getCalendar,
   getCheckInContext,
   getCycleHistory,
@@ -40,12 +39,11 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
   if (!isIsoDate(date)) notFound();
 
   const now = today();
-  const [context, note, [day], stack, blockTypes, presets, cycles, activeCycle, feed] = await Promise.all([
+  const [context, note, [day], stack, presets, cycles, activeCycle, feed] = await Promise.all([
     getCheckInContext(date),
     getDailyNote(date),
     getCalendar([date]),
     getStack(date),
-    getBlockTypes(),
     getCyclePresets(),
     getCycleHistory(date, date),
     getActiveCycle(),
@@ -197,60 +195,9 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
               ))}
           </section>
 
-          <section className="card flex flex-col gap-2">
-            <h2 className="font-semibold">This day&apos;s Blocks</h2>
-            <p className="text-xs text-muted">
-              To move a Block for this day only, use the{" "}
-              <Link href={`/os/week/${startOfWeek(date)}`} className="underline">Week</Link> on a computer. The weekly{" "}
-              <Link href="/os/structure" className="underline">Structure</Link> stays the same.
-            </p>
-            <ul className="space-y-1 text-sm">
-              {day.blocks.map((b) => (
-                <li key={b.key} className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: b.type.color }} />
-                  <span className="flex-1">{b.type.name}</span>
-                  {b.exceptionId ? (
-                    <form action={deleteException}>
-                      <Hidden id={b.exceptionId} />
-                      <button className="text-xs text-muted hover:underline">
-                        {b.structureBlockId ? "reset" : "remove"}
-                      </button>
-                    </form>
-                  ) : (
-                    <form action={setExceptionForm}>
-                      <Hidden
-                        date={date}
-                        structureBlockId={b.structureBlockId ?? ""}
-                        removed="true"
-                        startMin="00:00"
-                        endMin="00:00"
-                        blockTypeId={b.blockTypeId}
-                      />
-                      <button className="text-xs text-muted hover:underline">skip today</button>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <details>
-              <summary className="cursor-pointer text-sm text-muted">Add a Block for this day</summary>
-              <form action={setExceptionForm} className="mt-2 flex flex-wrap items-end gap-2">
-                <Hidden date={date} structureBlockId="" removed="false" />
-                <select name="blockTypeId" className="input w-auto" required>
-                  {blockTypes
-                    .filter((t) => !t.archived)
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                </select>
-                <input name="startMin" type="time" step={900} defaultValue="09:00" className="input w-auto" required />
-                <input name="endMin" type="time" step={900} defaultValue="10:00" className="input w-auto" required />
-                <button className="btn">Add</button>
-              </form>
-            </details>
-          </section>
+          <Link href={`/os/week/${startOfWeek(date)}`} className="px-1 text-xs text-muted hover:underline">
+            Change this day&apos;s Blocks in the Week
+          </Link>
         </div>
 
         {/* ── Calendar ── */}

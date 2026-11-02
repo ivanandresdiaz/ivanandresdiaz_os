@@ -20,7 +20,7 @@ export default async function StructurePage() {
       <PageTitle>Structure</PageTitle>
       <p className="-mt-2 text-sm text-muted">
         Your weekly template of Blocks — a nudge, not a rule. Changes apply from today on; past days keep their
-        history. To change a single day, drag the Block on that day&apos;s calendar instead.
+        history. To change a single day, use the Week.
       </p>
       <div className="grid gap-4 xl:grid-cols-[1fr_minmax(280px,340px)]">
         <StructureEditor blocks={blocks} types={types} />
