@@ -18,6 +18,7 @@ import { isDayWon } from "@/domain/highlights";
 import { inPlay, inPriority } from "@/domain/plan";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
 import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/domain/secondary-tasks";
+import type { UpkeepRef } from "@/domain/upkeeps";
 import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
 
@@ -329,7 +330,9 @@ export type WorkItem = {
   stepsTotal: number;
 };
 
-export type CalendarWorkItem = WorkItem | (Omit<WorkItem, "kind"> & { kind: "secondary" });
+export type CalendarWorkItem =
+  | WorkItem
+  | (Omit<WorkItem, "kind"> & { kind: "secondary"; upkeep: UpkeepRef | null });
 
 const LOOSE_COLOR = "#71717a";
 
@@ -349,7 +352,7 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
     db.select().from(s.blockTypes),
     db.select().from(s.moves),
     db.select().from(s.tasks),
-    db.select().from(s.secondaryTasks),
+    getSecondaryTasks(),
     db.select({ taskId: s.steps.taskId, done: s.steps.done }).from(s.steps),
   ]);
   const color = (campaignId: string | null) => {
@@ -403,7 +406,8 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
       kind: "secondary",
       id: task.id,
       title: task.title,
-      done: task.doneAt !== null,
+      done: task.doneOn !== null,
+      upkeep: task.upkeep,
       durationMin: 30,
       moveId: null,
       parentTitle: null,
@@ -531,6 +535,10 @@ export type MonthItem = {
   color: string;
   /** Null for a Secondary Task of that day without a Slot on it. */
   startMin: number | null;
+  /** The Upkeep it is an occurrence of. */
+  upkeepId: string | null;
+  /** Set when it can be dragged to another day: only pending Secondary Tasks, never strategy. */
+  movable: { secondaryTaskId: string; slot: { id: string; date: IsoDate } | null } | null;
 };
 
 export type MonthDay = { date: IsoDate; items: MonthItem[] };
@@ -543,16 +551,15 @@ export type MonthDay = { date: IsoDate; items: MonthItem[] };
 export async function getMonth(dates: IsoDate[]): Promise<MonthDay[]> {
   const start = dates[0];
   const end = dates[dates.length - 1];
-  const [slotRows, index, secondaryRows] = await Promise.all([
+  const [slotRows, index, secondary] = await Promise.all([
     db
       .select()
       .from(s.slots)
       .where(and(gte(s.slots.date, start), lte(s.slots.date, end)))
       .orderBy(asc(s.slots.startMin)),
     getWorkIndex(),
-    db.select().from(s.secondaryTasks).orderBy(asc(s.secondaryTasks.createdAt)),
+    getSecondaryTasks(),
   ]);
-  const secondary = secondaryRows.map(toSecondaryTask);
 
   return dates.map((date) => {
     const slots = slotRows.filter((slot) => slot.date === date);
@@ -562,18 +569,30 @@ export async function getMonth(dates: IsoDate[]): Promise<MonthDay[]> {
     return {
       date,
       items: [
-        ...unscheduled.map((task) => ({
+        ...unscheduled.map((task): MonthItem => ({
           key: `secondary:${task.id}`,
           title: task.title,
           done: task.doneOn !== null,
           color: LOOSE_COLOR,
           startMin: null,
+          upkeepId: task.upkeep?.id ?? null,
+          movable: task.doneOn === null ? { secondaryTaskId: task.id, slot: null } : null,
         })),
-        ...slots.flatMap((slot) => {
+        ...slots.flatMap((slot): MonthItem[] => {
           const work = index.get(workKey(slot.workKind, slotWorkId(slot)));
-          return work
-            ? [{ key: slot.id, title: work.title, done: work.done, color: work.color, startMin: slot.startMin }]
-            : [];
+          if (!work) return [];
+          const secondary = work.kind === "secondary";
+          return [{
+            key: slot.id,
+            title: work.title,
+            done: work.done,
+            color: work.color,
+            startMin: slot.startMin,
+            upkeepId: secondary ? (work.upkeep?.id ?? null) : null,
+            movable: secondary && !work.done
+              ? { secondaryTaskId: work.id, slot: { id: slot.id, date: slot.date } }
+              : null,
+          }];
         }),
       ],
     };
@@ -684,13 +703,51 @@ export async function getStack(date: IsoDate) {
   };
 }
 
-function toSecondaryTask(row: typeof s.secondaryTasks.$inferSelect): SecondaryTask {
-  return {
-    id: row.id,
-    title: row.title,
-    day: row.day,
-    doneOn: row.doneAt ? localMoment(row.doneAt, APP_TIMEZONE).date : null,
-  };
+/** Every Secondary Task with the interval of its Upkeep, oldest first. */
+async function getSecondaryTasks(): Promise<SecondaryTask[]> {
+  const rows = await db
+    .select({ task: s.secondaryTasks, intervalDays: s.upkeeps.intervalDays })
+    .from(s.secondaryTasks)
+    .leftJoin(s.upkeeps, eq(s.upkeeps.id, s.secondaryTasks.upkeepId))
+    .orderBy(asc(s.secondaryTasks.createdAt));
+  return rows.map(({ task, intervalDays }) => ({
+    id: task.id,
+    title: task.title,
+    day: task.day,
+    doneOn: task.doneAt ? localMoment(task.doneAt, APP_TIMEZONE).date : null,
+    upkeep: task.upkeepId && intervalDays !== null ? { id: task.upkeepId, intervalDays } : null,
+  }));
+}
+
+export type UpkeepView = {
+  id: string;
+  title: string;
+  intervalDays: number;
+  /** Its one pending occurrence. */
+  next: { id: string; day: IsoDate } | null;
+  lastDone: IsoDate | null;
+};
+
+/** The Upkeeps, the one due soonest first. */
+export async function getUpkeeps(): Promise<UpkeepView[]> {
+  const [upkeeps, tasks] = await Promise.all([
+    db.select().from(s.upkeeps).orderBy(asc(s.upkeeps.createdAt)),
+    getSecondaryTasks(),
+  ]);
+  return upkeeps
+    .map((upkeep) => {
+      const own = tasks.filter((task) => task.upkeep?.id === upkeep.id);
+      const next = own.find((task) => task.doneOn === null);
+      const lastDone = own.flatMap((task) => (task.doneOn ? [task.doneOn] : [])).sort().at(-1) ?? null;
+      return {
+        id: upkeep.id,
+        title: upkeep.title,
+        intervalDays: upkeep.intervalDays,
+        next: next ? { id: next.id, day: next.day } : null,
+        lastDone,
+      };
+    })
+    .sort((a, b) => (a.next?.day ?? "9999").localeCompare(b.next?.day ?? "9999"));
 }
 
 export async function getDailyNote(date: IsoDate) {
@@ -701,7 +758,7 @@ export async function getDailyNote(date: IsoDate) {
       .from(s.highlights)
       .where(eq(s.highlights.date, date))
       .orderBy(asc(s.highlights.position)),
-    db.select().from(s.secondaryTasks).orderBy(asc(s.secondaryTasks.createdAt)),
+    getSecondaryTasks(),
     db
       .select({ id: s.noiseItems.id, title: s.noiseItems.title })
       .from(s.noiseItems)
@@ -713,7 +770,7 @@ export async function getDailyNote(date: IsoDate) {
     noiseItems,
     checkInDoneAt: note?.checkInDoneAt ?? null,
     highlights,
-    secondaryTasks: secondaryTasksForDate(secondary.map(toSecondaryTask), date),
+    secondaryTasks: secondaryTasksForDate(secondary, date),
     dayWon: isDayWon(highlights),
   };
 }

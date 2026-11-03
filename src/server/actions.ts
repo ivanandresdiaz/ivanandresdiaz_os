@@ -23,6 +23,7 @@ import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFi
 import { parseQuarterKey } from "@/domain/plan";
 import { dayAfterScheduling } from "@/domain/secondary-tasks";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
+import { isValidInterval, monthMove, nextUpkeepDay } from "@/domain/upkeeps";
 import {
   type DayBlockChange,
   type DayBlockRef,
@@ -685,7 +686,9 @@ export async function toggleWorkDone(input: { kind: "task" | "move" | "secondary
       .update(table)
       .set({ doneAt: nowDone ? new Date() : null })
       .where(eq(table.id, id));
-    if (kind !== "secondary") {
+    if (kind === "secondary") {
+      await settleUpkeep(tx, id, nowDone);
+    } else {
       await tx
         .update(s.highlights)
         .set({ done: nowDone })
@@ -995,10 +998,140 @@ export async function addSecondaryTask(fd: FormData) {
   await done();
 }
 
+/** Deleting the pending occurrence of an Upkeep stops the Upkeep: there is no Skip. */
 export async function deleteSecondaryTask(input: { id: string }) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(input);
+  const [task] = await db
+    .select({ upkeepId: s.secondaryTasks.upkeepId, doneAt: s.secondaryTasks.doneAt })
+    .from(s.secondaryTasks)
+    .where(eq(s.secondaryTasks.id, id));
+  if (task?.upkeepId && task.doneAt === null) return stopUpkeep({ id: task.upkeepId });
   await db.delete(s.secondaryTasks).where(eq(s.secondaryTasks.id, id));
+  await done();
+}
+
+/**
+ * Drags a pending Secondary Task to another day in the Month: only to today or
+ * later. A Slot from today on keeps its hour; otherwise only its day moves.
+ */
+export async function moveSecondaryTaskInMonth(input: { id: string; slotId: string | null; date: string }) {
+  await requireIvan();
+  const v = z.object({ id: z.uuid(), slotId: z.uuid().nullable(), date: isoDate }).parse(input);
+  await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ doneAt: s.secondaryTasks.doneAt })
+      .from(s.secondaryTasks)
+      .where(eq(s.secondaryTasks.id, v.id));
+    if (!task || task.doneAt !== null) return;
+    const [slot] = v.slotId
+      ? await tx
+          .select({ id: s.slots.id, date: s.slots.date })
+          .from(s.slots)
+          .where(and(eq(s.slots.id, v.slotId), eq(s.slots.secondaryTaskId, v.id)))
+      : [];
+    const move = monthMove({ slot: slot ?? null }, v.date, today());
+    if (!move) return;
+    if (move.kind === "slot") {
+      await tx.update(s.slots).set({ date: move.date }).where(eq(s.slots.id, move.slotId));
+      await followSlot(tx, v.id, move.date);
+    } else {
+      await tx.update(s.secondaryTasks).set({ day: move.date }).where(eq(s.secondaryTasks.id, v.id));
+    }
+  });
+  await done();
+}
+
+// ─── Upkeeps ─────────────────────────────────────────────────────────────────
+
+const intervalDays = z.coerce.number().refine(isValidInterval, "Invalid interval");
+
+/**
+ * Keeps one pending occurrence per Upkeep. Done: the next one is born,
+ * counted from today. Reopened: the one born from it goes away.
+ */
+async function settleUpkeep(tx: Tx, taskId: string, nowDone: boolean) {
+  const [task] = await tx
+    .select({ upkeepId: s.secondaryTasks.upkeepId, title: s.upkeeps.title, intervalDays: s.upkeeps.intervalDays })
+    .from(s.secondaryTasks)
+    .innerJoin(s.upkeeps, eq(s.upkeeps.id, s.secondaryTasks.upkeepId))
+    .where(eq(s.secondaryTasks.id, taskId));
+  if (!task?.upkeepId) return;
+  const others = and(
+    eq(s.secondaryTasks.upkeepId, task.upkeepId),
+    isNull(s.secondaryTasks.doneAt),
+    sql`${s.secondaryTasks.id} <> ${taskId}`,
+  );
+  await tx.delete(s.secondaryTasks).where(others);
+  if (nowDone) {
+    await tx.insert(s.secondaryTasks).values({
+      title: task.title,
+      day: nextUpkeepDay(today(), task.intervalDays),
+      upkeepId: task.upkeepId,
+    });
+  }
+}
+
+export async function createUpkeep(fd: FormData) {
+  await requireIvan();
+  const v = z.object({ title: required, day: isoDate, intervalDays }).parse(fields(fd));
+  await db.transaction(async (tx) => {
+    const [upkeep] = await tx
+      .insert(s.upkeeps)
+      .values({ title: v.title, intervalDays: v.intervalDays })
+      .returning({ id: s.upkeeps.id });
+    await tx.insert(s.secondaryTasks).values({ title: v.title, day: v.day, upkeepId: upkeep.id });
+  });
+  await done();
+}
+
+/** Renames it (its pending occurrence too) or changes its interval; the pending one keeps its day. */
+export async function updateUpkeep(fd: FormData) {
+  await requireIvan();
+  const v = z.object({ id: z.uuid(), title: required, intervalDays }).parse(fields(fd));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(s.upkeeps)
+      .set({ title: v.title, intervalDays: v.intervalDays })
+      .where(eq(s.upkeeps.id, v.id));
+    await tx
+      .update(s.secondaryTasks)
+      .set({ title: v.title })
+      .where(and(eq(s.secondaryTasks.upkeepId, v.id), isNull(s.secondaryTasks.doneAt)));
+  });
+  await done();
+}
+
+/**
+ * Marks an occurrence done from the modal. The days chosen there become the
+ * Upkeep's interval for this and every next one.
+ */
+export async function completeUpkeepOccurrence(input: { id: string; intervalDays: number }) {
+  await requireIvan();
+  const v = z.object({ id: z.uuid(), intervalDays }).parse(input);
+  await db.transaction(async (tx) => {
+    const [task] = await tx
+      .update(s.secondaryTasks)
+      .set({ doneAt: new Date() })
+      .where(and(eq(s.secondaryTasks.id, v.id), isNull(s.secondaryTasks.doneAt)))
+      .returning({ upkeepId: s.secondaryTasks.upkeepId });
+    if (!task?.upkeepId) return;
+    await tx.update(s.upkeeps).set({ intervalDays: v.intervalDays }).where(eq(s.upkeeps.id, task.upkeepId));
+    await settleUpkeep(tx, v.id, true);
+  });
+  await done();
+}
+
+/** Stops it: its pending occurrence goes away; the done ones stay as plain history. */
+export async function stopUpkeep(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(s.secondaryTasks)
+      .where(and(eq(s.secondaryTasks.upkeepId, id), isNull(s.secondaryTasks.doneAt)));
+    await tx.delete(s.upkeeps).where(eq(s.upkeeps.id, id));
+  });
   await done();
 }
 
