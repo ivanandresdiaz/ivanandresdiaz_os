@@ -154,7 +154,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
             }))}
           />
 
-          <SecondaryTasks date={date} tasks={note.secondaryTasks} />
+          <SecondaryTasks date={date} today={now} tasks={note.secondaryTasks} />
 
           <NoiseItems date={date} items={note.noiseItems} />
 

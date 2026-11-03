@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { SECONDARY_TASK_DURATION_MIN, type SecondaryTaskView } from "@/domain/secondary-tasks";
-import { addSecondaryTask, deleteSecondaryTask, toggleWorkDone } from "@/server/actions";
+import { addSecondaryTask, deleteSecondaryTask } from "@/server/actions";
 import { WORK_MIME, type WorkDrop } from "./time-grid";
 import { AddIconButton, Hidden } from "./ui";
+import { StopUpkeep, UpkeepMark, useDoneToggle } from "./upkeeps";
 
-export function SecondaryTasks({ date, tasks }: { date: string; tasks: SecondaryTaskView[] }) {
+export function SecondaryTasks({ date, today, tasks }: { date: string; today: string; tasks: SecondaryTaskView[] }) {
   const [adding, setAdding] = useState(false);
+  const [stopping, setStopping] = useState<string | null>(null);
+  const { toggle, dialog } = useDoneToggle(today);
 
   return (
     <section className="card flex flex-col gap-3">
@@ -21,8 +24,8 @@ export function SecondaryTasks({ date, tasks }: { date: string; tasks: Secondary
 
       <div className="flex flex-col gap-2 empty:hidden">
         {tasks.map((task) => (
+          <div key={task.id} className="flex flex-col gap-1">
           <div
-            key={task.id}
             draggable={!task.done}
             onDragStart={(event) => {
               const drop: WorkDrop = {
@@ -41,11 +44,12 @@ export function SecondaryTasks({ date, tasks }: { date: string; tasks: Secondary
               type="checkbox"
               className="mt-0.5"
               checked={task.done}
-              onChange={() => toggleWorkDone({ kind: "secondary", id: task.id })}
+              onChange={() => toggle(task)}
               aria-label={`${task.title} done`}
             />
             <div className={`min-w-0 flex-1 ${task.done ? "line-through" : ""}`}>
               {task.title}
+              {task.upkeep && <UpkeepMark upkeepId={task.upkeep.id} date={task.day} />}
               {task.carried > 0 && (
                 <span
                   className="ml-1.5 rounded bg-amber-500/15 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"
@@ -58,11 +62,17 @@ export function SecondaryTasks({ date, tasks }: { date: string; tasks: Secondary
             <button
               type="button"
               className="text-muted hover:text-red-600"
-              onClick={() => deleteSecondaryTask({ id: task.id })}
-              title="Delete Secondary Task"
+              onClick={() =>
+                task.upkeep && !task.done ? setStopping(task.id) : deleteSecondaryTask({ id: task.id })
+              }
+              title={task.upkeep && !task.done ? "Stop this Upkeep" : "Delete Secondary Task"}
             >
               ×
             </button>
+          </div>
+          {stopping === task.id && task.upkeep && (
+            <StopUpkeep id={task.upkeep.id} title={task.title} onCancel={() => setStopping(null)} />
+          )}
           </div>
         ))}
       </div>
@@ -84,6 +94,7 @@ export function SecondaryTasks({ date, tasks }: { date: string; tasks: Secondary
           </button>
         </form>
       )}
+      {dialog}
     </section>
   );
 }

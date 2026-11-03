@@ -17,6 +17,7 @@ import type { BlockType, CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot
 import { DayBlockDialog, type DayBlockDraft } from "./day-block-dialog";
 import { StartCycleButton } from "./start-cycle-button";
 import { TimeGrid, type GridItem } from "./time-grid";
+import { UpkeepMark, useDoneToggle } from "./upkeeps";
 
 type BlockItem = GridItem & {
   layer: "block";
@@ -196,7 +197,7 @@ export function Calendar({
           ) : item.layer === "block" ? (
             <BlockView item={item} startMin={pos.startMin} endMin={pos.endMin} />
           ) : (
-            <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} />
+            <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} today={today} />
           )
         }
       />
@@ -270,13 +271,16 @@ function SlotView({
   startMin,
   endMin,
   compact,
+  today,
 }: {
   slot: CalendarSlot;
   startMin: number;
   endMin: number;
   compact: boolean;
+  today: IsoDate;
 }) {
   const { work } = slot;
+  const upkeep = useDoneToggle(today);
   return (
     <div
       className={`group h-full overflow-hidden rounded-md border bg-surface px-1.5 py-0.5 text-xs shadow-sm ${
@@ -289,11 +293,14 @@ function SlotView({
           type="checkbox"
           checked={work.done}
           {...stop}
-          onChange={() => toggleWorkDone({ kind: work.kind, id: work.id })}
+          onChange={() =>
+            work.kind === "secondary" ? upkeep.toggle(work) : toggleWorkDone({ kind: work.kind, id: work.id })
+          }
           aria-label={`${work.title} done`}
         />
         <span className={`flex-1 font-medium leading-tight ${work.done ? "line-through" : ""}`}>
           {work.title}
+          {work.kind === "secondary" && work.upkeep && <UpkeepMark upkeepId={work.upkeep.id} date={slot.date} />}
         </span>
         {!work.done && work.kind !== "secondary" && <StartCycleButton slotId={slot.id} className="text-[10px]" />}
         <button
@@ -314,6 +321,7 @@ function SlotView({
           {work.stepsTotal > 0 ? ` · ${work.stepsDone}/${work.stepsTotal}` : ""}
         </div>
       ) : null}
+      {upkeep.dialog}
     </div>
   );
 }
