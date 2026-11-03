@@ -461,6 +461,41 @@ Origen: el Check-in mostraba los Principles abiertos desde la mejora de los Prin
 | Q167 | Cerrados por defecto | ✅ Los Principles del Check-in arrancan cerrados. El título "Principles" los abre y los cierra, sin un botón extra. Lo demás no cambia: el título de cada uno abre su drawer y muestra cuántas References tiene. No son un paso del ritual: están a mano para leerlos. |
 | Q168 | Recuerda la última elección | ✅ Si Ivan los abre, quedan abiertos la próxima vez, y cerrados si los cierra. Es algo sencillo: lo recuerda cada navegador (localStorage), así que el teléfono y el portátil llevan cada uno la suya. |
 
+## Ronda 25 — Upkeep: lo recurrente que es responsabilidad (2026-11-02)
+
+Origen: Ivan no lleva el control de cuándo cambiarle el aceite a la moto (cada 3 meses para su uso). Quiere algo recurrente que no es estrategia pero sí responsabilidad: al hacerlo se programa el siguiente, y si no se atiende se arrastra.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q169 | "Tareas perdidas" | ✅ Son las Tasks sueltas del Backlog. No se introduce "someday". |
+| Q170 | Se ve con antelación | ✅ Ivan quiere verla días antes en el Month; no puede nacer el mismo día en que toca. |
+| Q171 | La cuenta arranca al hacerla | ✅ La siguiente se cuenta desde el día en que se marca hecha, no desde el día en que tocaba. Al marcarla, un modal confirma y muestra que la próxima queda en X días; X se puede corregir ahí. |
+| Q172 | Fecha al crearla | ✅ Al crearla se elige la fecha. Después se puede mover arrastrándola a otro día en el Month (p. ej. de un martes al sábado). |
+| Q173 | Una ocurrencia viva | ✅ Lo que se repite es la regla; cada vez que toca es una Secondary Task normal con su día. Siempre hay una sola pendiente por regla: nace al crear la regla o al marcar hecha la anterior, así que se ve en el Month desde ese momento. |
+| Q174 | Nombre | ✅ **Upkeep**. _Evitar_: Recurring Task (choca con Task, que es estratégica), Chore. |
+| Q175 | El X del modal | ✅ Corregir los días en el modal cambia el intervalo del Upkeep: vale para la próxima y para todas las que siguen. |
+| Q176 | Unidad | ✅ Solo días, para que sea flexible. |
+| Q177 | Arrastrar en el Month (revisa Q124) | ✅ En el Month se arrastran a otro día las Secondary Tasks pendientes, incluidas las ocurrencias de un Upkeep; si tienen Slot, conservan su hora. Solo hacia hoy o el futuro: el plan de un día vivido no se reescribe. Ver Q186. |
+| Q178 | Dónde viven | ✅ Un botón "Upkeeps" en el encabezado del Month abre un drawer con la lista: título, "every N days", el próximo y la última vez. Arriba, un + para crear uno con título, primera fecha (por defecto hoy) e intervalo. |
+| Q179 | Borrar una ocurrencia | ✅ La × pregunta "Stop this Upkeep?"; al confirmar, el Upkeep se detiene y su ocurrencia pendiente desaparece. No hay Skip: postergar es arrastrar, hacerla es marcarla. También se detiene desde el drawer. |
+| Q180 | Desmarcar | ✅ Reabre la ocurrencia y borra la siguiente que nació de ella. El intervalo queda como se dejó en el modal. |
+| Q181 | Cambiar el intervalo en el drawer | ✅ La ocurrencia ya pendiente no se mueve; el nuevo intervalo cuenta desde la próxima vez que se marque. Para moverla, se arrastra. |
+| Q182 | Cómo se ve | ✅ Un ↻ pequeño junto al título, sin color. Tocarlo abre ese Upkeep en el drawer. |
+| Q183 | El drawer | ✅ Ordenado por el próximo, el que toca antes primero. Un Upkeep detenido desaparece, sin archivo. Ahí se renombra, se cambia el intervalo y se detiene; la fecha de la ocurrencia pendiente se cambia arrastrándola en el Month. |
+| Q184 | El Month no marca | ✅ El Month mira, navega y arrastra; no marca hecho. Se marca en el Check-in y en el calendario del Day o la Week, donde sale el modal del Upkeep. |
+| Q185 | Cancelar el modal | ✅ Cancel o Escape la dejan sin marcar. Solo "Done" la completa y crea la siguiente. |
+| Q186 | La estrategia no se mueve en el Month | ✅ Las Tasks y los Moves no se arrastran en el Month: se acomodan en el Day y la Week, donde se ven los Blocks. En el Month solo se mueve lo que no es estrategia. |
+
+## Upkeep y arrastrar en el Month — construido en local (2026-11-02)
+
+- **Modelo:** tabla `upkeeps` (título, `interval_days`) y `secondary_tasks.upkeep_id` (al detener el Upkeep, las hechas quedan como Secondary Tasks sueltas). Migración `drizzle/0009_upkeeps.sql`, aplicada en local; **falta aplicarla en Neon**.
+- **Dominio:** `src/domain/upkeeps.ts`: la siguiente se cuenta desde el día en que se marca, el intervalo va en días con meses como pista, y `monthMove` decide qué pasa al soltar en el Month.
+- **Marcar:** en el Check-in y en el Slot del calendario, una ocurrencia abre el modal "Done — Next in [N] days → fecha". Cambiar N cambia el intervalo del Upkeep. Cancel o Escape la dejan sin marcar; desmarcar borra la siguiente.
+- **↻:** en el Check-in y en el calendario lleva a `/os/month/YYYY-MM?upkeep=<id>`, que abre el drawer sobre ese Upkeep. En el Month abre el drawer ahí mismo, salvo en el teléfono, donde gana el título.
+- **Drawer "↻ Upkeeps":** en el encabezado del Month. Crear (título, primera fecha, cada N días, 90 por defecto), editar con ✎ (Save solo si algo cambió) y detener con confirmación.
+- **Month:** con dnd-kit (ADR 0002) se arrastran las Secondary Tasks pendientes, solo a hoy o al futuro. Un Slot desde hoy conserva su hora; uno pasado queda como historial y solo se mueve el día. Las Tasks y los Moves no se mueven ahí.
+- Verificación: 105 tests, typecheck, lint y prueba en el navegador (crear, arrastrar jueves → sábado, rechazar un día pasado, traerla a hoy, modal con 90 → 100, Escape, desmarcar, agendar y marcar desde el Slot, ↻ desde el Check-in y desde el Month, editar el intervalo sin mover la pendiente, detener desde la ×, ancho de teléfono). La base local quedó sin filas de prueba.
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
