@@ -243,8 +243,8 @@ Origen: mañana a las 9:00, reunión con el jefe para instalar Claude Work. Ya s
 | Q117 | Posponer y adelantar | ✅ Agendarla en un día futuro la pasa a ese día, "como si la Secondary no hubiera existido" antes. Agendarla hoy la trae a hoy si su día no había llegado; una arrastrada que se agenda hoy conserva su ×N. |
 | Q118 | Cumpleaños | ⏸ Pendiente, para más adelante (el cumpleaños es de la Person). |
 | Q119 | Antes de su día | ✅ Sin lista "Upcoming" en el Check-in: sería ruido todos los días. Mirar hacia adelante es trabajo de la vista Month. |
-| Q120 | Recordatorio | ✅ Sin recordatorio por ahora. |
-| Q121 | Google Calendar | ❌ No. Sin sincronización. |
+| Q120 | Recordatorio | ✅ Sin recordatorio por ahora. → Revisada en Q196: Reminder opcional en el Slot. |
+| Q121 | Google Calendar | ❌ No. Sin sincronización. → Revisada en Q187: solo los Slots con campanita, en una sola vía. |
 
 ## Ronda 17 — La vista Month (2026-11-02)
 
@@ -495,6 +495,48 @@ Origen: Ivan no lleva el control de cuándo cambiarle el aceite a la moto (cada 
 - **Drawer "↻ Upkeeps":** en el encabezado del Month. Crear (título, primera fecha, cada N días, 90 por defecto), editar con ✎ (Save solo si algo cambió) y detener con confirmación.
 - **Month:** con dnd-kit (ADR 0002) se arrastran las Secondary Tasks pendientes, solo a hoy o al futuro. Un Slot desde hoy conserva su hora; uno pasado queda como historial y solo se mueve el día. Las Tasks y los Moves no se mueven ahí.
 - Verificación: 105 tests, typecheck, lint y prueba en el navegador (crear, arrastrar jueves → sábado, rechazar un día pasado, traerla a hoy, modal con 90 → 100, Escape, desmarcar, agendar y marcar desde el Slot, ↻ desde el Check-in y desde el Month, editar el intervalo sin mover la pendiente, detener desde la ×, ancho de teléfono). La base local quedó sin filas de prueba.
+
+## Ronda 26 — Reminders: avisos a la hora de algunas tareas (2026-11-02)
+
+Origen: Ivan quiere un aviso a la hora de algunas tareas, no de todas (p. ej. "mañana me reúno con mi jefe"). Usa la PWA desde el iPhone, donde las notificaciones locales no llegan con la app cerrada. Se compararon Web Push (necesita un servidor que despierte a la hora exacta; Vercel Cron en Hobby corre una vez al día), ntfy o Pushover, Telegram, un feed .ics suscrito y WhatsApp vía Compuzuly. Google Calendar gana porque Google se encarga de avisar a tiempo: Ivan OS solo escribe el evento.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q187 | Canal (revisa Q121) | ✅ Google Calendar, en una sola vía: Ivan OS → Google. Telegram queda como plan B sin construir; WhatsApp descartado. |
+| Q188 | Qué se sincroniza | ✅ Solo los Slots con campanita. Los demás se quedan solo en Ivan OS. |
+| Q189 | Nombre y alcance | ✅ **Reminder**, opcional en el Slot y activado con la campanita. Vale para cualquier Slot: Task, Move o Secondary Task (también la ocurrencia agendada de un Upkeep). Sin Slot no hay hora y no hay Reminder. _Evitar_: Alert, Notification. |
+| Q190 | Cuándo | ✅ Un Reminder por Slot, 10 min antes por defecto ("me encanta"). Opciones: a la hora, 5, 10, 15, 30 o 60 min antes. |
+| Q191 | Sigue al Slot | ✅ Mover el Slot o cambiar su duración actualiza el evento. Marcarlo hecho, quitarle la campanita o borrar el Slot elimina el evento de Google. |
+| Q192 | Ivan OS manda | ✅ Lo que se edite o borre en Google se ignora y se reescribe cuando el Slot vuelva a cambiar. |
+| Q193 | Dónde | ✅ Un calendario aparte llamado "Ivan OS" en la cuenta de Google de Ivan; cada evento lleva el enlace al Day. |
+| Q194 | Qué app avisa | ✅ La app de Google Calendar en el iPhone (Ivan ya activó sus notificaciones). |
+| Q195 | Cycles | ✅ Fuera. Solo avisan los Slots con campanita. |
+| Q196 | Q120 | ✅ "Sin recordatorio por ahora" queda reemplazada por el Reminder. |
+| Q197 | Conectar | ✅ Google Calendar se conecta aparte del login, con "Connect Google Calendar", la primera vez que se toca una campanita sin conexión. El permiso de eventos se pide una vez y el acceso queda en el servidor. Ivan pasa la app de OAuth de *Testing* a *In production* para que el acceso no caduque cada 7 días. |
+| Q198 | Dónde está la campanita | ✅ Se pone y se quita en el Slot del calendario del Day y la Week. Al tocarla abre un menú: Off, At start, 5, 10 ✓, 15, 30, 60 min before; al activarla queda en 10. En el Check-in y el Month solo se ve una 🔔 pequeña sin color junto al título, como el ↻. |
+| Q199 | Slots ya empezados | ✅ No muestran la campanita. |
+| Q200 | Slots pasados sin hacer | ✅ Su evento se queda en Google como pasado; no hay limpieza. |
+| Q201 | No se arrastra | ✅ Cada Slot nuevo nace sin campanita, también el de una Secondary Task arrastrada que se vuelve a agendar. |
+| Q202 | Si Google falla | ✅ El Slot se guarda igual en Ivan OS y la campanita muestra el error ("Reconnect Google Calendar"). Nunca debe parecer que va a avisar si no va a avisar. |
+
+## Reminders — construido en local (2026-11-02)
+
+- **Campanita en el Slot** (calendario del Day y la Week). Apagada se ve al pasar el mouse, o siempre tenue en pantalla táctil, hasta que el Slot empieza. Al tocarla queda en 10 min y abre el menú: Off, At start, 5, 10, 15, 30, 60 min before. En el Check-in (Secondary Tasks) y en el Month solo se ve una 🔔 sin color.
+- **Google Calendar** se conecta aparte del login, con "Connect Google Calendar" desde la primera campanita. Pide solo el permiso `calendar.app.created`, que da acceso únicamente a los calendarios que crea la app y nunca a los demás de Ivan. Crea el calendario "Ivan OS" y, al volver, enciende la campanita que pidió la conexión. El refresh token se guarda cifrado (AES-256-GCM con una clave derivada de `AUTH_SECRET`). Se comprueba que la cuenta sea la de `ALLOWED_EMAIL`.
+- **Sincronización de una vía.** Cada evento tiene un id fijo derivado del Slot, así que escribir dos veces no crea dos eventos, y un evento borrado a mano en Google se vuelve a escribir. Siguen al Slot:
+  - moverlo o cambiar su duración en el calendario o arrastrarlo en el Month;
+  - marcar o desmarcar hecho (también desde el modal de Upkeep y desde un Highlight);
+  - renombrar la Task, el Move o el Upkeep;
+  - borrar el Slot o lo que lo contiene.
+  Los borrados en cascada los atrapa un trigger de Postgres que guarda el evento en `calendar_cleanups`, y se reintenta la próxima vez que Google responde.
+- **Si Google falla**, el Slot se guarda igual y la campanita muestra "!" con "Try again" y "Reconnect Google Calendar". Una tarea hecha cuyo evento no se pudo borrar sigue mostrando "!", porque Google todavía avisaría. Si Google revoca el acceso, la conexión queda pendiente de reconectar.
+- Migración `0010_reminders`, aplicada en local. **Falta aplicarla en Neon, junto con la 0009.**
+- Pasos de Ivan en Google Cloud, en el proyecto del login:
+  1. Activar la Google Calendar API.
+  2. Añadir el permiso `.../auth/calendar.app.created` en la pantalla de consentimiento.
+  3. Pasar la app a *In production*.
+  4. Añadir los redirect URIs `http://localhost:3200/api/google-calendar/callback` y `https://<dominio de producción>/api/google-calendar/callback`.
+- Verificación: 111 tests, typecheck, lint y prueba en el navegador. Se probó la campanita sin conexión (lleva a conectar), el callback con un `state` falso (se rechaza), un Slot ya empezado (sin campanita), al tocar → 10 ✓, cambiar a 30, Off, el error simulado ("!" en el calendario, el Check-in y el Month), hecho con un evento sin borrar ("!" se queda), el borrado (el trigger encola el evento), teléfono táctil y Week. Ivan hizo la configuración en Google Cloud y confirmó que la conexión real funciona en local. La base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 
