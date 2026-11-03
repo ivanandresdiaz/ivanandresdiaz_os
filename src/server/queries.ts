@@ -255,6 +255,29 @@ export async function getCampaigns(filter: { quarterId: string } | { candidates:
     .orderBy(asc(s.campaigns.position), asc(s.campaigns.createdAt));
 }
 
+/** A Link as shown: its address and its optional title. */
+export type LinkView = { id: string; url: string; title: string };
+
+/** The Links of some Tasks and Moves, in Ivan's order. */
+async function getLinks(owner: { taskIds?: string[]; moveIds?: string[] }) {
+  const { taskIds = [], moveIds = [] } = owner;
+  if (taskIds.length === 0 && moveIds.length === 0) return [];
+  return db
+    .select()
+    .from(s.links)
+    .where(
+      or(
+        taskIds.length ? inArray(s.links.taskId, taskIds) : undefined,
+        moveIds.length ? inArray(s.links.moveId, moveIds) : undefined,
+      ),
+    )
+    .orderBy(asc(s.links.position), asc(s.links.createdAt));
+}
+
+function linkView(row: typeof s.links.$inferSelect): LinkView {
+  return { id: row.id, url: row.url, title: row.title };
+}
+
 export async function getCampaignDetail(id: string) {
   const [campaign] = await db.select().from(s.campaigns).where(eq(s.campaigns.id, id));
   if (!campaign) return null;
@@ -277,23 +300,45 @@ export async function getCampaignDetail(id: string) {
         .where(inArray(s.steps.taskId, tasks.map((t) => t.id)))
         .orderBy(asc(s.steps.position), asc(s.steps.createdAt))
     : [];
+  const links = await getLinks({ taskIds: tasks.map((t) => t.id), moveIds: moves.map((m) => m.id) });
   return {
     campaign,
     moves: moves.map((move) => ({
       ...move,
+      links: links.filter((l) => l.moveId === move.id).map(linkView),
       tasks: tasks
         .filter((t) => t.moveId === move.id)
-        .map((task) => ({ ...task, steps: steps.filter((st) => st.taskId === task.id) })),
+        .map((task) => ({
+          ...task,
+          steps: steps.filter((st) => st.taskId === task.id),
+          links: links.filter((l) => l.taskId === task.id).map(linkView),
+        })),
     })),
   };
 }
 
 export async function getLooseTasks() {
-  return db
+  const tasks = await db
     .select()
     .from(s.tasks)
     .where(isNull(s.tasks.moveId))
     .orderBy(asc(s.tasks.doneAt), asc(s.tasks.createdAt));
+  const ids = tasks.map((t) => t.id);
+  const [steps, links] = await Promise.all([
+    ids.length
+      ? db
+          .select()
+          .from(s.steps)
+          .where(inArray(s.steps.taskId, ids))
+          .orderBy(asc(s.steps.position), asc(s.steps.createdAt))
+      : [],
+    getLinks({ taskIds: ids }),
+  ]);
+  return tasks.map((task) => ({
+    ...task,
+    steps: steps.filter((st) => st.taskId === task.id),
+    links: links.filter((l) => l.taskId === task.id).map(linkView),
+  }));
 }
 
 /** Structure rows in force on `date` (what the weekly template looks like that day). */
@@ -329,6 +374,8 @@ export type WorkItem = {
   weekOf: IsoDate | null;
   stepsDone: number;
   stepsTotal: number;
+  /** It has a Description or Links, to read where it is worked on. */
+  hasDetails: boolean;
 };
 
 export type CalendarWorkItem =
@@ -348,14 +395,16 @@ function slotWorkId(slot: typeof s.slots.$inferSelect): string {
 }
 
 async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
-  const [campaigns, types, moves, tasks, secondary, steps] = await Promise.all([
+  const [campaigns, types, moves, tasks, secondary, steps, links] = await Promise.all([
     db.select().from(s.campaigns),
     db.select().from(s.blockTypes),
     db.select().from(s.moves),
     db.select().from(s.tasks),
     getSecondaryTasks(),
     db.select({ taskId: s.steps.taskId, done: s.steps.done }).from(s.steps),
+    db.select({ taskId: s.links.taskId, moveId: s.links.moveId }).from(s.links),
   ]);
+  const linked = new Set(links.flatMap((l) => [l.taskId, l.moveId]).filter(Boolean));
   const color = (campaignId: string | null) => {
     const campaign = campaigns.find((c) => c.id === campaignId);
     return types.find((t) => t.id === campaign?.blockTypeId)?.color ?? LOOSE_COLOR;
@@ -379,6 +428,7 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
       weekOf: move.weekOf,
       stepsDone: 0,
       stepsTotal: 0,
+      hasDetails: move.description !== "" || linked.has(move.id),
     });
   }
   for (const task of tasks) {
@@ -400,6 +450,7 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
       weekOf: move?.weekOf ?? null,
       stepsDone: own.filter((st) => st.done).length,
       stepsTotal: own.length,
+      hasDetails: task.description !== "" || linked.has(task.id),
     });
   }
   for (const task of secondary) {
@@ -419,6 +470,7 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
       weekOf: null,
       stepsDone: 0,
       stepsTotal: 0,
+      hasDetails: false,
     });
   }
   return index;
@@ -835,6 +887,9 @@ export type CycleView = {
   label: string;
   work: WorkItem | null;
   steps: { id: string; title: string; done: boolean }[];
+  /** The Description and Links of the Task or Move it works on. */
+  description: string;
+  links: LinkView[];
   /** Minutes late against the Slot it was planned in (negative = early). */
   startDelayMin: number | null;
   realFocusMin: number;
@@ -846,7 +901,8 @@ async function toCycleViews(rows: (typeof s.cycles.$inferSelect)[]): Promise<Cyc
   const index = await getWorkIndex();
   const slotIds = rows.flatMap((r) => (r.slotId ? [r.slotId] : []));
   const taskIds = rows.flatMap((r) => (r.workKind === "task" && r.taskId ? [r.taskId] : []));
-  const [slotRows, stepRows] = await Promise.all([
+  const moveIds = rows.flatMap((r) => (r.workKind === "move" && r.moveId ? [r.moveId] : []));
+  const [slotRows, stepRows, linkRows, taskRows, moveRows] = await Promise.all([
     slotIds.length ? db.select().from(s.slots).where(inArray(s.slots.id, slotIds)) : [],
     taskIds.length
       ? db
@@ -854,6 +910,13 @@ async function toCycleViews(rows: (typeof s.cycles.$inferSelect)[]): Promise<Cyc
           .from(s.steps)
           .where(inArray(s.steps.taskId, taskIds))
           .orderBy(asc(s.steps.position), asc(s.steps.createdAt))
+      : [],
+    getLinks({ taskIds, moveIds }),
+    taskIds.length
+      ? db.select({ id: s.tasks.id, description: s.tasks.description }).from(s.tasks).where(inArray(s.tasks.id, taskIds))
+      : [],
+    moveIds.length
+      ? db.select({ id: s.moves.id, description: s.moves.description }).from(s.moves).where(inArray(s.moves.id, moveIds))
       : [],
   ]);
   const now = new Date();
@@ -870,6 +933,18 @@ async function toCycleViews(rows: (typeof s.cycles.$inferSelect)[]): Promise<Cyc
       steps: stepRows
         .filter((st) => row.workKind === "task" && st.taskId === row.taskId)
         .map((st) => ({ id: st.id, title: st.title, done: st.done })),
+      description:
+        (row.workKind === "task"
+          ? taskRows.find((r) => r.id === row.taskId)
+          : row.workKind === "move"
+            ? moveRows.find((r) => r.id === row.moveId)
+            : undefined
+        )?.description ?? "",
+      links: linkRows
+        .filter((l) =>
+          row.workKind === "task" ? l.taskId === row.taskId : row.workKind === "move" ? l.moveId === row.moveId : false,
+        )
+        .map(linkView),
       startDelayMin: slot ? startDelayMin(slot, row.startedAt, APP_TIMEZONE) : null,
       realFocusMin: realFocusMin(row, now),
       complete: isComplete(row, now),

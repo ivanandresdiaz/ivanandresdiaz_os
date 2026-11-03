@@ -5,6 +5,7 @@ import { formatMinutes, WEEKDAY_NAMES, weekdayOf } from "@/domain/dates";
 import { toggleWorkDone } from "@/server/actions";
 import type { StackItem } from "@/server/queries";
 import { StartCycleButton } from "./start-cycle-button";
+import { DetailsMark } from "./work-details";
 import { WORK_MIME, type WorkDrop } from "./time-grid";
 
 /** The work to place on the calendar. Drag an item onto a day. */
@@ -80,6 +81,7 @@ function Row({ item }: { item: StackItem }) {
       <div className="min-w-0 flex-1">
         <div className={`leading-tight ${item.done ? "line-through" : ""}`}>
           {item.title}
+          {item.hasDetails && <DetailsMark />}
           {item.carried && (
             <span
               className="ml-1.5 rounded bg-amber-500/15 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"

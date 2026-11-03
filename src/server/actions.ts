@@ -19,6 +19,7 @@ import {
 import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
+import { MAX_DESCRIPTION, MAX_LINK_TITLE, MAX_LINK_URL, normalizeLinkUrl } from "@/domain/links";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { parseQuarterKey } from "@/domain/plan";
 import { dayAfterScheduling } from "@/domain/secondary-tasks";
@@ -675,6 +676,92 @@ export async function deleteStep(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
   await db.delete(s.steps).where(eq(s.steps.id, id));
+  await done();
+}
+
+// ─── Description and Links of a Task or a Move ───────────────────────────────
+
+const detailOwner = z.object({ kind: z.enum(["task", "move"]), id: z.uuid() });
+
+/** Saves the Description of a Task or a Move; empty removes it. */
+export async function setDescription(input: { kind: "task" | "move"; id: string; description: string }) {
+  await requireIvan();
+  const { kind, id, description } = detailOwner
+    .extend({ description: z.string().trim().max(MAX_DESCRIPTION) })
+    .parse(input);
+  const table = kind === "task" ? s.tasks : s.moves;
+  await db.update(table).set({ description }).where(eq(table.id, id));
+  await done();
+}
+
+const linkFields = z.object({
+  url: z.string().max(MAX_LINK_URL),
+  title: z.string().trim().max(MAX_LINK_TITLE).default(""),
+});
+
+/** Adds a Link at the end. An address that is not a web page is refused, with a reason to show. */
+export async function createLink(input: {
+  kind: "task" | "move";
+  id: string;
+  url: string;
+  title?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireIvan();
+  const { kind, id, title, ...rest } = detailOwner.extend(linkFields.shape).parse(input);
+  const url = normalizeLinkUrl(rest.url);
+  if (!url) return { ok: false, error: "That is not a web address." };
+  const owner = kind === "task" ? s.links.taskId : s.links.moveId;
+  const [{ last }] = await db.select({ last: max(s.links.position) }).from(s.links).where(eq(owner, id));
+  await db.insert(s.links).values({
+    taskId: kind === "task" ? id : null,
+    moveId: kind === "move" ? id : null,
+    url,
+    title,
+    position: (last ?? -1) + 1,
+  });
+  await done();
+  return { ok: true };
+}
+
+export async function updateLink(input: {
+  id: string;
+  url: string;
+  title?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireIvan();
+  const { id, title, ...rest } = linkFields.extend({ id: z.uuid() }).parse(input);
+  const url = normalizeLinkUrl(rest.url);
+  if (!url) return { ok: false, error: "That is not a web address." };
+  await db.update(s.links).set({ url, title }).where(eq(s.links.id, id));
+  await done();
+  return { ok: true };
+}
+
+export async function deleteLink(fd: FormData) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
+  await db.delete(s.links).where(eq(s.links.id, id));
+  await done();
+}
+
+/** Saves the order Ivan put the Links of one Task or Move in. */
+export async function reorderLinks(input: { ids: string[] }) {
+  await requireIvan();
+  const { ids } = z.object({ ids: z.array(z.uuid()).min(1) }).parse(input);
+  const rows = await db
+    .select({ taskId: s.links.taskId, moveId: s.links.moveId })
+    .from(s.links)
+    .where(inArray(s.links.id, ids));
+  const sameOwner =
+    rows.length === ids.length &&
+    new Set(ids).size === ids.length &&
+    rows.every((r) => r.taskId === rows[0].taskId && r.moveId === rows[0].moveId);
+  if (!sameOwner) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.links).set({ position }).where(eq(s.links.id, id));
+    }
+  });
   await done();
 }
 

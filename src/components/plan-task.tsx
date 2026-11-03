@@ -2,13 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { createStep, deleteStep, deleteTask, toggleStep, toggleWorkDoneForm, updateTask } from "@/server/actions";
-import { AddIconButton, Hidden } from "./ui";
+import type { LinkView } from "@/server/queries";
+import { GameTags, Hidden } from "./ui";
+import { AddMenu, DescriptionButton, DescriptionDrawer, LinkForm, LinkList } from "./work-details";
 
 export type TaskItemData = {
   id: string;
   title: string;
   done: boolean;
   steps: { id: string; title: string; done: boolean }[];
+  description: string;
+  links: LinkView[];
+  /** A loose Task shows its Infinite Games; a Move's Task plays in its Campaign's. */
+  games?: readonly string[];
 };
 
 /**
@@ -67,9 +73,15 @@ export function TitleField({
   );
 }
 
-/** A Task of the Move: done, title, its Steps, and a + to add one. Its length is set in the calendar. */
+/**
+ * A Task, in a Move or loose in the Backlog: done, title, and what it holds.
+ * Its + adds a Step, its Description or a Link. Its length is set in the calendar.
+ */
 export function TaskItem({ task }: { task: TaskItemData }) {
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"step" | "link" | null>(null);
+  const [reading, setReading] = useState(false);
+  const owner = { kind: "task", id: task.id, title: task.title } as const;
+  const hasDescription = task.description.trim() !== "";
   return (
     <li className="rounded-md border border-line p-2">
       <div className="flex items-center gap-2">
@@ -84,7 +96,15 @@ export function TaskItem({ task }: { task: TaskItemData }) {
           action={updateTask}
           className={task.done ? "line-through opacity-60" : ""}
         />
-        {!adding && <AddIconButton label={`Add a Step to ${task.title}`} onClick={() => setAdding(true)} />}
+        {hasDescription && <DescriptionButton title={task.title} onClick={() => setReading(true)} />}
+        <AddMenu
+          label={`Add to ${task.title}`}
+          options={[
+            { label: "Step", onSelect: () => setAdding("step") },
+            ...(hasDescription ? [] : [{ label: "Description", onSelect: () => setReading(true) }]),
+            { label: "Link", onSelect: () => setAdding("link") },
+          ]}
+        />
         <form action={deleteTask}>
           <Hidden id={task.id} />
           <button className="text-muted hover:text-red-600" title="Delete Task" aria-label={`Delete ${task.title}`}>
@@ -92,7 +112,12 @@ export function TaskItem({ task }: { task: TaskItemData }) {
           </button>
         </form>
       </div>
-      {(task.steps.length > 0 || adding) && (
+      {task.games && task.games.length > 0 && (
+        <div className="mt-1 ml-6">
+          <GameTags games={task.games} />
+        </div>
+      )}
+      {(task.steps.length > 0 || adding === "step") && (
         <ul className="mt-1 ml-6 flex flex-col gap-0.5 text-sm">
           {task.steps.map((step) => (
             <li key={step.id} className="flex items-center gap-2">
@@ -109,7 +134,7 @@ export function TaskItem({ task }: { task: TaskItemData }) {
               </form>
             </li>
           ))}
-          {adding && (
+          {adding === "step" && (
             <li>
               {/* It stays open after Enter, to add the next Step; empty, it closes on leaving. */}
               <form action={createStep}>
@@ -121,14 +146,21 @@ export function TaskItem({ task }: { task: TaskItemData }) {
                   placeholder="New Step"
                   aria-label="New Step"
                   className="input text-xs"
-                  onKeyDown={(event) => event.key === "Escape" && setAdding(false)}
-                  onBlur={(event) => event.currentTarget.value.trim() === "" && setAdding(false)}
+                  onKeyDown={(event) => event.key === "Escape" && setAdding(null)}
+                  onBlur={(event) => event.currentTarget.value.trim() === "" && setAdding(null)}
                 />
               </form>
             </li>
           )}
         </ul>
       )}
+      <LinkList links={task.links} className="mt-1 ml-6" />
+      {adding === "link" && (
+        <div className="mt-1 ml-6">
+          <LinkForm owner={owner} onDone={() => setAdding(null)} />
+        </div>
+      )}
+      {reading && <DescriptionDrawer owner={owner} description={task.description} onClose={() => setReading(false)} />}
     </li>
   );
 }

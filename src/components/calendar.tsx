@@ -17,6 +17,7 @@ import {
 import type { BlockType, CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
 import { DayBlockDialog, type DayBlockDraft } from "./day-block-dialog";
 import { ReminderBell } from "./reminder-bell";
+import { DetailsMark } from "./work-details";
 import { StartCycleButton } from "./start-cycle-button";
 import { TimeGrid, type GridItem } from "./time-grid";
 import { UpkeepMark, useDoneToggle } from "./upkeeps";
@@ -319,6 +320,7 @@ function SlotView({
         <span className={`flex-1 font-medium leading-tight ${work.done ? "line-through" : ""}`}>
           {work.title}
           {work.kind === "secondary" && work.upkeep && <UpkeepMark upkeepId={work.upkeep.id} date={slot.date} />}
+          {work.hasDetails && <DetailsMark />}
         </span>
         <ReminderBell
           slot={slot}

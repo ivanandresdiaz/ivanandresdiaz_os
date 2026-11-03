@@ -192,8 +192,8 @@ function QuarterDrawer({ quarter, onClose }: { quarter: QuarterText; onClose: ()
 export type Mode = "preview" | "edit";
 
 /** Preview or Edit, asking before unsaved changes are thrown away. */
-export function useEditMode(dirty: boolean, discard: () => void) {
-  const [mode, setMode] = useState<Mode>("preview");
+export function useEditMode(dirty: boolean, discard: () => void, initial: Mode = "preview") {
+  const [mode, setMode] = useState<Mode>(initial);
 
   function confirmDiscard() {
     if (!dirty) return true;

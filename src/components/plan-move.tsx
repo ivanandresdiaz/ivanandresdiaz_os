@@ -1,15 +1,35 @@
+"use client";
+
+import { useState } from "react";
 import { createTask, deleteMove, setMoveWeek, updateMove } from "@/server/actions";
+import type { LinkView } from "@/server/queries";
 import { AddSection } from "./add-section";
 import { TaskItem, TitleField } from "./plan-task";
 import { Hidden, WeekChip } from "./ui";
+import { AddMenu, DescriptionButton, DescriptionDrawer, LinkForm, LinkList } from "./work-details";
 
 type Step = { id: string; title: string; done: boolean };
-type Task = { id: string; title: string; doneAt: Date | null; steps: Step[] };
-export type MoveDetail = { id: string; title: string; weekOf: string | null; doneAt: Date | null; tasks: Task[] };
+type Task = {
+  id: string;
+  title: string;
+  doneAt: Date | null;
+  description: string;
+  steps: Step[];
+  links: LinkView[];
+};
+export type MoveDetail = {
+  id: string;
+  title: string;
+  weekOf: string | null;
+  doneAt: Date | null;
+  description: string;
+  links: LinkView[];
+  tasks: Task[];
+};
 
 /**
- * A Move in its column: its title to read, its week, and its Tasks with their Steps.
- * It is ticked done in the Campaign's list, not here.
+ * A Move in its column: its title to read, its Description and Links, its week,
+ * and its Tasks with their Steps. It is ticked done in the Campaign's list, not here.
  */
 export function MovePanel({
   move,
@@ -25,6 +45,10 @@ export function MovePanel({
   nextWeek: string;
   weekLabel: string | null;
 }) {
+  const [addingLink, setAddingLink] = useState(false);
+  const [reading, setReading] = useState(false);
+  const owner = { kind: "move", id: move.id, title: move.title } as const;
+  const hasDescription = move.description.trim() !== "";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-2">
@@ -34,6 +58,14 @@ export function MovePanel({
           </h3>
           {move.doneAt && <span className="text-xs text-muted">Done</span>}
         </div>
+        {hasDescription && <DescriptionButton title={move.title} onClick={() => setReading(true)} />}
+        <AddMenu
+          label={`Add to ${move.title}`}
+          options={[
+            ...(hasDescription ? [] : [{ label: "Description", onSelect: () => setReading(true) }]),
+            { label: "Link", onSelect: () => setAddingLink(true) },
+          ]}
+        />
         {/* Keyed by the title: once renamed, it closes. */}
         <details key={move.title} className="relative">
           <summary
@@ -71,6 +103,14 @@ export function MovePanel({
         <p className="text-xs text-muted">Its week is chosen once the Campaign is active.</p>
       )}
 
+      {(move.links.length > 0 || addingLink) && (
+        <div className="flex flex-col gap-1">
+          <LinkList links={move.links} />
+          {addingLink && <LinkForm owner={owner} onDone={() => setAddingLink(false)} />}
+        </div>
+      )}
+      {reading && <DescriptionDrawer owner={owner} description={move.description} onClose={() => setReading(false)} />}
+
       <AddSection
         heading={<div className="label">Tasks</div>}
         addLabel={`Add a Task to ${move.title}`}
@@ -90,7 +130,14 @@ export function MovePanel({
           {move.tasks.map((task) => (
             <TaskItem
               key={task.id}
-              task={{ id: task.id, title: task.title, done: task.doneAt !== null, steps: task.steps }}
+              task={{
+                id: task.id,
+                title: task.title,
+                done: task.doneAt !== null,
+                description: task.description,
+                steps: task.steps,
+                links: task.links,
+              }}
             />
           ))}
         </ul>

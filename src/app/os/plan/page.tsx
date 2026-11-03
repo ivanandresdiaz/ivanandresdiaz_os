@@ -6,6 +6,7 @@ import { type CampaignCard, CampaignPriority } from "@/components/campaign-prior
 import { type MoveCard, MovePriority } from "@/components/move-priority";
 import { QuarterReader, SeasonReader } from "@/components/plan-drawers";
 import { MovePanel } from "@/components/plan-move";
+import { TaskItem } from "@/components/plan-task";
 import { GamesPicker, GameTags, Hidden } from "@/components/ui";
 import { addDays, quarterLabel, quarterOf, quarterRange, startOfWeek, type QuarterRef } from "@/domain/dates";
 import {
@@ -24,9 +25,7 @@ import {
   createCampaign,
   createMove,
   createTask,
-  deleteTask,
   startSeason,
-  toggleWorkDoneForm,
 } from "@/server/actions";
 import {
   getBlockTypes,
@@ -366,22 +365,20 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                   </form>
                 }
               >
-                <ul className="flex flex-col gap-1 text-sm empty:hidden">
+                <ul className="flex flex-col gap-2 text-sm empty:hidden">
                   {looseTasks.map((t) => (
-                    <li key={t.id} className="flex items-center gap-2">
-                      <form action={toggleWorkDoneForm}>
-                        <Hidden kind="task" id={t.id} />
-                        <button>{t.doneAt ? "☑" : "☐"}</button>
-                      </form>
-                      <span className={t.doneAt ? "line-through opacity-60" : ""}>{t.title}</span>
-                      <GameTags games={t.games} />
-                      <form action={deleteTask} className="ml-auto">
-                        <Hidden id={t.id} />
-                        <button className="text-muted hover:text-red-600" aria-label={`Delete ${t.title}`}>
-                          ×
-                        </button>
-                      </form>
-                    </li>
+                    <TaskItem
+                      key={t.id}
+                      task={{
+                        id: t.id,
+                        title: t.title,
+                        done: t.doneAt !== null,
+                        description: t.description,
+                        steps: t.steps,
+                        links: t.links,
+                        games: t.games,
+                      }}
+                    />
                   ))}
                 </ul>
               </AddSection>

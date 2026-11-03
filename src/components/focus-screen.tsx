@@ -6,13 +6,23 @@ import { cyclePhase, type CyclePhase } from "@/domain/cycles";
 import { formatDuration } from "@/domain/dates";
 import { notify } from "@/lib/notify";
 import { endCycle, startCycle, toggleStep, toggleWorkDone } from "@/server/actions";
+import { linkLabel } from "@/domain/links";
 import type { CycleView } from "@/server/queries";
+import { Markdown } from "./markdown";
 import { NotificationsToggle } from "./pwa";
 import { formatCountdown, useNow } from "./use-now";
 
 type Preset = { id: string; name: string; focusMin: number; breakMin: number };
 
 const BREATH_MS = 6000;
+
+/** The dark palette, for content that uses the theme tokens (the Markdown of a Description). */
+const DARK_TOKENS = {
+  "--foreground": "#e7e5e4",
+  "--muted": "#a8a29e",
+  "--line": "#292524",
+  "--accent": "#f59e0b",
+} as React.CSSProperties;
 
 /**
  * The focus screen: a breathing animation on entry, then one big countdown
@@ -150,6 +160,40 @@ export function FocusScreen({ cycle, presets }: { cycle: CycleView; presets: Pre
             </li>
           ))}
         </ul>
+      )}
+
+      {(cycle.links.length > 0 || cycle.description.trim() !== "") && (
+        // The focus screen is always dark: its Markdown and Links take the dark colors.
+        <div className="flex w-full max-w-sm flex-col gap-2 text-sm" style={DARK_TOKENS}>
+          {cycle.links.length > 0 && (
+            <ul className="flex flex-col gap-1" aria-label="Links">
+              {cycle.links.map((link) => (
+                <li key={link.id} className="flex min-w-0 items-center gap-1.5">
+                  <span aria-hidden="true" className="text-stone-500">
+                    ↗
+                  </span>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={link.url}
+                    className="min-w-0 truncate text-amber-400 underline-offset-2 hover:underline"
+                  >
+                    {linkLabel(link)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {cycle.description.trim() !== "" && (
+            <details className="rounded-md border border-stone-800 px-3 py-2">
+              <summary className="cursor-pointer text-stone-400">Description</summary>
+              <div className="mt-2 text-stone-300">
+                <Markdown>{cycle.description}</Markdown>
+              </div>
+            </details>
+          )}
+        </div>
       )}
 
       <div className="flex flex-wrap justify-center gap-3">
