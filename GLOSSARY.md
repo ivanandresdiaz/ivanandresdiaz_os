@@ -42,7 +42,7 @@ _Evitar_: Capa.
 **Season Goal** (Objetivo de Temporada): un objetivo estratégico que dura lo que dura la Season (p. ej. "make 30,000"). De él salen las Campaigns.
 _Evitar_: Meta.
 
-**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS. Ivan ordena las Campaigns de cada Quarter por prioridad, y su trabajo aparece en ese orden. La prioridad no sigue el orden de los Season Goals. Las candidatas del Backlog también tienen prioridad. Una candidata es solo una idea para un Quarter futuro: no toca la semana, y sus Moves se eligen para una semana solo cuando se activa.
+**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). El Goal es un resultado, no un tema: "deploy Mi Tierra on GCP", no "learn GCP". Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS. Ivan ordena las Campaigns de cada Quarter por prioridad, y su trabajo aparece en ese orden. La prioridad no sigue el orden de los Season Goals. Las candidatas del Backlog también tienen prioridad. Una candidata es solo una idea para un Quarter futuro: no toca la semana, y sus Moves se eligen para una semana solo cuando se activa.
 _Evitar_: Movimiento, Meta, Rank.
 
 **Move** (Jugada): un paso concreto de una Campaign que cabe en una semana (p. ej. SSO login). Se elige en la Weekly Review. Si no tiene Tasks, se arrastra directo al calendario. Ivan ordena los Moves de cada Campaign por prioridad, y su trabajo aparece en ese orden.
