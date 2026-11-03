@@ -212,12 +212,26 @@ export const structureExceptions = pgTable(
   (t) => [unique().on(t.date, t.structureBlockId)],
 );
 
+/** A recurring responsibility that is not strategy; each time it is due is a Secondary Task. */
+export const upkeeps = pgTable(
+  "upkeeps",
+  {
+    id: id(),
+    title: text("title").notNull(),
+    intervalDays: integer("interval_days").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [check("upkeep_interval", sql`${t.intervalDays} > 0`)],
+);
+
 export const secondaryTasks = pgTable("secondary_tasks", {
   id: id(),
   title: text("title").notNull(),
   /** Its day: it shows up in the Check-in from then on. The column keeps its first name. */
   day: isoDate("created_on").notNull(),
   doneAt: timestamp("done_at", { withTimezone: true }),
+  /** The Upkeep it is an occurrence of. Stopping the Upkeep keeps the done ones as plain history. */
+  upkeepId: uuid("upkeep_id").references(() => upkeeps.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 });
 
