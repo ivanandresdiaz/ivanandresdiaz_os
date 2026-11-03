@@ -530,13 +530,44 @@ Origen: Ivan quiere un aviso a la hora de algunas tareas, no de todas (p. ej. "m
   - borrar el Slot o lo que lo contiene.
   Los borrados en cascada los atrapa un trigger de Postgres que guarda el evento en `calendar_cleanups`, y se reintenta la próxima vez que Google responde.
 - **Si Google falla**, el Slot se guarda igual y la campanita muestra "!" con "Try again" y "Reconnect Google Calendar". Una tarea hecha cuyo evento no se pudo borrar sigue mostrando "!", porque Google todavía avisaría. Si Google revoca el acceso, la conexión queda pendiente de reconectar.
-- Migración `0010_reminders`, aplicada en local. **Falta aplicarla en Neon, junto con la 0009.**
+- Migración `0010_reminders`, aplicada en local y en Neon (junto con la 0009).
 - Pasos de Ivan en Google Cloud, en el proyecto del login:
   1. Activar la Google Calendar API.
   2. Añadir el permiso `.../auth/calendar.app.created` en la pantalla de consentimiento.
   3. Pasar la app a *In production*.
   4. Añadir los redirect URIs `http://localhost:3200/api/google-calendar/callback` y `https://<dominio de producción>/api/google-calendar/callback`.
 - Verificación: 111 tests, typecheck, lint y prueba en el navegador. Se probó la campanita sin conexión (lleva a conectar), el callback con un `state` falso (se rechaza), un Slot ya empezado (sin campanita), al tocar → 10 ✓, cambiar a 30, Off, el error simulado ("!" en el calendario, el Check-in y el Month), hecho con un evento sin borrar ("!" se queda), el borrado (el trigger encola el evento), teléfono táctil y Week. Ivan hizo la configuración en Google Cloud y confirmó que la conexión real funciona en local. La base local quedó sin filas de prueba.
+
+## Ronda 27 — Description y Links en las Tasks (2026-11-02)
+
+Origen: Ivan agregó a la Campaign de SSO una Task para aprender las skills de IA de un profesional y quiso guardarle contexto y enlaces al curso. Quiere hacerlo de forma minimalista: nada vacío por defecto, todo desde un `+`.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q203 | El texto | ✅ **Description**: un Long text opcional (Markdown, Dictation y English Coach). "Description" sigue en _Evitar_ solo para la Expansion de un Principle. |
+| Q204 | Los enlaces | ✅ **Link**: una URL con título opcional; puede haber varios. _Evitar_: Resource, Reference. |
+| Q205 | Quién los lleva | ✅ Tasks (también las sueltas) y Moves. Las Secondary Tasks no. |
+| Q206 | El `+` de la Task | ✅ Abre un menú: Step · Description · Link. La Description sale del menú cuando ya existe. |
+| Q207 | Dónde se ven | ✅ La Description en un panel lateral (drawer) con vista previa y edición, abierto con un ícono ≡ junto al título. Los Links, una línea cada uno debajo de los Steps; se abren en otra pestaña. |
+| Q208 | Título del Link | ✅ Opcional; sin título se muestra el dominio y la ruta. La app no visita la página. Un Link se edita, se borra y se reordena. |
+| Q209 | Pantalla de foco | ✅ Un Cycle sobre la Task muestra sus Links y su Description plegada. El calendario y el Stack solo muestran un ícono. |
+| Q210 | Links aparte | ✅ Son una lista aparte de la Description, para pegar rápido desde el iPhone y abrir con un toque. La Description también acepta enlaces en Markdown. |
+
+## Ronda 28 — Dónde viven en el plan (2026-11-02)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q211 | El Move | ✅ Un `+` en su cabecera, junto a ✎ y ×, con Description · Link. El `+` de la sección Tasks sigue siendo solo para Tasks. Sus Links van debajo de la fila de la semana. |
+| Q212 | Tasks sueltas | ✅ Usan la misma tarjeta que las Tasks de un Move (renombrar, Steps, `+`) y conservan sus Infinite Games. |
+
+## Description y Links — construido en local (2026-11-02)
+
+- **El `+` de la Task** abre Step · Description · Link; Description sale del menú cuando ya existe. **El Move** tiene su `+` en la cabecera (Description · Link) y sus Links debajo de la fila de la semana. **Las Tasks sueltas** del Backlog usan la misma tarjeta (renombrar, Steps, `+`) y muestran sus Infinite Games.
+- **Description**: el ícono ≡ junto al título abre el panel lateral con vista previa y edición (Markdown, Dictation y English Coach). Una nueva abre directo en edición; guardarla vacía la quita.
+- **Links**: una línea cada uno, abierta en otra pestaña. Se pega la dirección (sin `https://` también vale) y un título opcional; sin título se muestra el dominio y la ruta. Solo se aceptan páginas web (`http`/`https`), y la base de datos lo exige también. Cada Link se edita (✎), sube (↑) o se borra (×); en pantalla táctil esos botones siempre se ven.
+- **Pantalla de foco**: un Cycle sobre la Task o el Move muestra sus Links y la Description plegada. **Calendario y Stack**: solo un ≡ pequeño junto al título.
+- Migración `0011_task_details` (columna `description` en `tasks` y `moves`, tabla `links`), aplicada en local. **Falta aplicarla en Neon.**
+- Verificación: 114 tests, typecheck, lint y prueba en el navegador (Link sin esquema, `javascript:` rechazado, título, reordenar, editar, Description con Markdown, ≡ en el calendario y el Stack, pantalla de foco, Task suelta con Step, teléfono). La base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 

@@ -51,6 +51,12 @@ _Evitar_: Movimiento, Meta, Rank.
 
 **Step** (Paso): un ítem de checklist dentro de una Task. No se agenda.
 
+**Description** (Descripción): el Long text opcional de una Task o de un Move, con lo que hay que saber para hacerlo: el contexto, el enfoque, las ideas. Las Secondary Tasks no tienen.
+_Evitar_: Notes (las notas son de una Person), Expansion (esa es la de un Principle).
+
+**Link** (Enlace): una dirección web, con título opcional, que una Task o un Move guarda como recurso para hacerlo (p. ej. el curso de un profesional o la documentación de una herramienta). Puede tener varios, en el orden que Ivan elija. Solo apunta a otra página; no se sube nada. Las Secondary Tasks no tienen.
+_Evitar_: Resource, Reference (una Reference es la imagen, el video o el audio de un Principle).
+
 **Habit** (Hábito): un input recurrente que ocupa un Habit Block de la Structure (p. ej. gym a las 5 AM, Reading de 7:30 a 8). No se mide por tiempo: se cumple o no.
 
 **Roadmap**: una vista, no algo que se llena. Es una línea de tiempo del Quarter con un carril por Campaign; los **Ports** (puertos) son hitos con fecha dentro de una Campaign.
@@ -127,7 +133,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Herramientas
 
-**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
+**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle, la Description de una Task o un Move). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
 **Dictation** (Dictado): hablar en inglés para que el texto se escriba en un Long text, donde está el cursor y sin borrar lo que ya hay. Transcribe literal, con mis errores, porque corregirlos es trabajo del English Coach. El audio no se guarda.
 _Evitar_: Voice input, audio (un audio es una Reference).
