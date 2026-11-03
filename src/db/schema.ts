@@ -249,6 +249,12 @@ export const slots = pgTable(
     taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
     moveId: uuid("move_id").references(() => moves.id, { onDelete: "cascade" }),
     secondaryTaskId: uuid("secondary_task_id").references(() => secondaryTasks.id, { onDelete: "cascade" }),
+    /** Its Reminder: minutes before the start (0 = at the start). Null: no bell. */
+    reminderLeadMin: integer("reminder_lead_min"),
+    /** The Google Calendar event that carries the Reminder, while there is one. */
+    reminderEventId: text("reminder_event_id"),
+    /** The last change could not reach Google Calendar: what Google shows may be wrong. */
+    reminderFailed: boolean("reminder_failed").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [
@@ -257,8 +263,35 @@ export const slots = pgTable(
       sql`(${t.workKind} = 'task' and ${t.taskId} is not null and ${t.moveId} is null and ${t.secondaryTaskId} is null) or (${t.workKind} = 'move' and ${t.moveId} is not null and ${t.taskId} is null and ${t.secondaryTaskId} is null) or (${t.workKind} = 'secondary' and ${t.secondaryTaskId} is not null and ${t.taskId} is null and ${t.moveId} is null)`,
     ),
     check("slot_time", sql`${t.startMin} >= 0 and ${t.endMin} <= 1440 and ${t.startMin} < ${t.endMin}`),
+    check("slot_reminder_lead", sql`${t.reminderLeadMin} is null or ${t.reminderLeadMin} in (0, 5, 10, 15, 30, 60)`),
   ],
 );
+
+/**
+ * The one Google Calendar connection, for Reminders. Tokens are encrypted;
+ * a null refresh token means Google took the access back and Ivan must reconnect.
+ */
+export const googleCalendar = pgTable(
+  "google_calendar",
+  {
+    id: smallint("id").primaryKey().default(1),
+    refreshToken: text("refresh_token"),
+    accessToken: text("access_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    /** The "Ivan OS" calendar created in Ivan's account. */
+    calendarId: text("calendar_id"),
+    /** Where Ivan OS was opened when it connected: event descriptions link back there. */
+    appOrigin: text("app_origin").notNull(),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("google_calendar_single", sql`${t.id} = 1`)],
+);
+
+/** Events whose Slot is gone (filled by a trigger on slots); deleted from Google when it answers. */
+export const calendarCleanups = pgTable("calendar_cleanups", {
+  eventId: text("event_id").primaryKey(),
+  createdAt: createdAt(),
+});
 
 /** The Daily Note. Slice 1 covers the Check-in part. */
 export const dailyNotes = pgTable("daily_notes", {
