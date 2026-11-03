@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -21,6 +21,7 @@ import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/
 import type { UpkeepRef } from "@/domain/upkeeps";
 import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
+import { isConnected } from "./google-calendar";
 
 export type BlockType = {
   id: string;
@@ -430,13 +431,21 @@ function schedulableWork(index: Map<string, CalendarWorkItem>): WorkItem[] {
   );
 }
 
+/** A Slot's bell: its lead (null when off) and whether its last change failed to reach Google. */
+export type SlotReminder = { leadMin: number | null; failed: boolean };
+
 export type CalendarSlot = {
   id: string;
   date: IsoDate;
   startMin: number;
   endMin: number;
   work: CalendarWorkItem;
+  reminder: SlotReminder;
 };
+
+function reminderOf(slot: typeof s.slots.$inferSelect): SlotReminder {
+  return { leadMin: slot.reminderLeadMin, failed: slot.reminderFailed };
+}
 
 export type CalendarBlock = DayBlock & { type: BlockType };
 
@@ -505,7 +514,7 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
       .flatMap((slot) => {
         const work = index.get(workKey(slot.workKind, slotWorkId(slot)));
         return work
-          ? [{ id: slot.id, date, startMin: slot.startMin, endMin: slot.endMin, work }]
+          ? [{ id: slot.id, date, startMin: slot.startMin, endMin: slot.endMin, work, reminder: reminderOf(slot) }]
           : [];
       }),
     habitsDone: checks.filter((c) => c.date === date).map((c) => c.blockTypeId),
@@ -537,6 +546,8 @@ export type MonthItem = {
   startMin: number | null;
   /** The Upkeep it is an occurrence of. */
   upkeepId: string | null;
+  /** Its Slot's bell, shown but not changed here. */
+  reminder: SlotReminder | null;
   /** Set when it can be dragged to another day: only pending Secondary Tasks, never strategy. */
   movable: { secondaryTaskId: string; slot: { id: string; date: IsoDate } | null } | null;
 };
@@ -576,6 +587,7 @@ export async function getMonth(dates: IsoDate[]): Promise<MonthDay[]> {
           color: LOOSE_COLOR,
           startMin: null,
           upkeepId: task.upkeep?.id ?? null,
+          reminder: null,
           movable: task.doneOn === null ? { secondaryTaskId: task.id, slot: null } : null,
         })),
         ...slots.flatMap((slot): MonthItem[] => {
@@ -589,6 +601,7 @@ export async function getMonth(dates: IsoDate[]): Promise<MonthDay[]> {
             color: work.color,
             startMin: slot.startMin,
             upkeepId: secondary ? (work.upkeep?.id ?? null) : null,
+            reminder: reminderOf(slot),
             movable: secondary && !work.done
               ? { secondaryTaskId: work.id, slot: { id: slot.id, date: slot.date } }
               : null,
@@ -751,7 +764,7 @@ export async function getUpkeeps(): Promise<UpkeepView[]> {
 }
 
 export async function getDailyNote(date: IsoDate) {
-  const [[note], highlights, secondary, noiseItems] = await Promise.all([
+  const [[note], highlights, secondary, noiseItems, belled] = await Promise.all([
     db.select().from(s.dailyNotes).where(eq(s.dailyNotes.date, date)),
     db
       .select()
@@ -764,13 +777,28 @@ export async function getDailyNote(date: IsoDate) {
       .from(s.noiseItems)
       .where(eq(s.noiseItems.date, date))
       .orderBy(asc(s.noiseItems.createdAt)),
+    // Secondary Tasks with a bell on a Slot from this day on (a past one has nothing left to remind).
+    db
+      .select({ id: s.slots.secondaryTaskId, failed: s.slots.reminderFailed })
+      .from(s.slots)
+      .where(
+        and(
+          isNotNull(s.slots.secondaryTaskId),
+          gte(s.slots.date, date),
+          or(isNotNull(s.slots.reminderLeadMin), eq(s.slots.reminderFailed, true)),
+        ),
+      ),
   ]);
+  const reminderFor = (id: string): { failed: boolean } | null => {
+    const own = belled.filter((row) => row.id === id);
+    return own.length ? { failed: own.some((row) => row.failed) } : null;
+  };
   return {
     date,
     noiseItems,
     checkInDoneAt: note?.checkInDoneAt ?? null,
     highlights,
-    secondaryTasks: secondaryTasksForDate(secondary, date),
+    secondaryTasks: secondaryTasksForDate(secondary, date).map((task) => ({ ...task, reminder: reminderFor(task.id) })),
     dayWon: isDayWon(highlights),
   };
 }
@@ -865,4 +893,9 @@ export async function getCycleHistory(start: IsoDate, end: IsoDate) {
     const day = localMoment(c.startedAt, APP_TIMEZONE).date;
     return start <= day && day <= end;
   });
+}
+
+/** Whether Google Calendar is connected, so a bell can turn on (Reminders). */
+export async function getCalendarConnected(): Promise<boolean> {
+  return isConnected();
 }

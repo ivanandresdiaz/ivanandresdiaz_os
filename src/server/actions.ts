@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { closeAt } from "@/domain/cycles";
-import { addDays, isIsoDate, parseMinutes, type QuarterRef } from "@/domain/dates";
+import { addDays, isIsoDate, localMoment, parseMinutes, type QuarterRef } from "@/domain/dates";
 import {
   type CoachReview,
   dictationExtension,
@@ -23,6 +23,7 @@ import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFi
 import { parseQuarterKey } from "@/domain/plan";
 import { dayAfterScheduling } from "@/domain/secondary-tasks";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
+import { isReminderLead, slotStarted } from "@/domain/reminders";
 import { isValidInterval, monthMove, nextUpkeepDay } from "@/domain/upkeeps";
 import {
   type DayBlockChange,
@@ -36,7 +37,9 @@ import {
 import { aiAvailability, CoachError, reviewEnglish, transcribe } from "@/lib/ai";
 import { deleteObject, getObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
-import { today } from "@/lib/today";
+import { APP_TIMEZONE, today } from "@/lib/today";
+import { isConnected } from "./google-calendar";
+import { retryFailedReminders, syncDeletions, syncSlots, syncWork } from "./reminders";
 
 const isoDate = z.string().refine(isIsoDate, "Invalid date");
 const minute = z.coerce.number().int().min(0).max(DAY_END_MIN);
@@ -535,6 +538,7 @@ export async function deleteCampaign(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
   await db.delete(s.campaigns).where(eq(s.campaigns.id, id));
+  await syncDeletions();
   redirect("/os/plan");
 }
 
@@ -584,6 +588,7 @@ export async function updateMove(fd: FormData) {
   await requireIvan();
   const { id, title } = z.object({ id: z.uuid(), title: required }).parse(fields(fd));
   await db.update(s.moves).set({ title }).where(eq(s.moves.id, id));
+  await syncWork("move", [id]);
   await done();
 }
 
@@ -611,6 +616,7 @@ export async function deleteMove(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
   await db.delete(s.moves).where(eq(s.moves.id, id));
+  await syncDeletions();
   await done();
 }
 
@@ -632,6 +638,7 @@ export async function updateTask(fd: FormData) {
   // Only the title: a Task's length is set in the calendar.
   const { id, title } = z.object({ id: z.uuid(), title: required }).parse(fields(fd));
   await db.update(s.tasks).set({ title }).where(eq(s.tasks.id, id));
+  await syncWork("task", [id]);
   await done();
 }
 
@@ -639,6 +646,7 @@ export async function deleteTask(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(fields(fd));
   await db.delete(s.tasks).where(eq(s.tasks.id, id));
+  await syncDeletions();
   await done();
 }
 
@@ -695,6 +703,8 @@ export async function toggleWorkDone(input: { kind: "task" | "move" | "secondary
         .where(kind === "task" ? eq(s.highlights.taskId, id) : eq(s.highlights.moveId, id));
     }
   });
+  // Done: its Reminders go away. Reopened: they come back.
+  await syncWork(kind, [id]);
   await done();
 }
 
@@ -959,6 +969,7 @@ export async function updateSlot(input: {
       .returning({ secondaryTaskId: s.slots.secondaryTaskId });
     if (slot?.secondaryTaskId) await followSlot(tx, slot.secondaryTaskId, values.date);
   });
+  await syncSlots([id]);
   await done();
 }
 
@@ -981,6 +992,38 @@ export async function deleteSlot(input: { id: string }) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(input);
   await db.delete(s.slots).where(eq(s.slots.id, id));
+  await syncDeletions();
+  await done();
+}
+
+const reminderLead = z.number().refine(isReminderLead, "Invalid lead").nullable();
+
+/**
+ * Turns a Slot's bell on (with its lead) or off. A Slot that already started
+ * takes no new bell. Without Google Calendar connected it asks to connect.
+ */
+export async function setSlotReminder(input: {
+  id: string;
+  leadMin: number | null;
+}): Promise<{ ok: true } | { ok: false; error: "connect" | "started" }> {
+  await requireIvan();
+  const v = z.object({ id: z.uuid(), leadMin: reminderLead }).parse(input);
+  const [slot] = await db.select().from(s.slots).where(eq(s.slots.id, v.id));
+  if (!slot) return { ok: true };
+  if (v.leadMin !== null) {
+    if (slotStarted(slot, localMoment(new Date(), APP_TIMEZONE))) return { ok: false, error: "started" };
+    if (!(await isConnected())) return { ok: false, error: "connect" };
+  }
+  await db.update(s.slots).set({ reminderLeadMin: v.leadMin }).where(eq(s.slots.id, v.id));
+  await syncSlots([v.id]);
+  await done();
+  return { ok: true };
+}
+
+/** Tries the Reminders that did not reach Google again. */
+export async function retryReminders() {
+  await requireIvan();
+  await retryFailedReminders();
   await done();
 }
 
@@ -1008,6 +1051,7 @@ export async function deleteSecondaryTask(input: { id: string }) {
     .where(eq(s.secondaryTasks.id, id));
   if (task?.upkeepId && task.doneAt === null) return stopUpkeep({ id: task.upkeepId });
   await db.delete(s.secondaryTasks).where(eq(s.secondaryTasks.id, id));
+  await syncDeletions();
   await done();
 }
 
@@ -1039,6 +1083,7 @@ export async function moveSecondaryTaskInMonth(input: { id: string; slotId: stri
       await tx.update(s.secondaryTasks).set({ day: move.date }).where(eq(s.secondaryTasks.id, v.id));
     }
   });
+  if (v.slotId) await syncSlots([v.slotId]);
   await done();
 }
 
@@ -1089,16 +1134,19 @@ export async function createUpkeep(fd: FormData) {
 export async function updateUpkeep(fd: FormData) {
   await requireIvan();
   const v = z.object({ id: z.uuid(), title: required, intervalDays }).parse(fields(fd));
-  await db.transaction(async (tx) => {
+  const pending = await db.transaction(async (tx) => {
     await tx
       .update(s.upkeeps)
       .set({ title: v.title, intervalDays: v.intervalDays })
       .where(eq(s.upkeeps.id, v.id));
-    await tx
+    const renamed = await tx
       .update(s.secondaryTasks)
       .set({ title: v.title })
-      .where(and(eq(s.secondaryTasks.upkeepId, v.id), isNull(s.secondaryTasks.doneAt)));
+      .where(and(eq(s.secondaryTasks.upkeepId, v.id), isNull(s.secondaryTasks.doneAt)))
+      .returning({ id: s.secondaryTasks.id });
+    return renamed.map((task) => task.id);
   });
+  await syncWork("secondary", pending);
   await done();
 }
 
@@ -1119,6 +1167,7 @@ export async function completeUpkeepOccurrence(input: { id: string; intervalDays
     await tx.update(s.upkeeps).set({ intervalDays: v.intervalDays }).where(eq(s.upkeeps.id, task.upkeepId));
     await settleUpkeep(tx, v.id, true);
   });
+  await syncWork("secondary", [v.id]);
   await done();
 }
 
@@ -1132,6 +1181,7 @@ export async function stopUpkeep(input: { id: string }) {
       .where(and(eq(s.secondaryTasks.upkeepId, id), isNull(s.secondaryTasks.doneAt)));
     await tx.delete(s.upkeeps).where(eq(s.upkeeps.id, id));
   });
+  await syncDeletions();
   await done();
 }
 
