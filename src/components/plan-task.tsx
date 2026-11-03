@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { createStep, deleteStep, deleteTask, toggleStep, toggleWorkDoneForm, updateTask } from "@/server/actions";
 import type { LinkView } from "@/server/queries";
 import { GameTags, Hidden } from "./ui";
-import { AddMenu, DescriptionButton, DescriptionDrawer, LinkForm, LinkList } from "./work-details";
+import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
 
 export type TaskItemData = {
   id: string;
@@ -116,6 +116,9 @@ export function TaskItem({ task }: { task: TaskItemData }) {
         <div className="mt-1 ml-6">
           <GameTags games={task.games} />
         </div>
+      )}
+      {hasDescription && (
+        <DescriptionPreview description={task.description} onOpen={() => setReading(true)} className="mt-1 ml-6" />
       )}
       {(task.steps.length > 0 || adding === "step") && (
         <ul className="mt-1 ml-6 flex flex-col gap-0.5 text-sm">

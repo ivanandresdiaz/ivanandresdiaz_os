@@ -6,7 +6,7 @@ import type { LinkView } from "@/server/queries";
 import { AddSection } from "./add-section";
 import { TaskItem, TitleField } from "./plan-task";
 import { Hidden, WeekChip } from "./ui";
-import { AddMenu, DescriptionButton, DescriptionDrawer, LinkForm, LinkList } from "./work-details";
+import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
 
 type Step = { id: string; title: string; done: boolean };
 type Task = {
@@ -86,6 +86,8 @@ export function MovePanel({
           </button>
         </form>
       </div>
+
+      {hasDescription && <DescriptionPreview description={move.description} onOpen={() => setReading(true)} />}
 
       {playing ? (
         <div className="flex flex-wrap items-center gap-2">

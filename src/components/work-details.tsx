@@ -39,6 +39,30 @@ export function DescriptionButton({ onClick, title }: { onClick: () => void; tit
 }
 
 /**
+ * A Description shown in place, under its title: long ones are cut after a few
+ * lines. Clicking it (not one of its links) opens the drawer to read or edit it.
+ */
+export function DescriptionPreview({
+  description,
+  onOpen,
+  className = "",
+}: {
+  description: string;
+  onOpen: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      onClick={(event) => !(event.target as HTMLElement).closest("a") && onOpen()}
+      title="Open the Description"
+      className={`line-clamp-6 cursor-pointer rounded hover:bg-background ${className}`}
+    >
+      <Markdown>{description}</Markdown>
+    </div>
+  );
+}
+
+/**
  * The + of a Task or a Move: a short menu of what it can take. Nothing is there
  * until it is asked for; the Description leaves the menu once it exists.
  */
