@@ -6,6 +6,7 @@ const task = (id: string, day: string, doneOn: string | null = null): SecondaryT
   title: id,
   day,
   doneOn,
+  upkeep: null,
 });
 
 describe("Secondary Tasks", () => {

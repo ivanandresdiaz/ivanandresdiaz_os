@@ -1,4 +1,5 @@
 import type { IsoDate } from "./dates";
+import type { UpkeepRef } from "./upkeeps";
 
 export const SECONDARY_TASK_DURATION_MIN = 30;
 
@@ -9,6 +10,8 @@ export type SecondaryTask = {
   day: IsoDate;
   /** The civil date on which it was completed, in Ivan's timezone. */
   doneOn: IsoDate | null;
+  /** The Upkeep it is an occurrence of, if any. */
+  upkeep: UpkeepRef | null;
 };
 
 export type SecondaryTaskView = SecondaryTask & {
