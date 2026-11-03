@@ -143,6 +143,8 @@ export const moves = pgTable("moves", {
     .notNull()
     .references(() => campaigns.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
+  /** Its Description: a Long text in Markdown; empty = none. */
+  description: text("description").notNull().default(""),
   /** Monday of the week it was chosen for; null = not chosen yet. */
   weekOf: isoDate("week_of"),
   doneAt: timestamp("done_at", { withTimezone: true }),
@@ -155,12 +157,33 @@ export const tasks = pgTable("tasks", {
   /** Null = loose Task, lives in the Backlog of its Infinite Games. */
   moveId: uuid("move_id").references(() => moves.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
+  /** Its Description: a Long text in Markdown; empty = none. */
+  description: text("description").notNull().default(""),
   durationMin: integer("duration_min").notNull().default(60),
   games: games(),
   doneAt: timestamp("done_at", { withTimezone: true }),
   position: integer("position").notNull().default(0),
   createdAt: createdAt(),
 });
+
+/** A Link: a web address a Task or a Move keeps as a resource for doing it. */
+export const links = pgTable(
+  "links",
+  {
+    id: id(),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+    moveId: uuid("move_id").references(() => moves.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    /** Optional; without one, the address itself is shown. */
+    title: text("title").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("link_owner", sql`(${t.taskId} is null) <> (${t.moveId} is null)`),
+    check("link_url", sql`${t.url} ~ '^https?://'`),
+  ],
+);
 
 export const steps = pgTable("steps", {
   id: id(),

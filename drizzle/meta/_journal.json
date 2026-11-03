@@ -78,6 +78,13 @@
       "when": 1793669433411,
       "tag": "0010_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793673859035,
+      "tag": "0011_task_details",
+      "breakpoints": true
     }
   ]
 }
