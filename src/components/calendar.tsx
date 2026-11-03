@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatMinutes, WEEKDAY_NAMES, weekdayOf, type IsoDate } from "@/domain/dates";
+import { slotStarted } from "@/domain/reminders";
 import { type DayBlockRef, isDayEditable, structureOverlaps } from "@/domain/structure";
 import {
   backToStructure,
@@ -15,6 +16,7 @@ import {
 } from "@/server/actions";
 import type { BlockType, CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
 import { DayBlockDialog, type DayBlockDraft } from "./day-block-dialog";
+import { ReminderBell } from "./reminder-bell";
 import { StartCycleButton } from "./start-cycle-button";
 import { TimeGrid, type GridItem } from "./time-grid";
 import { UpkeepMark, useDoneToggle } from "./upkeeps";
@@ -66,10 +68,13 @@ export function Calendar({
   today,
   timeZone,
   blockTypes,
+  calendarConnected,
 }: {
   days: CalendarDay[];
   today: IsoDate;
   timeZone: string;
+  /** Whether Google Calendar is connected, for the bells (Reminders). */
+  calendarConnected: boolean;
   /**
    * Only the Week passes them: there, with a mouse, the Blocks of today and
    * later dates change for that date only (Exceptions). The Day just shows them,
@@ -197,7 +202,16 @@ export function Calendar({
           ) : item.layer === "block" ? (
             <BlockView item={item} startMin={pos.startMin} endMin={pos.endMin} />
           ) : (
-            <SlotView slot={item.slot} startMin={pos.startMin} endMin={pos.endMin} compact={!single} today={today} />
+            <SlotView
+              slot={item.slot}
+              startMin={pos.startMin}
+              endMin={pos.endMin}
+              compact={!single}
+              today={today}
+              // Until the clock is read, only a past day counts as started.
+              started={slotStarted(item.slot, { date: today, minute: minute ?? -1 })}
+              calendarConnected={calendarConnected}
+            />
           )
         }
       />
@@ -272,12 +286,16 @@ function SlotView({
   endMin,
   compact,
   today,
+  started,
+  calendarConnected,
 }: {
   slot: CalendarSlot;
   startMin: number;
   endMin: number;
   compact: boolean;
   today: IsoDate;
+  started: boolean;
+  calendarConnected: boolean;
 }) {
   const { work } = slot;
   const upkeep = useDoneToggle(today);
@@ -302,6 +320,13 @@ function SlotView({
           {work.title}
           {work.kind === "secondary" && work.upkeep && <UpkeepMark upkeepId={work.upkeep.id} date={slot.date} />}
         </span>
+        <ReminderBell
+          slot={slot}
+          title={work.title}
+          done={work.done}
+          started={started}
+          connected={calendarConnected}
+        />
         {!work.done && work.kind !== "secondary" && <StartCycleButton slotId={slot.id} className="text-[10px]" />}
         <button
           type="button"

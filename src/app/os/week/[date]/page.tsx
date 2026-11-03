@@ -5,7 +5,7 @@ import { Stack } from "@/components/stack";
 import { addDays, isIsoDate, monthOf, startOfWeek, weekDates } from "@/domain/dates";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
-import { getBlockTypes, getCalendar, getStack } from "@/server/queries";
+import { getBlockTypes, getCalendar, getCalendarConnected, getStack } from "@/server/queries";
 
 export default async function WeekPage({ params }: PageProps<"/os/week/[date]">) {
   await requireIvan();
@@ -16,7 +16,12 @@ export default async function WeekPage({ params }: PageProps<"/os/week/[date]">)
 
   const now = today();
   const dates = weekDates(monday);
-  const [days, stack, blockTypes] = await Promise.all([getCalendar(dates), getStack(monday), getBlockTypes()]);
+  const [days, stack, blockTypes, calendarConnected] = await Promise.all([
+    getCalendar(dates),
+    getStack(monday),
+    getBlockTypes(),
+    getCalendarConnected(),
+  ]);
 
   return (
     <>
@@ -44,7 +49,7 @@ export default async function WeekPage({ params }: PageProps<"/os/week/[date]">)
         remove it, ↺ to return the day to the Structure.
       </p>
       <div className="grid gap-4 xl:grid-cols-[1fr_minmax(260px,300px)]">
-        <Calendar days={days} today={now} timeZone={APP_TIMEZONE} blockTypes={blockTypes} />
+        <Calendar days={days} today={now} timeZone={APP_TIMEZONE} blockTypes={blockTypes} calendarConnected={calendarConnected} />
         <aside className="flex flex-col gap-2">
           <h2 className="font-semibold">Stack</h2>
           <p className="text-xs text-muted">Drag work onto a day.</p>

@@ -8,6 +8,7 @@ import { formatMinutes, monthOf, WEEKDAY_NAMES, WEEKDAYS, weekdayOf, type IsoDat
 import { monthMove } from "@/domain/upkeeps";
 import { moveSecondaryTaskInMonth } from "@/server/actions";
 import type { MonthDay, MonthItem, UpkeepView } from "@/server/queries";
+import { ReminderMark } from "./reminder-bell";
 import { UpkeepsDrawer } from "./upkeeps";
 
 type Move = { key: string; from: IsoDate; to: IsoDate; keepsHour: boolean };
@@ -226,6 +227,12 @@ function Item({
         </button>
       )}
       {item.title}
+      {item.reminder && ((item.reminder.leadMin !== null && !item.done) || item.reminder.failed) && (
+        // On a phone the title wins, as with ↻.
+        <span className="hidden sm:inline">
+          <ReminderMark failed={item.reminder.failed} />
+        </span>
+      )}
     </span>
   );
 }

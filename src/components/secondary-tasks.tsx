@@ -4,10 +4,20 @@ import { useState } from "react";
 import { SECONDARY_TASK_DURATION_MIN, type SecondaryTaskView } from "@/domain/secondary-tasks";
 import { addSecondaryTask, deleteSecondaryTask } from "@/server/actions";
 import { WORK_MIME, type WorkDrop } from "./time-grid";
+import { ReminderMark } from "./reminder-bell";
 import { AddIconButton, Hidden } from "./ui";
 import { StopUpkeep, UpkeepMark, useDoneToggle } from "./upkeeps";
 
-export function SecondaryTasks({ date, today, tasks }: { date: string; today: string; tasks: SecondaryTaskView[] }) {
+export function SecondaryTasks({
+  date,
+  today,
+  tasks,
+}: {
+  date: string;
+  today: string;
+  /** `reminder`: a bell on one of its Slots from this day on. */
+  tasks: (SecondaryTaskView & { reminder: { failed: boolean } | null })[];
+}) {
   const [adding, setAdding] = useState(false);
   const [stopping, setStopping] = useState<string | null>(null);
   const { toggle, dialog } = useDoneToggle(today);
@@ -50,6 +60,7 @@ export function SecondaryTasks({ date, today, tasks }: { date: string; today: st
             <div className={`min-w-0 flex-1 ${task.done ? "line-through" : ""}`}>
               {task.title}
               {task.upkeep && <UpkeepMark upkeepId={task.upkeep.id} date={task.day} />}
+              {task.reminder && (!task.done || task.reminder.failed) && <ReminderMark failed={task.reminder.failed} />}
               {task.carried > 0 && (
                 <span
                   className="ml-1.5 rounded bg-amber-500/15 px-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"

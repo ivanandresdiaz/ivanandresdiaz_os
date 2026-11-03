@@ -31,6 +31,7 @@ import {
   getCyclePresets,
   getDailyNote,
   getFeedProgress,
+  getCalendarConnected,
   getStack,
 } from "@/server/queries";
 
@@ -40,7 +41,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
   if (!isIsoDate(date)) notFound();
 
   const now = today();
-  const [context, note, [day], stack, presets, cycles, activeCycle, feed] = await Promise.all([
+  const [context, note, [day], stack, presets, cycles, activeCycle, feed, calendarConnected] = await Promise.all([
     getCheckInContext(date),
     getDailyNote(date),
     getCalendar([date]),
@@ -49,6 +50,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
     getCycleHistory(date, date),
     getActiveCycle(),
     date === now ? getFeedProgress(date) : null,
+    getCalendarConnected(),
   ]);
   const realFocus = cycles.reduce((sum, c) => sum + c.realFocusMin, 0);
   const stackItems = stack.pickable;
@@ -205,7 +207,7 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
         </div>
 
         {/* ── Calendar ── */}
-        <Calendar days={[day]} today={now} timeZone={APP_TIMEZONE} />
+        <Calendar days={[day]} today={now} timeZone={APP_TIMEZONE} calendarConnected={calendarConnected} />
 
         {/* ── Stack ── */}
         <aside className="flex flex-col gap-2">
