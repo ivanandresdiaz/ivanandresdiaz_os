@@ -114,9 +114,9 @@ _Evitar_: Recurring Task, Chore.
 
 **Learning Log** (¿Qué estoy aprendiendo?): la captura rápida durante el día de ideas, reflexiones y aprendizajes.
 
-**Journal**: la parte nocturna de la Daily Note; autorreflexión para tener una relación conmigo mismo.
+**Journal**: la parte nocturna de la Daily Note; autorreflexión para tener una relación conmigo mismo. Es un solo texto libre por día, sin plantilla de preguntas.
 
-**Weekly Review** (Revisión semanal): el domingo, o el lunes si quedó pendiente. Reviso el Learning Log de la semana y lo que pasó, y elijo los Moves de la semana que viene.
+**Weekly Review** (Revisión semanal): el domingo, o el lunes si quedó pendiente. Reviso el Learning Log de la semana y lo que pasó, y elijo los Moves de la semana que viene. Al terminarla guarda el puntaje sentido, unas notas opcionales y los Moves elegidos tal como quedaron; después se pueden corregir el puntaje y las notas, pero no esos Moves. Cada Weekly Review queda en un historial. La que no se hace se queda saltada y no deja deuda.
 
 **Alignment** (Alineamiento): qué tanto de mi tiempo va a lo que persigo. Se calcula como la parte del tiempo de los Container Blocks de la semana (ya con sus Exceptions) que fue a Campaigns activas, y se contrasta con un puntaje sentido del 1 al 10 en la Weekly Review. Se mide sobre lo planeado y lo logrado; el tiempo real de los Cycles es una métrica adicional, no la base.
 
@@ -133,7 +133,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Herramientas
 
-**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle, la Description de una Task o un Move). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
+**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle, la Description de una Task o un Move, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
 **Dictation** (Dictado): hablar en inglés para que el texto se escriba en un Long text, donde está el cursor y sin borrar lo que ya hay. Transcribe literal, con mis errores, porque corregirlos es trabajo del English Coach. El audio no se guarda.
 _Evitar_: Voice input, audio (un audio es una Reference).

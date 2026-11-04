@@ -293,7 +293,7 @@ Origen: la página Plan es larga y obliga a hacer scroll (el texto de la Season,
 
 **Calendario.** Structure semanal de Blocks (Habit / Container) + Exceptions por fecha. Drag y resize. Vistas día, semana y mes (el mes solo mira lo agendado y navega; construido el 2026-11-02). Warnings no bloqueantes. Lo no hecho vuelve al stack como carried over ×N.
 
-**Rituales.** Daily Note = Check-in (Principles, objetivos, 1–3 Highlights con why, Secondary Tasks con carry over y agenda opcional, eliminar, agendar) + Learning Log + Journal (plantilla de preguntas versionada; navegación entre días). Weekly Review el domingo o el lunes: Learning Log, lo que pasó, elegir Moves.
+**Rituales.** Daily Note = Check-in (Principles, objetivos, 1–3 Highlights con why, Secondary Tasks con carry over y agenda opcional, eliminar, agendar) + Learning Log + Journal (texto libre, sin plantilla, ver Q232; navegación entre días). Weekly Review el domingo o el lunes: Learning Log, lo que pasó, elegir Moves.
 
 **Juego.** XP y nivel por Infinite Game, solo por inputs que son señal. Streaks con "never miss twice"; la principal es elegir el Highlight. Day Won → premio + sugerencias de los juegos con menos tiempo. Ambitious Mode sin XP extra. Cycles opcionales con presets y pantalla de foco.
 
@@ -568,6 +568,65 @@ Origen: Ivan agregó a la Campaign de SSO una Task para aprender las skills de I
 - **Pantalla de foco**: un Cycle sobre la Task o el Move muestra sus Links y la Description plegada. **Calendario y Stack**: solo un ≡ pequeño junto al título.
 - Migración `0011_task_details` (columna `description` en `tasks` y `moves`, tabla `links`), aplicada en local. **Falta aplicarla en Neon.**
 - Verificación: 114 tests, typecheck, lint y prueba en el navegador (Link sin esquema, `javascript:` rechazado, título, reordenar, editar, Description con Markdown, ≡ en el calendario y el Stack, pantalla de foco, Task suelta con Step, teléfono). La base local quedó sin filas de prueba.
+
+## Ronda 29 — Las Campaigns del Check-in, solo títulos (2026-11-04)
+
+Origen: en el Check-in cada Campaign mostraba título y Goal. Los Goals de producción son frases completas e Ivan quiere ver por defecto solo los títulos.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q213 | Cómo se ven los Goals | ✅ Un solo toggle para toda la lista: la etiqueta "Q4 2026 Campaigns" muestra u oculta todos los Goals. |
+| Q214 | Los títulos bastan | ✅ Los títulos cargan la mirada de la mañana. No hay regla nueva sobre cómo se escriben. |
+| Q215 | Alcance | ✅ Solo cambia la lista de Campaigns del Check-in. Las Season Goals y las tarjetas del Plan se quedan igual. |
+| Q216 | Rebanada 3 | ✅ Ivan quiere ver las Campaigns con sus Goals en la Weekly Review, plegables hacia el lado, y pide construir la rebanada. |
+| Q217 | El toggle | ✅ La etiqueta con una flecha, como Principles. Los títulos siempre se ven; la flecha solo muestra u oculta los Goals. |
+| Q218 | Recuerda la última elección | ✅ Cada navegador recuerda si los dejó abiertos, como en Q168. |
+| Q219 | Goal abierto | ✅ En su propia línea debajo del título. Una Campaign sin Goal muestra solo el título. |
+
+## Ronda 30 — Rebanada 3: alcance y Learning Log (2026-11-04)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q220 | Alcance y orden | ✅ Toda la rebanada 3, en este orden: toggle del Check-in, Learning Log, Weekly Review, Journal. El XP sigue en la rebanada 4 y el cálculo de Alignment en la 5. |
+| Q221 | Dónde vive la Review | 🔁 No es una pantalla aparte: vive en la Week, para ver el tiempo gastado y los datos reales. Revisado en Q224. |
+| Q222 | Qué semana planea | ✅ Una Review por semana. El domingo 8 de noviembre o el lunes 9 mira la semana del 2 y planea la del 9. Después del lunes queda saltada, sin deuda. Ivan quiere ver el historial para sacar estadísticas algún día. |
+| Q223 | Learning Log | ✅ Una lista rápida en el Day: una línea por entrada, con día y hora, sin etiquetas, y se puede editar o borrar. Ivan la ajustará si no le gusta. |
+
+## Ronda 31 — La Weekly Review en la Week (2026-11-04)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q224 | Panel, no drawer | ✅ Un panel a la izquierda de la Week que empuja el calendario y se pliega hacia el lado. Los drawers de la derecha taparían el Stack y bloquearían el arrastre. En el teléfono llena la pantalla. El Stack conserva su ancho. |
+| Q225 | Dos pasos | ✅ Look back con el calendario de la semana que cierra; "Next" lleva el calendario y el Stack a la semana que viene para elegir Moves, con el panel abierto. |
+| Q226 | Lo que guarda | ✅ Una copia de los Moves elegidos con sus títulos, el puntaje sentido del 1 al 10 y notas opcionales (Long text). El puntaje se recoge desde ahora porque el sentir de una semana no se recupera. |
+| Q227 | Look back | ✅ Solo el Learning Log de la semana y sus Moves, hechos o no. El calendario ya muestra el tiempo. |
+| Q228 | Cómo se abre | ✅ Un botón en la cabecera de la Week y, domingo y lunes mientras esté pendiente, un enlace arriba en el Day. Sin notificaciones. |
+
+## Ronda 32 — Historial de Reviews y Journal (2026-11-04)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q229 | Historial | ✅ Un plegable "All Reviews" en el panel: semana, puntaje y Moves hechos. Las saltadas van en gris. Al abrir una, el calendario salta a su semana. |
+| Q230 | Editar una terminada | ✅ El puntaje y las notas se pueden corregir; los Moves guardados no. Una Review no se reabre entera. |
+| Q231 | Para terminar | ✅ Solo el puntaje es obligatorio. Se puede terminar sin notas y sin Moves. |
+| Q232 | Journal sin plantilla | ✅ Un solo Long text en blanco por día. Revisa Q23: la sección nocturna de la plantilla quedó vacía en las últimas 14 notas diarias (13–31 de octubre), mientras Ivan seguía escribiendo reflexiones libres en `journal/reflections/`. |
+| Q233 | Dónde vive | ✅ Una tarjeta en el Day que abre un drawer a la derecha, con flechas entre días con Journal. Los días pasados se pueden escribir. |
+
+Detalles que Ivan aceptó al confirmar el plan: de martes a sábado el panel solo lee el historial; las saltadas se muestran desde la primera Review terminada; se eligen Moves de Campaigns activas del Quarter del lunes que se planea; los Moves sin terminar siguen en la lista de su Campaign; un Move borrado conserva su título en la Review y cuenta como no hecho; cada navegador recuerda si el panel quedó plegado.
+
+## Rebanada 3 — construida en local (2026-11-04)
+
+- **Check-in:** los títulos de las Campaigns siempre se ven; la etiqueta con su flecha muestra u oculta los Goals, cada uno en su línea. Cada navegador recuerda la elección.
+- **Learning Log:** una tarjeta en el Day con el `+` de siempre. Cada entrada lleva su hora y se edita (✎) o se borra (×).
+- **Weekly Review:** un panel a la izquierda de la Week. Un botón en la cabecera la abre siempre; domingo y lunes, mientras esté pendiente, también hay un enlace en el Day.
+  - **Look back** (`?review=look`) sobre la semana que cierra; **Next** lleva a **Choose Moves** (`?review=choose`) sobre la que planea. Un paso que ya no aplica cae en lectura (`?review=read`).
+  - **Finish Review** exige solo el puntaje. El puntaje y las notas se guardan como borrador en el navegador hasta terminar, así que volver un paso no los pierde.
+  - **All Reviews**: semana, puntaje y Moves hechos; las saltadas en gris desde la primera Review terminada.
+- **Journal:** una tarjeta en el Day con su primera línea; el drawer a la derecha tiene flechas entre días con Journal.
+- **`DrawerFrame`:** Next conserva oculta la ruta que deja, con sus efectos limpiados. Un `<dialog>` modal abierto ahí congelaba la página visible, así que ahora se suelta al ocultarse y se reabre al volver.
+- Migración `0012_slice_3_notes_and_reviews` (`daily_notes.journal`, `learning_entries`, `weekly_reviews`, `review_moves`), aplicada en local. **Falta aplicarla en Neon, antes de desplegar:** el Day lee `daily_notes.journal`.
+- Limitación de la primera Review: como ninguna Review anterior guardó los Moves de esa semana, un Move que se vuelve a elegir para la semana siguiente sale de "Moves of this week". Desde la segunda Review la copia guardada lo conserva.
+- Verificación: 132 tests, typecheck, lint, `next build` y prueba en el navegador con el reloj del servidor movido a domingo, lunes y martes. Se probó el toggle y su recuerdo, agregar, editar y borrar entradas, el panel plegado (devuelve 300 px al calendario) y recordado, elegir un Move y verlo en el Stack, el borrador al volver un paso, terminar, corregir puntaje y notas, Moves congelados con un Move borrado, semanas saltadas, arrastrar del Stack al calendario con el panel abierto, las flechas del Journal con cambios sin guardar, el teléfono y la consola sin errores. La base local quedó sin filas de prueba.
 
 ## Despliegue (2026-10-30)
 
