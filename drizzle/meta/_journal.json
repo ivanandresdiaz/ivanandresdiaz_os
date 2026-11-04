@@ -85,6 +85,13 @@
       "when": 1793673859035,
       "tag": "0011_task_details",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793812022077,
+      "tag": "0012_slice_3_notes_and_reviews",
+      "breakpoints": true
     }
   ]
 }

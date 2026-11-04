@@ -320,7 +320,44 @@ export const calendarCleanups = pgTable("calendar_cleanups", {
 export const dailyNotes = pgTable("daily_notes", {
   date: isoDate("date").primaryKey(),
   checkInDoneAt: timestamp("check_in_done_at", { withTimezone: true }),
+  /** The Journal of the day: a Long text in Markdown; empty = not written. */
+  journal: text("journal").notNull().default(""),
   createdAt: createdAt(),
+});
+
+/** A quick capture of the Learning Log: an idea, a reflection or something learned. */
+export const learningEntries = pgTable("learning_entries", {
+  id: id(),
+  date: isoDate("date").notNull(),
+  body: text("body").notNull(),
+  createdAt: createdAt(),
+});
+
+/** A finished Weekly Review. It closes the week of `weekOf` (a Monday) and plans the next one. */
+export const weeklyReviews = pgTable(
+  "weekly_reviews",
+  {
+    weekOf: isoDate("week_of").primaryKey(),
+    feltScore: smallint("felt_score").notNull(),
+    /** A Long text; empty = none. */
+    notes: text("notes").notNull().default(""),
+    doneAt: timestamp("done_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("felt_score_range", sql`${t.feltScore} between 1 and 10`)],
+);
+
+/**
+ * A Move as it was chosen when a Weekly Review finished. A Move holds only its latest
+ * week, so this copy is the record. Deleting the Move keeps its title here.
+ */
+export const reviewMoves = pgTable("review_moves", {
+  id: id(),
+  reviewWeek: isoDate("review_week")
+    .notNull()
+    .references(() => weeklyReviews.weekOf, { onDelete: "cascade" }),
+  moveId: uuid("move_id").references(() => moves.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  position: integer("position").notNull(),
 });
 
 /** Something I decide to ignore on one date. It never carries over. */
