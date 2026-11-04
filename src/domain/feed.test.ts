@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FEED_SIZE, feedSeen, MAX_DAILY_LIKES, pickFeed, rankByLikes, stepLikes } from "./feed";
+import { FEED_SIZE, feedDone, feedSeen, MAX_DAILY_LIKES, pickFeed, rankByLikes, stepLikes } from "./feed";
 
 /** A small deterministic generator so the draws are reproducible. */
 function seeded(seed: number) {
@@ -75,5 +75,11 @@ describe("Feed", () => {
     expect(feedSeen(10, 8)).toBe(8);
     expect(feedSeen(3, 10)).toBe(3);
     expect(feedSeen(-1, 10)).toBe(0);
+  });
+
+  it("is done once the last Reference was reached, and an empty Feed never is", () => {
+    expect(feedDone(9, 10)).toBe(false);
+    expect(feedDone(10, 10)).toBe(true);
+    expect(feedDone(0, 0)).toBe(false);
   });
 });

@@ -55,3 +55,8 @@ export function pickFeed(ids: readonly string[], likes: ReadonlyMap<string, numb
 export function feedSeen(seen: number, length: number) {
   return Math.max(0, Math.min(seen, length));
 }
+
+/** Reaching the last Reference finishes the Feed for the day, whatever is rewatched later. */
+export function feedDone(seen: number, length: number) {
+  return length > 0 && seen >= length;
+}

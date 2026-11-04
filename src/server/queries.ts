@@ -94,11 +94,10 @@ export type FeedView = {
 
 const likeSum = sql<number>`cast(sum(${s.referenceLikes.count}) as int)`;
 
-async function likeTotals(ids?: string[]) {
+async function likeTotals() {
   const rows = await db
     .select({ id: s.referenceLikes.referenceId, total: likeSum })
     .from(s.referenceLikes)
-    .where(ids ? inArray(s.referenceLikes.referenceId, ids) : undefined)
     .groupBy(s.referenceLikes.referenceId);
   return new Map(rows.map((r) => [r.id, r.total]));
 }
@@ -167,20 +166,20 @@ export async function getTodayFeed(): Promise<FeedView> {
   const ids = feed?.referenceIds ?? [];
   const [items, totals, todays, top] = await Promise.all([
     feedItems(ids),
-    ids.length ? likeTotals(ids) : new Map<string, number>(),
-    ids.length
-      ? db
-          .select({ id: s.referenceLikes.referenceId, count: s.referenceLikes.count })
-          .from(s.referenceLikes)
-          .where(and(eq(s.referenceLikes.date, date), inArray(s.referenceLikes.referenceId, ids)))
-      : [],
+    likeTotals(),
+    db
+      .select({ id: s.referenceLikes.referenceId, count: s.referenceLikes.count })
+      .from(s.referenceLikes)
+      .where(eq(s.referenceLikes.date, date)),
     getTopReferences(),
   ]);
   const givenToday = new Map(todays.map((l) => [l.id, l.count]));
+  // Every liked Reference, not only today's: the Top 10 plays with the same Likes.
+  const liked = new Set([...ids, ...totals.keys()]);
   return {
     date,
     items,
-    likes: Object.fromEntries(items.map((i) => [i.id, { total: totals.get(i.id) ?? 0, today: givenToday.get(i.id) ?? 0 }])),
+    likes: Object.fromEntries([...liked].map((id) => [id, { total: totals.get(id) ?? 0, today: givenToday.get(id) ?? 0 }])),
     position: Math.min(feed?.position ?? 0, items.length),
     seen: feedSeen(feed?.seen ?? 0, items.length),
     top,

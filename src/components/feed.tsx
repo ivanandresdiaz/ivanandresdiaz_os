@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
-import { DOUBLE_TAP_MS, MAX_DAILY_LIKES, stepLikes, UNLIKE_HOLD_MS } from "@/domain/feed";
+import { DOUBLE_TAP_MS, feedDone, MAX_DAILY_LIKES, stepLikes, UNLIKE_HOLD_MS } from "@/domain/feed";
 import { AUDIO_SKIP_SECONDS, formatClock, IMAGE_STORY_MS, skipTo } from "@/domain/references";
 import { likeReference, saveFeedPosition } from "@/server/actions";
 import type { FeedItem, FeedLikes, FeedView, TopReference } from "@/server/queries";
@@ -19,22 +19,29 @@ function applyLike(likes: FeedLikes, { id, delta }: LikeChange): FeedLikes {
   return { ...likes, [id]: { total: current.total + today - current.today, today } };
 }
 
-type Mode = "start" | "playing" | "end";
+const ENDINGS = {
+  today: { title: "Done for today", note: "That was today’s Feed. No more until tomorrow.", leave: "See your Top 10" },
+  top: { title: "That was your Top 10", note: null, leave: "Back" },
+};
+
+type Round = { kind: keyof typeof ENDINGS; list: FeedItem[]; from: number };
 
 /**
  * Today's Feed. A start card, then a full-screen vertical feed (swipe up for the
- * next Reference; each one moves on by itself when it ends), then the end with the Top 10.
+ * next Reference; each one moves on by itself when it ends). Once finished it
+ * stays on the Done screen for the day, where it can be rewatched, or the Top 10 watched.
  */
 export function Feed({ feed }: { feed: FeedView }) {
-  // The list and its signed links stay as first loaded, so a refresh never restarts what is playing.
-  const [items] = useState(feed.items);
-  const [mode, setMode] = useState<Mode>(feed.position >= feed.items.length && feed.items.length > 0 ? "end" : "start");
+  const { items, top } = feed;
+  // What is playing, with its signed links, stays as it started, so a refresh never restarts or reorders it.
+  const [round, setRound] = useState<Round | null>(null);
   const [startAt, setStartAt] = useState(feed.position >= feed.items.length ? 0 : feed.position);
   const [seen, setSeen] = useState(feed.seen);
   // A reducer, so quick taps stack on top of each other until the server answers.
   const [likes, changeLikes] = useOptimistic(feed.likes, applyLike);
   const [, startTransition] = useTransition();
   const [player, setPlayer] = useState<HTMLVideoElement | null>(null);
+  const finished = feedDone(seen, items.length);
 
   /** Gives (+1) or takes back (-1) one of today's Likes; false when there is nothing to change. */
   function like(id: string, delta: 1 | -1) {
@@ -48,10 +55,10 @@ export function Feed({ feed }: { feed: FeedView }) {
   }
 
   /** Runs inside the tap: on iPhone, a media element may play with sound only once a tap has played it. */
-  function begin(from: number) {
+  function begin(kind: Round["kind"], list: FeedItem[], from: number) {
     const el = player ?? createPlayer();
     setPlayer(el);
-    const unlockWith = items[from]?.kind !== "image" ? items[from] : items.find((i) => i.kind !== "image");
+    const unlockWith = list[from]?.kind !== "image" ? list[from] : list.find((i) => i.kind !== "image");
     if (unlockWith && el.dataset.id !== unlockWith.id) {
       el.src = unlockWith.url;
       el.dataset.id = unlockWith.id;
@@ -59,9 +66,15 @@ export function Feed({ feed }: { feed: FeedView }) {
     el.muted = false;
     el.play().catch(() => {});
     // Starting on an image: the play above only unlocks the sound, so nothing should be heard yet.
-    if (items[from]?.kind === "image") el.pause();
-    setStartAt(from);
-    setMode("playing");
+    if (list[from]?.kind === "image") el.pause();
+    setRound({ kind, list, from });
+  }
+
+  /** Reaching a Reference counts as seeing it. A rewatch changes nothing, so nothing is saved. */
+  function reach(index: number) {
+    if (finished) return;
+    setSeen((s) => Math.max(s, Math.min(index + 1, items.length)));
+    saveFeedPosition({ position: index });
   }
 
   if (items.length === 0) {
@@ -75,25 +88,26 @@ export function Feed({ feed }: { feed: FeedView }) {
     );
   }
 
-  if (mode === "playing" && player) {
+  if (round && player) {
     return (
       <FeedPlayer
-        items={items}
+        items={round.list}
         player={player}
-        startAt={startAt}
+        startAt={round.from}
         likes={likes}
+        ending={ENDINGS[round.kind]}
         onLike={like}
-        onReach={(index) => setSeen((s) => Math.max(s, Math.min(index + 1, items.length)))}
+        onReach={round.kind === "today" ? reach : undefined}
         onClose={(index) => {
           player.pause();
-          setStartAt(index >= items.length ? 0 : index);
-          setMode(index >= items.length ? "end" : "start");
+          if (round.kind === "today") setStartAt(index >= round.list.length ? 0 : index);
+          setRound(null);
         }}
       />
     );
   }
 
-  if (mode === "end") {
+  if (finished) {
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section className="card flex flex-col items-start gap-3">
@@ -102,11 +116,11 @@ export function Feed({ feed }: { feed: FeedView }) {
             You saw today’s {items.length} Reference{items.length === 1 ? "" : "s"}. There is no more Feed until
             tomorrow.
           </p>
-          <button type="button" className="btn" onClick={() => begin(0)}>
+          <button type="button" className="btn" onClick={() => begin("today", items, 0)}>
             Watch today’s again
           </button>
         </section>
-        <TopList top={feed.top} />
+        <TopList top={top} onWatch={(from) => begin("top", top, from)} />
       </div>
     );
   }
@@ -118,7 +132,7 @@ export function Feed({ feed }: { feed: FeedView }) {
         <p className="text-sm text-muted">
           {seen} of {items.length} seen today. Optional: it gives no XP, at your own pace.
         </p>
-        <button type="button" className="btn-primary" onClick={() => begin(startAt)}>
+        <button type="button" className="btn-primary" onClick={() => begin("today", items, startAt)}>
           {seen > 0 ? "Continue" : "Start"}
         </button>
       </section>
@@ -140,6 +154,7 @@ function FeedPlayer({
   player,
   startAt,
   likes,
+  ending,
   onLike,
   onReach,
   onClose,
@@ -148,8 +163,9 @@ function FeedPlayer({
   player: HTMLVideoElement;
   startAt: number;
   likes: FeedLikes;
+  ending: (typeof ENDINGS)[Round["kind"]];
   onLike: (id: string, delta: 1 | -1) => boolean;
-  onReach: (index: number) => void;
+  onReach?: (index: number) => void;
   onClose: (index: number) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -178,10 +194,8 @@ function FeedPlayer({
     goTo(startAt, false);
   }, [goTo, startAt]);
 
-  // Ivan reaching a Reference counts as seeing it; the end slide marks the Feed done.
   useEffect(() => {
-    onReach(active);
-    saveFeedPosition({ position: active });
+    onReach?.(active);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
@@ -483,8 +497,8 @@ function FeedPlayer({
         })}
 
         <section className="flex h-dvh snap-start snap-always flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-2xl font-semibold">Done for today</p>
-          <p className="text-sm text-white/70">That was today’s Feed. No more until tomorrow.</p>
+          <p className="text-2xl font-semibold">{ending.title}</p>
+          {ending.note && <p className="text-sm text-white/70">{ending.note}</p>}
           <div className="flex gap-3">
             <button
               type="button"
@@ -498,7 +512,7 @@ function FeedPlayer({
               onClick={() => onClose(items.length)}
               className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-black"
             >
-              See your Top 10
+              {ending.leave}
             </button>
           </div>
         </section>
@@ -534,27 +548,36 @@ function FeedPlayer({
   );
 }
 
-function TopList({ top }: { top: TopReference[] }) {
+function TopList({ top, onWatch }: { top: TopReference[]; onWatch: (from: number) => void }) {
   return (
     <section className="card flex flex-col gap-3">
-      <h2 className="font-semibold">Top 10</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">Top 10</h2>
+        {top.length > 0 && (
+          <button type="button" className="btn" onClick={() => onWatch(0)}>
+            Watch
+          </button>
+        )}
+      </div>
       {top.length === 0 ? (
         <p className="text-sm text-muted">Like References in the Feed to see which ones move you most.</p>
       ) : (
         <ol className="flex flex-col gap-2">
           {top.map((item, i) => (
-            <li key={item.id} className="flex items-center gap-3">
-              <span className="w-5 text-center text-sm font-semibold">{i + 1}</span>
-              <Thumb item={item} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{item.principleTitle}</div>
-                {item.kind === "audio" && (
-                  <div className="truncate text-xs text-muted">{item.title || UNTITLED_AUDIO}</div>
-                )}
-              </div>
-              <span className="text-sm tabular-nums">
-                <span className="text-red-500">♥</span> {item.likes}
-              </span>
+            <li key={item.id}>
+              <button type="button" className="flex w-full items-center gap-3 text-left" onClick={() => onWatch(i)}>
+                <span className="w-5 text-center text-sm font-semibold">{i + 1}</span>
+                <Thumb item={item} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{item.principleTitle}</div>
+                  {item.kind === "audio" && (
+                    <div className="truncate text-xs text-muted">{item.title || UNTITLED_AUDIO}</div>
+                  )}
+                </div>
+                <span className="text-sm tabular-nums">
+                  <span className="text-red-500">♥</span> {item.likes}
+                </span>
+              </button>
             </li>
           ))}
         </ol>
