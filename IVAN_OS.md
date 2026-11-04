@@ -628,6 +628,37 @@ Detalles que Ivan aceptó al confirmar el plan: de martes a sábado el panel sol
 - Limitación de la primera Review: como ninguna Review anterior guardó los Moves de esa semana, un Move que se vuelve a elegir para la semana siguiente sale de "Moves of this week". Desde la segunda Review la copia guardada lo conserva.
 - Verificación: 132 tests, typecheck, lint, `next build` y prueba en el navegador con el reloj del servidor movido a domingo, lunes y martes. Se probó el toggle y su recuerdo, agregar, editar y borrar entradas, el panel plegado (devuelve 300 px al calendario) y recordado, elegir un Move y verlo en el Stack, el borrador al volver un paso, terminar, corregir puntaje y notas, Moves congelados con un Move borrado, semanas saltadas, arrastrar del Stack al calendario con el panel abierto, las flechas del Journal con cambios sin guardar, el teléfono y la consola sin errores. La base local quedó sin filas de prueba.
 
+## Ronda 33 — El Feed terminado sigue terminado (2026-11-04)
+
+Origen: Ivan quiere que, si ya vio el Feed del día, `/feed` muestre "Done for today" y le deje verlo de nuevo, porque esas References le pegan fuerte y quiere practicarlas para memorizarlas. En el código, "Done" dependía de la posición guardada: Watch again la devolvía a la primera, y salir en la última Reference la dejaba antes del final. En los dos casos `/feed` mostraba "10 of 10 seen" con Continue.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q234 | Qué es terminar | ✅ Llegar a la última Reference termina el Feed del día; no hace falta pasar a la pantalla final. |
+| Q235 | Dura todo el día | ✅ Una vez terminado, `/feed` muestra Done hasta mañana, sin importar cuántas veces vuelva a verlo o lo deje a medias. Nunca Continue. |
+| Q236 | Dónde arranca Watch again | ✅ Siempre desde la primera Reference, en el orden de hoy. No recuerda dónde quedó la vez anterior. |
+| Q237 | Volver a ver no deja registro | ✅ Sin contador, XP ni Streak. Los Likes siguen igual, hasta 5 por Reference al día. |
+| Q238 | Qué se puede practicar | ✅ Las 10 de hoy y además el Top 10, que gana un botón Watch y se ve en el mismo reproductor. Una marca "to memorize" queda para después, si hace falta. |
+| Q239 | La pantalla final | ✅ No cambia: "Done for today" con Watch again y See your Top 10. |
+
+## Ronda 34 — Ver el Top 10 (2026-11-04)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q240 | Dónde aparece | ✅ Solo en la pantalla Done. Primero va la ronda de hoy. |
+| Q241 | Cómo arranca | ✅ Watch arranca en el #1; tocar una fila arranca en esa Reference y sigue hacia abajo. |
+| Q242 | Orden | ✅ De más a menos Likes, fijo mientras se ve. La lista se actualiza al volver. |
+| Q243 | Likes | ✅ Los mismos del Feed, con el mismo límite de 5 por Reference al día, compartido con la ronda de hoy. Practicar y dar Likes sube una Reference en el Top 10. |
+| Q244 | Pantalla final | ✅ "That was your Top 10" con Watch again y Back; Back vuelve a Done. |
+| Q245 | Separado del Feed | ✅ Ver el Top 10 no cambia el avance ni el Done de hoy. Solo se guardan los Likes. |
+
+## Feed terminado y Top 10 — construido en local (2026-11-04)
+
+- **Done:** ahora sale de cuántas References se han visto, no de la posición guardada. Volver a ver no guarda nada, así que no puede deshacerlo. No hay migración: el dato ya existía, y el Feed de un día que ya llegó a la última Reference pasa a Done al desplegar.
+- **Top 10:** botón Watch y filas que se tocan, en el mismo reproductor. El botón no aparece sin Likes.
+- La vista del Feed ahora trae los Likes de todas las References con Likes, no solo los de las de hoy, para que el Top 10 respete el límite diario.
+- Verificación: 133 tests, typecheck, lint, `next build` y prueba en el navegador con References de prueba. Se probó salir en la última Reference, recargar, dejar a medias un Watch again, ir y volver por la navegación, arrancar el Top 10 desde una fila, el tope de 5 Likes, el orden fijo y la lista actualizada al volver, el límite compartido con el Feed, el avance intacto en la base, Continue cuando no está terminado, el Top 10 vacío, el teléfono y la consola sin errores. La base local quedó sin filas de prueba.
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.

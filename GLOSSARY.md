@@ -17,9 +17,11 @@ _Evitar_: Description, body.
 **Reference** (Referencia): una imagen, un video o un audio que Ivan sube a un Principle porque lo encarna para él (p. ej. un reel que le cambió la forma de ver algo, o el fragmento de un podcast). Un Principle puede tener cualquier cantidad, en el orden que Ivan elija. Un audio lleva un título, porque no tiene nada que ver.
 _Evitar_: Story, Reel, Media, Podcast.
 
-**Feed**: la ronda diaria de hasta 10 References de cualquier Principle, que paso a mi ritmo. Las 9 primeras salen al azar y la última sale de las 10 con más Likes, sin repetir ninguna en el día. Se elige una vez al día y no cambia; al terminarla no hay más, aunque puedo volver a ver las de hoy. Es opcional: no da ni quita XP, no tiene Streak y no es Task ni Habit.
+**Feed**: la ronda diaria de hasta 10 References de cualquier Principle, que paso a mi ritmo. Las 9 primeras salen al azar y la última sale de las 10 con más Likes, sin repetir ninguna en el día. Se elige una vez al día y no cambia. Queda terminada al llegar a la última Reference y sigue terminada todo el día: no hay más hasta mañana, aunque puedo volver a ver las de hoy desde la primera, como práctica, sin que eso deje registro. Es opcional: no da ni quita XP, no tiene Streak y no es Task ni Habit.
 
-**Like** (Me gusta): la marca que le doy a una Reference en el Feed porque me movió. Le doy de 1 a 5 por día según cuánto me movió, así que una Reference puede juntar hasta 1.825 en un año; el total muestra cuáles influyen más en mí. Solo se pueden quitar los del mismo día.
+**Top 10**: las 10 References con más Likes de todos los tiempos. Se pueden ver seguidas, como práctica para memorizarlas.
+
+**Like** (Me gusta): la marca que le doy a una Reference en el Feed o en el Top 10 porque me movió. Le doy de 1 a 5 por día según cuánto me movió, así que una Reference puede juntar hasta 1.825 en un año; el total muestra cuáles influyen más en mí. Solo se pueden quitar los del mismo día.
 
 **Input**: lo que hago en el presente (un hábito cumplido, un bloque de trabajo). Se juega por inputs; solo los inputs suman puntos y rachas.
 **Output**: el resultado que llega después (ingresos, kilos, features en producción). No se persigue directamente, porque trae ansiedad y saca del presente. Puede ser el objetivo declarado, pero nunca da puntos.
