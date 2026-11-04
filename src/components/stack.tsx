@@ -13,16 +13,18 @@ export function Stack({
   thisWeek,
   carriedOver,
   loose,
+  movesTitle = "This week's Moves",
 }: {
   thisWeek: StackItem[];
   carriedOver: StackItem[];
   loose: StackItem[];
+  movesTitle?: string;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <Section title="Carried over" items={carriedOver} empty={null} />
       <Section
-        title="This week's Moves"
+        title={movesTitle}
         items={thisWeek}
         empty={
           <p className="text-sm text-muted">

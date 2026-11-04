@@ -219,6 +219,7 @@ export function DrawerFrame({
   onSwitch,
   onRequestClose,
   onClose,
+  navigation,
   children,
 }: {
   heading: string;
@@ -227,12 +228,22 @@ export function DrawerFrame({
   onSwitch: (mode: Mode) => void;
   onRequestClose: () => void;
   onClose: () => void;
+  /** Sits before the Preview/Edit switch. */
+  navigation?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const released = useRef(false);
 
+  // Next keeps a route it leaves in the page, hidden, with its effects cleaned up. A modal
+  // left open there would freeze the visible page, so it lets go and opens again on return.
   useEffect(() => {
-    dialog.current?.showModal();
+    const element = dialog.current;
+    element?.showModal();
+    return () => {
+      released.current = true;
+      element?.close();
+    };
   }, []);
 
   return (
@@ -243,7 +254,11 @@ export function DrawerFrame({
         event.preventDefault();
         onRequestClose();
       }}
-      onClose={onClose}
+      onClose={() => {
+        // Letting go is not Ivan closing it.
+        if (released.current) released.current = false;
+        else onClose();
+      }}
       onClick={(event) => event.target === event.currentTarget && onRequestClose()}
       className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-full max-w-[640px] translate-x-0 border-l border-line bg-surface p-0 text-foreground transition-transform duration-200 ease-out backdrop:bg-black/40 starting:translate-x-full motion-reduce:transition-none"
     >
@@ -253,6 +268,7 @@ export function DrawerFrame({
             <h2 className="truncate font-semibold">{heading}</h2>
             <div className="text-xs text-muted">{subheading}</div>
           </div>
+          {navigation}
           <div role="group" aria-label="Mode" className="flex rounded-md border border-line p-0.5 text-sm">
             {(["preview", "edit"] as const).map((m) => (
               <button

@@ -22,6 +22,7 @@ import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_DESCRIPTION, MAX_LINK_TITLE, MAX_LINK_URL, normalizeLinkUrl } from "@/domain/links";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
 import { parseQuarterKey } from "@/domain/plan";
+import { isFeltScore, openReview } from "@/domain/reviews";
 import { dayAfterScheduling } from "@/domain/secondary-tasks";
 import { DAY_END_MIN, MIN_SLOT_MIN } from "@/domain/slots";
 import { isReminderLead, slotStarted } from "@/domain/reminders";
@@ -40,12 +41,14 @@ import { deleteObject, getObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
 import { isConnected } from "./google-calendar";
+import { getMovesChosenFor } from "./queries";
 import { retryFailedReminders, syncDeletions, syncSlots, syncWork } from "./reminders";
 
 const isoDate = z.string().refine(isIsoDate, "Invalid date");
 const minute = z.coerce.number().int().min(0).max(DAY_END_MIN);
 const hhmm = z.string().transform((v) => parseMinutes(v));
 const text = z.string().trim();
+const MAX_LEARNING_ENTRY = 1_000;
 const required = z.string().trim().min(1);
 const optionalId = z
   .string()
@@ -1284,6 +1287,77 @@ export async function deleteNoiseItem(input: { id: string }) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(input);
   await db.delete(s.noiseItems).where(eq(s.noiseItems.id, id));
+  await done();
+}
+
+// ─── Learning Log, Journal and Weekly Review ─────────────────────────────────
+
+const learningBody = required.max(MAX_LEARNING_ENTRY);
+
+export async function addLearningEntry(fd: FormData) {
+  await requireIvan();
+  const { date, body } = z.object({ date: isoDate, body: learningBody }).parse(fields(fd));
+  await db.insert(s.learningEntries).values({ date, body });
+  await done();
+}
+
+export async function updateLearningEntry(fd: FormData) {
+  await requireIvan();
+  const { id, body } = z.object({ id: z.uuid(), body: learningBody }).parse(fields(fd));
+  await db.update(s.learningEntries).set({ body }).where(eq(s.learningEntries.id, id));
+  await done();
+}
+
+export async function deleteLearningEntry(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  await db.delete(s.learningEntries).where(eq(s.learningEntries.id, id));
+  await done();
+}
+
+export async function saveJournal(input: { date: string; journal: string }) {
+  await requireIvan();
+  const { date, journal } = z.object({ date: isoDate, journal: text.max(MAX_DESCRIPTION) }).parse(input);
+  await db
+    .insert(s.dailyNotes)
+    .values({ date, journal })
+    .onConflictDoUpdate({ target: s.dailyNotes.date, set: { journal } });
+  await done();
+}
+
+const reviewFields = z.object({
+  week: isoDate,
+  score: z.number().refine(isFeltScore, "The felt score goes from 1 to 10"),
+  notes: text.max(MAX_DESCRIPTION),
+});
+
+/** Closes the open Review and saves the Moves chosen for the week it plans, as they stand. */
+export async function finishWeeklyReview(input: { week: string; score: number; notes: string }) {
+  await requireIvan();
+  const { week, score, notes } = reviewFields.parse(input);
+  const open = openReview(today());
+  // Refused: the page refreshes to show the Review is no longer open.
+  if (open?.week !== week) return done();
+  const chosen = (await getMovesChosenFor(open.plans)).filter((move) => move.active);
+  await db.transaction(async (tx) => {
+    const [review] = await tx
+      .insert(s.weeklyReviews)
+      .values({ weekOf: week, feltScore: score, notes })
+      .onConflictDoNothing()
+      .returning({ week: s.weeklyReviews.weekOf });
+    if (!review || chosen.length === 0) return;
+    await tx.insert(s.reviewMoves).values(
+      chosen.map((move, position) => ({ reviewWeek: week, moveId: move.moveId, title: move.title, position })),
+    );
+  });
+  await done();
+}
+
+/** A finished Review keeps its Moves; only its score and notes can be corrected. */
+export async function updateWeeklyReview(input: { week: string; score: number; notes: string }) {
+  await requireIvan();
+  const { week, score, notes } = reviewFields.parse(input);
+  await db.update(s.weeklyReviews).set({ feltScore: score, notes }).where(eq(s.weeklyReviews.weekOf, week));
   await done();
 }
 

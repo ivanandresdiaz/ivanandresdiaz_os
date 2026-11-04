@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -17,6 +17,7 @@ import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
 import { inPlay, inPriority } from "@/domain/plan";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
+import { type FinishedReview, movesOfWeek, type ReviewMove, reviewHistory } from "@/domain/reviews";
 import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/domain/secondary-tasks";
 import type { UpkeepRef } from "@/domain/upkeeps";
 import { presignView } from "@/lib/r2";
@@ -816,7 +817,7 @@ export async function getUpkeeps(): Promise<UpkeepView[]> {
 }
 
 export async function getDailyNote(date: IsoDate) {
-  const [[note], highlights, secondary, noiseItems, belled] = await Promise.all([
+  const [[note], highlights, secondary, noiseItems, learningEntries, belled] = await Promise.all([
     db.select().from(s.dailyNotes).where(eq(s.dailyNotes.date, date)),
     db
       .select()
@@ -829,6 +830,7 @@ export async function getDailyNote(date: IsoDate) {
       .from(s.noiseItems)
       .where(eq(s.noiseItems.date, date))
       .orderBy(asc(s.noiseItems.createdAt)),
+    getLearningEntries(date, date),
     // Secondary Tasks with a bell on a Slot from this day on (a past one has nothing left to remind).
     db
       .select({ id: s.slots.secondaryTaskId, failed: s.slots.reminderFailed })
@@ -848,11 +850,50 @@ export async function getDailyNote(date: IsoDate) {
   return {
     date,
     noiseItems,
+    learningEntries,
+    journal: note?.journal ?? "",
     checkInDoneAt: note?.checkInDoneAt ?? null,
     highlights,
     secondaryTasks: secondaryTasksForDate(secondary, date).map((task) => ({ ...task, reminder: reminderFor(task.id) })),
     dayWon: isDayWon(highlights),
   };
+}
+
+export type LearningEntry = { id: string; date: IsoDate; body: string; minute: number };
+
+/** The Learning Log of some days, oldest first. */
+export async function getLearningEntries(start: IsoDate, end: IsoDate): Promise<LearningEntry[]> {
+  const rows = await db
+    .select()
+    .from(s.learningEntries)
+    .where(and(gte(s.learningEntries.date, start), lte(s.learningEntries.date, end)))
+    .orderBy(asc(s.learningEntries.date), asc(s.learningEntries.createdAt));
+  return rows.map((row) => ({
+    id: row.id,
+    date: row.date,
+    body: row.body,
+    minute: localMoment(row.createdAt, APP_TIMEZONE).minute,
+  }));
+}
+
+/** The closest days around this one that have a Journal written. */
+export async function getJournalNeighbors(date: IsoDate) {
+  const written = ne(s.dailyNotes.journal, "");
+  const [[previous], [next]] = await Promise.all([
+    db
+      .select({ date: s.dailyNotes.date })
+      .from(s.dailyNotes)
+      .where(and(written, lt(s.dailyNotes.date, date)))
+      .orderBy(desc(s.dailyNotes.date))
+      .limit(1),
+    db
+      .select({ date: s.dailyNotes.date })
+      .from(s.dailyNotes)
+      .where(and(written, gt(s.dailyNotes.date, date)))
+      .orderBy(asc(s.dailyNotes.date))
+      .limit(1),
+  ]);
+  return { previous: previous?.date ?? null, next: next?.date ?? null };
 }
 
 /** The strategic context shown at the top of the Check-in. */
@@ -867,6 +908,135 @@ export async function getCheckInContext(date: IsoDate) {
     ? (await getCampaigns({ quarterId: quarter.id })).filter((c) => c.status === "active")
     : [];
   return { principles, season, quarter, quarterRef: ref, campaigns };
+}
+
+// ─── Weekly Review ───────────────────────────────────────────────────────────
+
+export async function isReviewDone(week: IsoDate): Promise<boolean> {
+  const [row] = await db
+    .select({ week: s.weeklyReviews.weekOf })
+    .from(s.weeklyReviews)
+    .where(eq(s.weeklyReviews.weekOf, week));
+  return row !== undefined;
+}
+
+/** The Moves saved by some Reviews, in the order they were chosen. A deleted Move counts as not done. */
+async function getSavedMoves(weeks: IsoDate[]) {
+  if (weeks.length === 0) return [];
+  const rows = await db
+    .select({ row: s.reviewMoves, doneAt: s.moves.doneAt })
+    .from(s.reviewMoves)
+    .leftJoin(s.moves, eq(s.moves.id, s.reviewMoves.moveId))
+    .where(inArray(s.reviewMoves.reviewWeek, weeks))
+    .orderBy(asc(s.reviewMoves.position));
+  return rows.map(({ row, doneAt }) => ({
+    week: row.reviewWeek,
+    moveId: row.moveId,
+    title: row.title,
+    done: doneAt !== null && doneAt !== undefined,
+  }));
+}
+
+/** The Moves chosen for a week right now, in priority order. */
+export async function getMovesChosenFor(week: IsoDate) {
+  const rows = await db
+    .select({ move: s.moves, status: s.campaigns.status })
+    .from(s.moves)
+    .innerJoin(s.campaigns, eq(s.campaigns.id, s.moves.campaignId))
+    .where(eq(s.moves.weekOf, week))
+    .orderBy(asc(s.campaigns.position), asc(s.moves.position), asc(s.moves.createdAt));
+  return rows.map(({ move, status }) => ({
+    moveId: move.id,
+    title: move.title,
+    done: move.doneAt !== null,
+    active: status === "active",
+  }));
+}
+
+/** What the first step looks back on: the week's Learning Log and its Moves. */
+export async function getLookBack(week: IsoDate) {
+  const [entries, saved, chosen] = await Promise.all([
+    getLearningEntries(week, addDays(week, 6)),
+    // The Review before this one planned this week.
+    getSavedMoves([addDays(week, -7)]),
+    getMovesChosenFor(week),
+  ]);
+  return { entries, moves: movesOfWeek(saved, chosen) };
+}
+
+/** What the second step chooses from: the active Campaigns of the planned week's Quarter and their open Moves. */
+export async function getMoveChoices(plans: IsoDate) {
+  const ref = quarterOf(plans);
+  const quarter = await getQuarter(ref);
+  const campaigns = quarter
+    ? (await getCampaigns({ quarterId: quarter.id })).filter((c) => c.status === "active")
+    : [];
+  const moves = campaigns.length
+    ? await db
+        .select()
+        .from(s.moves)
+        .where(
+          and(
+            inArray(s.moves.campaignId, campaigns.map((c) => c.id)),
+            isNull(s.moves.doneAt),
+          ),
+        )
+        .orderBy(asc(s.moves.position), asc(s.moves.createdAt))
+    : [];
+  return {
+    quarterRef: ref,
+    campaigns: campaigns.map((c) => ({
+      id: c.id,
+      title: c.title,
+      goal: c.goal,
+      moves: moves
+        .filter((m) => m.campaignId === c.id)
+        .map((m) => ({ id: m.id, title: m.title, weekOf: m.weekOf })),
+    })),
+  };
+}
+
+export type ReviewView = {
+  week: IsoDate;
+  score: number;
+  notes: string;
+  finishedOn: IsoDate;
+  moves: ReviewMove[];
+  entries: LearningEntry[];
+};
+
+/** A finished Review with the Moves it saved and the Learning Log of its week. */
+export async function getReview(week: IsoDate): Promise<ReviewView | null> {
+  const [[row], moves, entries] = await Promise.all([
+    db.select().from(s.weeklyReviews).where(eq(s.weeklyReviews.weekOf, week)),
+    getSavedMoves([week]),
+    getLearningEntries(week, addDays(week, 6)),
+  ]);
+  if (!row) return null;
+  return {
+    week,
+    score: row.feltScore,
+    notes: row.notes,
+    finishedOn: localMoment(row.doneAt, APP_TIMEZONE).date,
+    moves,
+    entries,
+  };
+}
+
+/** Every Review, newest first, with the weeks skipped since the first one. */
+export async function getReviewHistory(date: IsoDate) {
+  const rows = await db.select().from(s.weeklyReviews);
+  const saved = await getSavedMoves(rows.map((row) => row.weekOf));
+  const finished: FinishedReview[] = rows.map((row) => {
+    const moves = saved.filter((move) => move.week === row.weekOf);
+    return {
+      week: row.weekOf,
+      score: row.feltScore,
+      movesDone: moves.filter((move) => move.done).length,
+      movesTotal: moves.length,
+    };
+  });
+  return reviewHistory(finished, date);
 }
 
 // ─── Cycles ──────────────────────────────────────────────────────────────────

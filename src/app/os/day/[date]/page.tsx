@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar } from "@/components/calendar";
+import { CheckInCampaigns } from "@/components/check-in-campaigns";
 import { CheckInPrinciples } from "@/components/check-in-principles";
 import { CycleStartForm } from "@/components/cycle-start-form";
 import { Highlights } from "@/components/highlights";
+import { JournalCard } from "@/components/journal";
+import { LearningLog } from "@/components/learning-log";
 import { NoiseItems } from "@/components/noise-items";
 import { SecondaryTasks } from "@/components/secondary-tasks";
 import { Stack } from "@/components/stack";
@@ -20,6 +23,7 @@ import {
   WEEKDAY_NAMES,
   weekdayOf,
 } from "@/domain/dates";
+import { openReview } from "@/domain/reviews";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
 import { completeCheckIn } from "@/server/actions";
@@ -32,16 +36,19 @@ import {
   getDailyNote,
   getFeedProgress,
   getCalendarConnected,
+  getJournalNeighbors,
   getStack,
+  isReviewDone,
 } from "@/server/queries";
 
-export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
+export default async function DayPage({ params, searchParams }: PageProps<"/os/day/[date]">) {
   await requireIvan();
-  const { date } = await params;
+  const [{ date }, { journal }] = await Promise.all([params, searchParams]);
   if (!isIsoDate(date)) notFound();
 
   const now = today();
-  const [context, note, [day], stack, presets, cycles, activeCycle, feed, calendarConnected] = await Promise.all([
+  const open = date === now ? openReview(now) : null;
+  const [context, note, [day], stack, presets, cycles, activeCycle, feed, calendarConnected, journals, reviewDone] = await Promise.all([
     getCheckInContext(date),
     getDailyNote(date),
     getCalendar([date]),
@@ -51,6 +58,8 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
     getActiveCycle(),
     date === now ? getFeedProgress(date) : null,
     getCalendarConnected(),
+    getJournalNeighbors(date),
+    open ? isReviewDone(open.week) : true,
   ]);
   const realFocus = cycles.reduce((sum, c) => sum + c.realFocusMin, 0);
   const stackItems = stack.pickable;
@@ -79,6 +88,11 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
         <Link className="btn" href={`/os/month/${monthOf(date)}`}>
           Month view
         </Link>
+        {open && !reviewDone && (
+          <Link className="btn" href={`/os/week/${open.week}?review=look`}>
+            Weekly Review
+          </Link>
+        )}
         {feed && (
           // Optional: no checkbox, no XP, no nudge when skipped.
           <Link className="ml-auto text-sm text-muted hover:text-foreground" href="/os/feed">
@@ -124,27 +138,19 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
               </div>
             )}
 
-            <div>
-              <div className="label">
-                {quarterLabel(context.quarterRef)} Campaigns
-              </div>
-              {context.campaigns.length === 0 ? (
+            {context.campaigns.length === 0 ? (
+              <div>
+                <div className="label">{quarterLabel(context.quarterRef)} Campaigns</div>
                 <p className="text-sm text-muted">
                   No active Campaigns. <Link href="/os/plan" className="underline">Plan the Quarter</Link>.
                 </p>
-              ) : (
-                <ul className="mt-1 space-y-1 text-sm">
-                  {context.campaigns.map((c) => (
-                    <li key={c.id}>
-                      <Link href={`/os/plan?campaign=${c.id}&col=campaign`} className="font-medium hover:underline">
-                        {c.title}
-                      </Link>
-                      {c.goal && <span className="text-muted"> — {c.goal}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              </div>
+            ) : (
+              <CheckInCampaigns
+                label={`${quarterLabel(context.quarterRef)} Campaigns`}
+                campaigns={context.campaigns.map(({ id, title, goal }) => ({ id, title, goal }))}
+              />
+            )}
           </section>
 
           <Highlights
@@ -159,6 +165,8 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
           <SecondaryTasks date={date} today={now} tasks={note.secondaryTasks} />
 
           <NoiseItems date={date} items={note.noiseItems} />
+
+          <LearningLog date={date} entries={note.learningEntries} />
 
           <section className="card flex flex-col gap-2">
             <div className="flex items-baseline justify-between">
@@ -200,6 +208,15 @@ export default async function DayPage({ params }: PageProps<"/os/day/[date]">) {
                 </details>
               ))}
           </section>
+
+          <JournalCard
+            key={date}
+            date={date}
+            journal={note.journal}
+            previous={journals.previous}
+            next={journals.next}
+            startOpen={journal === "open"}
+          />
 
           <Link href={`/os/week/${startOfWeek(date)}`} className="px-1 text-xs text-muted hover:underline">
             Change this day&apos;s Blocks in the Week
