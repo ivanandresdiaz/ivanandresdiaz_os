@@ -706,6 +706,24 @@ Datos reales de Neon: 59 puntajes diarios en 6 días, 36 de ellos en el tope de 
 - **Migración 0014:** sube el tope a 30 y no borra nada.
 - Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con imágenes de prueba a ancho de teléfono: 32 toques en 8 segundos guardan 30, la imagen se queda mientras llegan Likes y sigue unos 6 segundos después, y el corazón no se mueve. Video y audio reales no se probaron. La base local quedó sin filas de prueba.
 
+## Ronda 39 — Reordenar Tasks y Steps (2026-11-06)
+
+Origen: Ivan quiere reordenar las Tasks y los Steps como reordena la prioridad de las Campaigns. Revisa Q158 ("Las Tasks mantienen su orden, sin arrastre").
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q261 | Tasks de un Move | ✅ Las abiertas llevan ⠿ y número de prioridad, como las Campaigns y los Moves. El Stack y el Check-in siguen ese orden. |
+| Q262 | Steps | ✅ Llevan ⠿ sin número: su orden es una secuencia, no una prioridad. La pantalla de Focus sigue ese orden. |
+| Q263 | Lo hecho | ✅ Las Tasks hechas bajan, sin ⠿, y al desmarcarlas vuelven a su lugar. Los Steps hechos se quedan en su lugar y se pueden arrastrar. |
+| Q264 | Tasks sueltas | ✅ Tienen la misma prioridad en el Backlog, como una sola lista para todos los Infinite Games, y la sección Loose Tasks del Stack la sigue. |
+| Q265 | Límites | ✅ Solo se arrastra dentro de la misma lista: una Task no pasa a otro Move ni un Step a otra Task. Las Secondary Tasks siguen sin prioridad manual (Q66). |
+
+- **Código:** `TaskList` usa `PriorityList` y `ClosedList`; `OrderedList` es la lista sin número de los Steps. Las acciones nuevas son `reorderTasks` y `reorderSteps`. `createTask` ahora pone la Task nueva de última; antes todas nacían en la posición 0.
+- **Stack:** antes mostraba las Tasks de un Move sin orden fijo. Ahora van por prioridad, con las hechas de últimas, igual que en el Plan.
+- **Bug corregido:** las Tasks sueltas hechas salían encima de las abiertas.
+- Sin migraciones: `tasks.position` y `steps.position` ya existían, y el orden actual se conserva.
+- Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con mouse, teclado y toques reales a ancho de teléfono. Se probaron arrastrar una Task por encima de otra con Steps, arrastrar un Step sin mover su Task, recargar, una Task nueva de última, marcar y desmarcar, las Tasks sueltas y el orden del Stack. La base local quedó sin filas de prueba.
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.

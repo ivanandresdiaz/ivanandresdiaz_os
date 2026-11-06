@@ -52,9 +52,9 @@ _Evitar_: Movimiento, Meta, Rank.
 
 **Move** (Jugada): un paso concreto de una Campaign que cabe en una semana (p. ej. SSO login). Se elige en la Weekly Review. Si no tiene Tasks, se arrastra directo al calendario. Ivan ordena los Moves de cada Campaign por prioridad, y su trabajo aparece en ese orden.
 
-**Task** (Tarea): una parte opcional de un Move; es lo que se arrastra al calendario, con duración (p. ej. "Configure Google provider", 1 h). Nace durando 1 h; su duración se ajusta en el calendario, no al escribirla. Si no se termina en un día, se vuelve a agendar otro día.
+**Task** (Tarea): una parte opcional de un Move; es lo que se arrastra al calendario, con duración (p. ej. "Configure Google provider", 1 h). Nace durando 1 h; su duración se ajusta en el calendario, no al escribirla. Si no se termina en un día, se vuelve a agendar otro día. Ivan ordena las Tasks de cada Move por prioridad, y su trabajo aparece en ese orden. Las Tasks sueltas del Backlog también tienen prioridad.
 
-**Step** (Paso): un ítem de checklist dentro de una Task. No se agenda.
+**Step** (Paso): un ítem de checklist dentro de una Task. No se agenda. Una Task puede tener varios, en el orden que Ivan elija; ese orden es una secuencia, no una prioridad.
 
 **Description** (Descripción): el Long text opcional de una Task o de un Move, con lo que hay que saber para hacerlo: el contexto, el enfoque, las ideas. Las Secondary Tasks no tienen.
 _Evitar_: Notes (las notas son de una Person), Expansion (esa es la de un Principle).
