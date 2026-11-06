@@ -8,8 +8,8 @@ export const FEED_SIZE = 10;
 /** How many References the Top 10 holds. */
 export const TOP_SIZE = 10;
 
-/** How many Likes one Reference can get in a day. The reaction grows fast: 5 is good, 10 a "hell yeah", 15 rare on purpose. */
-export const MAX_DAILY_LIKES = 15;
+/** How many Likes one Reference can get in a day. The reaction grows fast: 5 is good, 10 a "hell yeah", 15 rare on purpose, 30 rarer still. */
+export const MAX_DAILY_LIKES = 30;
 
 /** How long to hold the heart to take back one of today's Likes. */
 export const UNLIKE_HOLD_MS = 500;

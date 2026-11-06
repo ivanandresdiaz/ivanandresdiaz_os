@@ -294,9 +294,11 @@ function FeedPlayer({
     }, SETTLE_MS);
   }
 
-  /** One more Like, with the burst only when it counted (none past the daily max). */
+  /** One more Like, with the burst only when it counted (none past the daily max). An image stays while Likes keep coming. */
   function likeOnce(item: FeedItem) {
-    if (onLike(item.id, 1)) setBurst((b) => b + 1);
+    if (!onLike(item.id, 1)) return;
+    setBurst((b) => b + 1);
+    elapsed.current = 0;
   }
 
   // Holding the heart takes back one of today's Likes; the click that ends the hold then gives none.
@@ -428,8 +430,8 @@ function FeedPlayer({
                   {like.today > 0 ? "♥" : "♡"}
                 </span>
                 {like.average !== null && <span className="tabular-nums">{like.average.toFixed(1)}</span>}
-                {/* Only the Likes given: empty dots would ask to be filled. Three rows held open, so the heart stays still. */}
-                <span aria-hidden className="grid h-[1.375rem] grid-cols-[repeat(5,0.375rem)] content-start gap-0.5">
+                {/* Only the Likes given: empty dots would ask to be filled. Six rows held open, so the heart stays still. */}
+                <span aria-hidden className="grid h-[2.875rem] grid-cols-[repeat(5,0.375rem)] content-start gap-0.5">
                   {Array.from({ length: like.today }, (_, n) => (
                     <span key={n} className="size-1.5 rounded-full bg-red-500" />
                   ))}

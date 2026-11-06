@@ -86,10 +86,10 @@ describe("Feed", () => {
     expect(rankByLikes(["steady", "new"], likes, seeded(1))).toEqual(["new", "steady"]);
   });
 
-  it("gives up to 15 Likes a day to a Reference and takes back only down to none", () => {
-    expect(MAX_DAILY_LIKES).toBe(15);
+  it("gives up to 30 Likes a day to a Reference and takes back only down to none", () => {
+    expect(MAX_DAILY_LIKES).toBe(30);
     expect(stepLikes(0, 1)).toBe(1);
-    expect(stepLikes(14, 1)).toBe(MAX_DAILY_LIKES);
+    expect(stepLikes(29, 1)).toBe(MAX_DAILY_LIKES);
     expect(stepLikes(MAX_DAILY_LIKES, 1)).toBe(MAX_DAILY_LIKES);
     expect(stepLikes(3, -1)).toBe(2);
     expect(stepLikes(0, -1)).toBe(0);
