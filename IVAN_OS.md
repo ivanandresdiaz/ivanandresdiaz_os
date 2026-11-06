@@ -659,6 +659,42 @@ Origen: Ivan quiere que, si ya vio el Feed del día, `/feed` muestre "Done for t
 - La vista del Feed ahora trae los Likes de todas las References con Likes, no solo los de las de hoy, para que el Top 10 respete el límite diario.
 - Verificación: 133 tests, typecheck, lint, `next build` y prueba en el navegador con References de prueba. Se probó salir en la última Reference, recargar, dejar a medias un Watch again, ir y volver por la navegación, arrancar el Top 10 desde una fila, el tope de 5 Likes, el orden fijo y la lista actualizada al volver, el límite compartido con el Feed, el avance intacto en la base, Continue cuando no está terminado, el Top 10 vacío, el teléfono y la consola sin errores. La base local quedó sin filas de prueba.
 
+## Ronda 35 — De total a Like Average (2026-11-06)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q246 | Qué días cuentan | ✅ Cada día que una Reference llegó a mí en el Feed, aunque no le diera Likes (vale 0), y cada día que le di Likes. Ver el Top 10 sin dar Likes no deja registro (Q245). |
+| Q247 | Hoy | ✅ El promedio solo cubre días terminados. Revisa Q243: dar Likes ya no sube una Reference al momento, y unos Likes bajos pueden bajarla al día siguiente. |
+| Q248 | Orden | ✅ Promedio simple, sin mínimo de días, para el Top 10 y la última del Feed. Empates: más días contados, luego al azar. El Top 10 desempata por id para no cambiar durante el día. |
+| Q250 | El total | ✅ Sale de la pantalla. Se guardan las filas diarias, así que puede volver. |
+| Q251 | "Categorizar" | ✅ La escala más fina basta: sin niveles con nombre ni filtros. |
+| Q252 | El corazón | ✅ Tres filas de 5 puntos, con el promedio arriba a un decimal. Un toque sigue siendo un Like. |
+
+## Ronda 36 — Empezar de cero (2026-11-06)
+
+Datos reales de Neon: 59 puntajes diarios en 6 días, 36 de ellos en el tope de 5 (61%), en 40 de 119 References.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q249 | Likes viejos | ✅ Se borran. Multiplicar por 3 era mi primera recomendación, pero habría llenado el Top 10 de empates en 15.0. |
+| Q255 | Puntos vacíos | ✅ Solo se ven los Likes dados: los puntos vacíos pedían llenarse. |
+| Q256 | Qué significa 15 | ✅ Raro a propósito. La reacción crece rápido: 5 ya es bueno, 10 es "hell yeah", 15 es "dude, WTF, stop and reassess how you think". Vive en el glosario, no en la pantalla. |
+
+## Ronda 37 — Cierre (2026-11-06)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q253 | Qué se borra | ✅ Todos los Likes y todos los días del Feed, incluido el de hoy, sin copia. Si los días del Feed quedaran, contarían como ceros. Las References subidas no se tocan. El Feed se redibuja una vez el día que salga. |
+| Q254 | Sin número o 0.0 | ✅ Sin número hasta tener un día terminado; después el promedio real, incluido `0.0`. El Top 10 solo lleva References por encima de 0. |
+| Q257 | Promedio de una escala exponencial | ✅ Promedio simple. Se puede cambiar después porque se guardan los puntajes diarios. |
+
+## Like Average — construido en local (2026-11-06)
+
+- **Regla:** `likeAverages` y `topReferences` en `src/domain/feed.ts`. Si menos de 10 References tienen promedio, la última del Feed completa su grupo con otras al azar, como antes.
+- **Migración 0013:** borra `reference_likes` y `feeds` y sube el tope a 15. Aplicada en Neon el 2026-11-06, antes del push: borró 62 Likes y 6 días del Feed; las 119 References quedaron.
+- **Top 10 vacío:** el mensaje dice que las References entran al día siguiente, porque el día de hoy no cuenta.
+- Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con imágenes de prueba a ancho de teléfono: `0.0`, sin número, `5.0` con días en cero, `15.0`, 17 toques guardan 15, el corazón no se mueve al llenarse los puntos, quitar un Like al mantener, el orden del Top 10, una Reference con Likes de hoy fuera del Top 10, y el Feed y el Top 10 tras borrar todo. Un cambio de día real solo está cubierto por tests. Video y audio reales no se probaron. La base local quedó sin filas de prueba.
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
