@@ -21,7 +21,7 @@ _Evitar_: Story, Reel, Media, Podcast.
 
 **Top 10**: las 10 References con el Like Average más alto. Se pueden ver seguidas, como práctica para memorizarlas.
 
-**Like** (Me gusta): la marca que le doy a una Reference en el Feed o en el Top 10 porque me movió. Le doy de 1 a 15 por día según la intensidad de mi reacción, que crece rápido: 5 ya es bueno, 10 es un "hell yeah" y 15 es raro a propósito: "dude, WTF, stop and reassess how you think". Solo se pueden quitar los del mismo día.
+**Like** (Me gusta): la marca que le doy a una Reference en el Feed o en el Top 10 porque me movió. Le doy de 1 a 30 por día según la intensidad de mi reacción, que crece rápido: 5 ya es bueno, 10 es un "hell yeah", 15 es raro a propósito ("dude, WTF, stop and reassess how you think") y 30 es aún más raro: la Reference que me hace cambiar algo en mi vida, no solo repensarlo. Solo se pueden quitar los del mismo día.
 
 **Like Average** (Promedio de Likes): cuánto me mueve una Reference cada vez que me llega. Es el promedio de Likes por día, contando solo días ya terminados: cada día que llegó a mí en el Feed, aunque no le diera Likes (ese día vale 0), y cada día que le di Likes. Ver el Top 10 sin dar Likes no cuenta. No mide cuánto me ha influido en total.
 _Evitar_: Score, Rating, Total.

@@ -695,6 +695,17 @@ Datos reales de Neon: 59 puntajes diarios en 6 días, 36 de ellos en el tope de 
 - **Top 10 vacío:** el mensaje dice que las References entran al día siguiente, porque el día de hoy no cuenta.
 - Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con imágenes de prueba a ancho de teléfono: `0.0`, sin número, `5.0` con días en cero, `15.0`, 17 toques guardan 15, el corazón no se mueve al llenarse los puntos, quitar un Like al mantener, el orden del Top 10, una Reference con Likes de hoy fuera del Top 10, y el Feed y el Top 10 tras borrar todo. Un cambio de día real solo está cubierto por tests. Video y audio reales no se probaron. La base local quedó sin filas de prueba.
 
+## Ronda 38 — Hasta 30 Likes (2026-11-06)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q258 | Qué significa 30 | ✅ Revisa el tope de Q256. 5, 10 y 15 no cambian; 30 es aún más raro que 15: la Reference que me hace cambiar algo en mi vida, no solo repensarlo. Los Likes ya dados siguen valiendo. |
+| Q259 | Imágenes | ✅ Cada Like reinicia los 6 segundos de una imagen, que sigue 6 segundos después del último. Video y audio no cambian. |
+| Q260 | Puntos | ✅ Seis filas de 5. Revisa Q252. El corazón queda unos 24 px más arriba en todas las References. |
+
+- **Migración 0014:** sube el tope a 30 y no borra nada.
+- Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con imágenes de prueba a ancho de teléfono: 32 toques en 8 segundos guardan 30, la imagen se queda mientras llegan Likes y sigue unos 6 segundos después, y el corazón no se mueve. Video y audio reales no se probaron. La base local quedó sin filas de prueba.
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.
