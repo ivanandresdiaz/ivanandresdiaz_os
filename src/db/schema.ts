@@ -54,7 +54,7 @@ export const feeds = pgTable("feeds", {
   createdAt: createdAt(),
 });
 
-/** The Likes a Reference got on one date: 1 to 5, by how much it moved Ivan. */
+/** The Likes a Reference got on one date: 1 to 15, by how strongly Ivan reacted. */
 export const referenceLikes = pgTable(
   "reference_likes",
   {
@@ -66,7 +66,7 @@ export const referenceLikes = pgTable(
     count: smallint("count").notNull().default(1),
     createdAt: createdAt(),
   },
-  (t) => [unique().on(t.referenceId, t.date), check("likes_per_day", sql`${t.count} between 1 and 5`)],
+  (t) => [unique().on(t.referenceId, t.date), check("likes_per_day", sql`${t.count} between 1 and 15`)],
 );
 
 /** Exactly one Season is active: the one with ended_on null. */
