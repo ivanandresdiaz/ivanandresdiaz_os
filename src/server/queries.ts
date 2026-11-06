@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -13,7 +13,7 @@ import {
   type StructureBlock,
   type StructureException,
 } from "@/domain/structure";
-import { FEED_SIZE, feedSeen, pickFeed, TOP_SIZE } from "@/domain/feed";
+import { FEED_SIZE, feedSeen, likeAverages, pickFeed, topReferences, type LikeAverages } from "@/domain/feed";
 import { isDayWon } from "@/domain/highlights";
 import { inPlay, inPriority } from "@/domain/plan";
 import { referenceKindOf, type ReferenceKind } from "@/domain/references";
@@ -80,9 +80,9 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
 // ─── Feed ────────────────────────────────────────────────────────────────────
 
 export type FeedItem = ReferenceView & { principleTitle: string };
-/** Per Reference: all its Likes ever, and how many of them (0 to 5) were given today. */
-export type FeedLikes = Record<string, { total: number; today: number }>;
-export type TopReference = FeedItem & { likes: number };
+/** Per Reference: its Like Average (null before its first finished day), and the Likes given today. */
+export type FeedLikes = Record<string, { average: number | null; today: number }>;
+export type TopReference = FeedItem & { average: number };
 export type FeedView = {
   date: IsoDate;
   items: FeedItem[];
@@ -92,14 +92,19 @@ export type FeedView = {
   top: TopReference[];
 };
 
-const likeSum = sql<number>`cast(sum(${s.referenceLikes.count}) as int)`;
-
-async function likeTotals() {
-  const rows = await db
-    .select({ id: s.referenceLikes.referenceId, total: likeSum })
-    .from(s.referenceLikes)
-    .groupBy(s.referenceLikes.referenceId);
-  return new Map(rows.map((r) => [r.id, r.total]));
+/** Every Like Average as of the start of `date`: today only counts once it is over. */
+async function likeAveragesBefore(date: IsoDate) {
+  const [feeds, likes] = await Promise.all([
+    db
+      .select({ date: s.feeds.date, referenceIds: s.feeds.referenceIds, seen: s.feeds.seen })
+      .from(s.feeds)
+      .where(lt(s.feeds.date, date)),
+    db
+      .select({ referenceId: s.referenceLikes.referenceId, date: s.referenceLikes.date, count: s.referenceLikes.count })
+      .from(s.referenceLikes)
+      .where(lt(s.referenceLikes.date, date)),
+  ]);
+  return likeAverages(feeds, likes);
 }
 
 /** References with their Principle's title, signed for viewing, in the order of `ids`. */
@@ -130,31 +135,25 @@ async function feedItems(ids: string[]): Promise<FeedItem[]> {
   );
 }
 
-/** The References with the most Likes, only those liked at least once. */
-async function getTopReferences(): Promise<TopReference[]> {
-  const rows = await db
-    .select({ id: s.referenceLikes.referenceId, total: likeSum })
-    .from(s.referenceLikes)
-    .groupBy(s.referenceLikes.referenceId)
-    .orderBy(desc(likeSum))
-    .limit(TOP_SIZE);
-  const items = await feedItems(rows.map((r) => r.id));
-  const totals = new Map(rows.map((r) => [r.id, r.total]));
-  return items.map((item) => ({ ...item, likes: totals.get(item.id) ?? 0 }));
+/** The Top 10, with the Like Average of each. */
+async function getTopReferences(averages: LikeAverages): Promise<TopReference[]> {
+  const items = await feedItems(topReferences(averages));
+  return items.map((item) => ({ ...item, average: averages.get(item.id)?.average ?? 0 }));
 }
 
 /** Today's Feed, drawn the first time it is opened and fixed for the rest of the day. */
 export async function getTodayFeed(): Promise<FeedView> {
   const date = today();
-  let [feed] = await db.select().from(s.feeds).where(eq(s.feeds.date, date));
+  const [averages, [drawn]] = await Promise.all([
+    likeAveragesBefore(date),
+    db.select().from(s.feeds).where(eq(s.feeds.date, date)),
+  ]);
+  let feed = drawn;
   if (!feed) {
-    const [references, totals] = await Promise.all([
-      db.select({ id: s.principleReferences.id }).from(s.principleReferences),
-      likeTotals(),
-    ]);
+    const references = await db.select({ id: s.principleReferences.id }).from(s.principleReferences);
     const ids = pickFeed(
       references.map((r) => r.id),
-      totals,
+      averages,
       Math.random,
     );
     // An empty Feed is not saved, so the first upload of the day can still fill it.
@@ -164,22 +163,23 @@ export async function getTodayFeed(): Promise<FeedView> {
     }
   }
   const ids = feed?.referenceIds ?? [];
-  const [items, totals, todays, top] = await Promise.all([
+  const [items, todays, top] = await Promise.all([
     feedItems(ids),
-    likeTotals(),
     db
       .select({ id: s.referenceLikes.referenceId, count: s.referenceLikes.count })
       .from(s.referenceLikes)
       .where(eq(s.referenceLikes.date, date)),
-    getTopReferences(),
+    getTopReferences(averages),
   ]);
   const givenToday = new Map(todays.map((l) => [l.id, l.count]));
-  // Every liked Reference, not only today's: the Top 10 plays with the same Likes.
-  const liked = new Set([...ids, ...totals.keys()]);
+  // Every counted Reference, not only today's: the Top 10 plays with the same Likes.
+  const counted = new Set([...ids, ...averages.keys()]);
   return {
     date,
     items,
-    likes: Object.fromEntries([...liked].map((id) => [id, { total: totals.get(id) ?? 0, today: givenToday.get(id) ?? 0 }])),
+    likes: Object.fromEntries(
+      [...counted].map((id) => [id, { average: averages.get(id)?.average ?? null, today: givenToday.get(id) ?? 0 }]),
+    ),
     position: Math.min(feed?.position ?? 0, items.length),
     seen: feedSeen(feed?.seen ?? 0, items.length),
     top,

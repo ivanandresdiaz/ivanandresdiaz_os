@@ -9,14 +9,13 @@ import { UNTITLED_AUDIO } from "./references";
 import { PrincipleCaption } from "./story-viewer";
 
 const SETTLE_MS = 120;
-const NO_LIKES = { total: 0, today: 0 };
+const NO_LIKES = { average: null, today: 0 };
 
 type LikeChange = { id: string; delta: 1 | -1 };
 
 function applyLike(likes: FeedLikes, { id, delta }: LikeChange): FeedLikes {
   const current = likes[id] ?? NO_LIKES;
-  const today = stepLikes(current.today, delta);
-  return { ...likes, [id]: { total: current.total + today - current.today, today } };
+  return { ...likes, [id]: { ...current, today: stepLikes(current.today, delta) } };
 }
 
 const ENDINGS = {
@@ -428,13 +427,11 @@ function FeedPlayer({
                 <span className={`text-3xl leading-none ${like.today > 0 ? "text-red-500" : "text-white"}`}>
                   {like.today > 0 ? "♥" : "♡"}
                 </span>
-                <span className="tabular-nums">{like.total}</span>
-                <span aria-hidden className="flex gap-0.5">
-                  {Array.from({ length: MAX_DAILY_LIKES }, (_, n) => (
-                    <span
-                      key={n}
-                      className={`size-1.5 rounded-full ${n < like.today ? "bg-red-500" : "border border-white/70"}`}
-                    />
+                {like.average !== null && <span className="tabular-nums">{like.average.toFixed(1)}</span>}
+                {/* Only the Likes given: empty dots would ask to be filled. Three rows held open, so the heart stays still. */}
+                <span aria-hidden className="grid h-[1.375rem] grid-cols-[repeat(5,0.375rem)] content-start gap-0.5">
+                  {Array.from({ length: like.today }, (_, n) => (
+                    <span key={n} className="size-1.5 rounded-full bg-red-500" />
                   ))}
                 </span>
               </button>
@@ -560,7 +557,7 @@ function TopList({ top, onWatch }: { top: TopReference[]; onWatch: (from: number
         )}
       </div>
       {top.length === 0 ? (
-        <p className="text-sm text-muted">Like References in the Feed to see which ones move you most.</p>
+        <p className="text-sm text-muted">Like References in the Feed. They rank here the next day.</p>
       ) : (
         <ol className="flex flex-col gap-2">
           {top.map((item, i) => (
@@ -575,7 +572,7 @@ function TopList({ top, onWatch }: { top: TopReference[]; onWatch: (from: number
                   )}
                 </div>
                 <span className="text-sm tabular-nums">
-                  <span className="text-red-500">♥</span> {item.likes}
+                  <span className="text-red-500">♥</span> {item.average.toFixed(1)}
                 </span>
               </button>
             </li>
