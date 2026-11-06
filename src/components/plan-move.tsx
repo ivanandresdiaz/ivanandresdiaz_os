@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createTask, deleteMove, setMoveWeek, updateMove } from "@/server/actions";
 import type { LinkView } from "@/server/queries";
 import { AddSection } from "./add-section";
-import { TaskItem, TitleField } from "./plan-task";
+import { TaskList, TitleField } from "./plan-task";
 import { Hidden, WeekChip } from "./ui";
 import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
 
@@ -128,21 +128,18 @@ export function MovePanel({
         {move.tasks.length === 0 && (
           <p className="text-sm text-muted">No Tasks: the Move goes to the calendar as a whole.</p>
         )}
-        <ul className="flex flex-col gap-2 empty:hidden">
-          {move.tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              task={{
-                id: task.id,
-                title: task.title,
-                done: task.doneAt !== null,
-                description: task.description,
-                steps: task.steps,
-                links: task.links,
-              }}
-            />
-          ))}
-        </ul>
+        {move.tasks.length > 0 && (
+          <TaskList
+            tasks={move.tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              done: task.doneAt !== null,
+              description: task.description,
+              steps: task.steps,
+              links: task.links,
+            }))}
+          />
+        )}
       </AddSection>
     </div>
   );

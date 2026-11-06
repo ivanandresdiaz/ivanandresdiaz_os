@@ -1,8 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createStep, deleteStep, deleteTask, toggleStep, toggleWorkDoneForm, updateTask } from "@/server/actions";
+import {
+  createStep,
+  deleteStep,
+  deleteTask,
+  reorderSteps,
+  reorderTasks,
+  toggleStep,
+  toggleWorkDoneForm,
+  updateTask,
+} from "@/server/actions";
 import type { LinkView } from "@/server/queries";
+import { ClosedList, OrderedList, PriorityList } from "./priority-list";
 import { GameTags, Hidden } from "./ui";
 import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
 
@@ -73,17 +83,30 @@ export function TitleField({
   );
 }
 
+/** Tasks of a Move, or Loose Tasks, in Ivan's priority; done ones sit below, out of it. */
+export function TaskList({ tasks }: { tasks: TaskItemData[] }) {
+  const row = (task: TaskItemData) => <TaskItem task={task} />;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <PriorityList items={tasks.filter((t) => !t.done)} save={(ids) => reorderTasks({ ids })}>
+        {row}
+      </PriorityList>
+      <ClosedList items={tasks.filter((t) => t.done)}>{row}</ClosedList>
+    </div>
+  );
+}
+
 /**
  * A Task, in a Move or loose in the Backlog: done, title, and what it holds.
  * Its + adds a Step, its Description or a Link. Its length is set in the calendar.
  */
-export function TaskItem({ task }: { task: TaskItemData }) {
+function TaskItem({ task }: { task: TaskItemData }) {
   const [adding, setAdding] = useState<"step" | "link" | null>(null);
   const [reading, setReading] = useState(false);
   const owner = { kind: "task", id: task.id, title: task.title } as const;
   const hasDescription = task.description.trim() !== "";
   return (
-    <li className="rounded-md border border-line p-2">
+    <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <form action={toggleWorkDoneForm}>
           <Hidden kind="task" id={task.id} />
@@ -120,42 +143,44 @@ export function TaskItem({ task }: { task: TaskItemData }) {
       {hasDescription && (
         <DescriptionPreview description={task.description} onOpen={() => setReading(true)} className="mt-1 ml-6" />
       )}
-      {(task.steps.length > 0 || adding === "step") && (
-        <ul className="mt-1 ml-6 flex flex-col gap-0.5 text-sm">
-          {task.steps.map((step) => (
-            <li key={step.id} className="flex items-center gap-2">
+      {task.steps.length > 0 && (
+        <OrderedList
+          items={task.steps}
+          save={(ids) => reorderSteps({ ids })}
+          className="mt-1 flex flex-col gap-0.5 text-sm"
+        >
+          {(step) => (
+            <>
               <form action={toggleStep}>
                 <Hidden id={step.id} />
                 <button>{step.done ? "☑" : "☐"}</button>
               </form>
-              <span className={step.done ? "line-through opacity-60" : ""}>{step.title}</span>
+              <span className={`min-w-0 ${step.done ? "line-through opacity-60" : ""}`}>{step.title}</span>
               <form action={deleteStep} className="ml-auto">
                 <Hidden id={step.id} />
                 <button className="text-muted hover:text-red-600" aria-label={`Delete ${step.title}`}>
                   ×
                 </button>
               </form>
-            </li>
-          ))}
-          {adding === "step" && (
-            <li>
-              {/* It stays open after Enter, to add the next Step; empty, it closes on leaving. */}
-              <form action={createStep}>
-                <Hidden taskId={task.id} />
-                <input
-                  name="title"
-                  required
-                  autoFocus
-                  placeholder="New Step"
-                  aria-label="New Step"
-                  className="input text-xs"
-                  onKeyDown={(event) => event.key === "Escape" && setAdding(null)}
-                  onBlur={(event) => event.currentTarget.value.trim() === "" && setAdding(null)}
-                />
-              </form>
-            </li>
+            </>
           )}
-        </ul>
+        </OrderedList>
+      )}
+      {adding === "step" && (
+        // It stays open after Enter, to add the next Step; empty, it closes on leaving.
+        <form action={createStep} className="mt-1 ml-6 text-sm">
+          <Hidden taskId={task.id} />
+          <input
+            name="title"
+            required
+            autoFocus
+            placeholder="New Step"
+            aria-label="New Step"
+            className="input text-xs"
+            onKeyDown={(event) => event.key === "Escape" && setAdding(null)}
+            onBlur={(event) => event.currentTarget.value.trim() === "" && setAdding(null)}
+          />
+        </form>
       )}
       <LinkList links={task.links} className="mt-1 ml-6" />
       {adding === "link" && (
@@ -164,6 +189,6 @@ export function TaskItem({ task }: { task: TaskItemData }) {
         </div>
       )}
       {reading && <DescriptionDrawer owner={owner} description={task.description} onClose={() => setReading(false)} />}
-    </li>
+    </div>
   );
 }

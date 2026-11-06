@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
@@ -322,7 +322,7 @@ export async function getLooseTasks() {
     .select()
     .from(s.tasks)
     .where(isNull(s.tasks.moveId))
-    .orderBy(asc(s.tasks.doneAt), asc(s.tasks.createdAt));
+    .orderBy(asc(s.tasks.position), asc(s.tasks.createdAt));
   const ids = tasks.map((t) => t.id);
   const [steps, links] = await Promise.all([
     ids.length
@@ -399,7 +399,8 @@ async function getWorkIndex(): Promise<Map<string, CalendarWorkItem>> {
     db.select().from(s.campaigns),
     db.select().from(s.blockTypes),
     db.select().from(s.moves),
-    db.select().from(s.tasks),
+    // In Ivan's priority, done ones last: the Stack keeps this order inside a Move and among the Loose Tasks.
+    db.select().from(s.tasks).orderBy(sql`${s.tasks.doneAt} is not null`, asc(s.tasks.position), asc(s.tasks.createdAt)),
     getSecondaryTasks(),
     db.select({ taskId: s.steps.taskId, done: s.steps.done }).from(s.steps),
     db.select({ taskId: s.links.taskId, moveId: s.links.moveId }).from(s.links),

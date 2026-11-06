@@ -6,7 +6,7 @@ import { type CampaignCard, CampaignPriority } from "@/components/campaign-prior
 import { type MoveCard, MovePriority } from "@/components/move-priority";
 import { QuarterReader, SeasonReader } from "@/components/plan-drawers";
 import { MovePanel } from "@/components/plan-move";
-import { TaskItem } from "@/components/plan-task";
+import { TaskList } from "@/components/plan-task";
 import { GamesPicker, GameTags, Hidden } from "@/components/ui";
 import { addDays, quarterLabel, quarterOf, quarterRange, startOfWeek, type QuarterRef } from "@/domain/dates";
 import {
@@ -365,22 +365,19 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                   </form>
                 }
               >
-                <ul className="flex flex-col gap-2 text-sm empty:hidden">
-                  {looseTasks.map((t) => (
-                    <TaskItem
-                      key={t.id}
-                      task={{
-                        id: t.id,
-                        title: t.title,
-                        done: t.doneAt !== null,
-                        description: t.description,
-                        steps: t.steps,
-                        links: t.links,
-                        games: t.games,
-                      }}
-                    />
-                  ))}
-                </ul>
+                {looseTasks.length > 0 && (
+                  <TaskList
+                    tasks={looseTasks.map((t) => ({
+                      id: t.id,
+                      title: t.title,
+                      done: t.doneAt !== null,
+                      description: t.description,
+                      steps: t.steps,
+                      links: t.links,
+                      games: t.games,
+                    }))}
+                  />
+                )}
               </AddSection>
             </div>
           </details>

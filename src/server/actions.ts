@@ -633,7 +633,31 @@ export async function createTask(fd: FormData) {
       durationMin: z.coerce.number().int().min(MIN_SLOT_MIN).max(DAY_END_MIN).default(60),
     })
     .parse(fields(fd));
-  await db.insert(s.tasks).values({ moveId, title, durationMin, games: games(fd) });
+  // It joins last: in its Move, or among the Loose Tasks.
+  const [{ last }] = await db
+    .select({ last: max(s.tasks.position) })
+    .from(s.tasks)
+    .where(moveId ? eq(s.tasks.moveId, moveId) : isNull(s.tasks.moveId));
+  await db.insert(s.tasks).values({ moveId, title, durationMin, games: games(fd), position: (last ?? -1) + 1 });
+  await done();
+}
+
+/** Saves the priority Ivan dragged a Move's open Tasks (or the open Loose Tasks) into. */
+export async function reorderTasks(input: { ids: string[] }) {
+  await requireIvan();
+  const { ids } = z.object({ ids: z.array(z.uuid()).min(1) }).parse(input);
+  const rows = await db
+    .select({ id: s.tasks.id, moveId: s.tasks.moveId })
+    .from(s.tasks)
+    .where(inArray(s.tasks.id, ids));
+  const sameList =
+    rows.length === ids.length && new Set(ids).size === ids.length && rows.every((r) => r.moveId === rows[0].moveId);
+  if (!sameList) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.tasks).set({ position }).where(eq(s.tasks.id, id));
+    }
+  });
   await done();
 }
 
@@ -662,6 +686,25 @@ export async function createStep(fd: FormData) {
     .from(s.steps)
     .where(eq(s.steps.taskId, taskId));
   await db.insert(s.steps).values({ taskId, title, position: (last ?? -1) + 1 });
+  await done();
+}
+
+/** Saves the order Ivan dragged a Task's Steps into. */
+export async function reorderSteps(input: { ids: string[] }) {
+  await requireIvan();
+  const { ids } = z.object({ ids: z.array(z.uuid()).min(1) }).parse(input);
+  const rows = await db
+    .select({ id: s.steps.id, taskId: s.steps.taskId })
+    .from(s.steps)
+    .where(inArray(s.steps.id, ids));
+  const sameTask =
+    rows.length === ids.length && new Set(ids).size === ids.length && rows.every((r) => r.taskId === rows[0].taskId);
+  if (!sameTask) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(s.steps).set({ position }).where(eq(s.steps.id, id));
+    }
+  });
   await done();
 }
 
