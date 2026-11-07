@@ -2,7 +2,17 @@ import "server-only";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import * as s from "@/db/schema";
-import { addDays, localMoment, quarterOf, startOfWeek, type IsoDate, type QuarterRef } from "@/domain/dates";
+import type { ContextSource, ContextTask } from "@/domain/context";
+import {
+  addDays,
+  localMoment,
+  quarterLabel,
+  quarterOf,
+  startOfWeek,
+  type IsoDate,
+  type QuarterNumber,
+  type QuarterRef,
+} from "@/domain/dates";
 import { cyclePhase, focusSpanOn, isComplete, realFocusMin, startDelayMin } from "@/domain/cycles";
 import { normalizeGames, type InfiniteGame } from "@/domain/infinite-games";
 import { carriedOver, type CarriedOver, placedOn, unplaced, type WorkKind } from "@/domain/slots";
@@ -1193,4 +1203,132 @@ export async function getCycleHistory(start: IsoDate, end: IsoDate) {
 /** Whether Google Calendar is connected, so a bell can turn on (Reminders). */
 export async function getCalendarConnected(): Promise<boolean> {
   return isConnected();
+}
+
+/**
+ * Everything a Context can be made of, for the Profile. One user, so the whole
+ * history comes at once: Ivan picks and searches it in the browser.
+ */
+export async function getContextSource(): Promise<ContextSource> {
+  const date = today();
+  const ref = quarterOf(date);
+  const weekOf = startOfWeek(date);
+  const [
+    season,
+    quarter,
+    principles,
+    campaignRows,
+    goalRows,
+    quarterRows,
+    typeRows,
+    moveRows,
+    taskRows,
+    stepRows,
+    linkRows,
+    chosen,
+    highlightRows,
+    noteRows,
+    learningRows,
+    reviewRows,
+    reviewMoveRows,
+    structure,
+  ] = await Promise.all([
+    getActiveSeason(),
+    getQuarter(ref),
+    getPrinciples(),
+    db.select().from(s.campaigns).orderBy(asc(s.campaigns.position), asc(s.campaigns.createdAt)),
+    db.select({ id: s.seasonGoals.id, title: s.seasonGoals.title }).from(s.seasonGoals),
+    db.select().from(s.quarters),
+    db.select({ id: s.blockTypes.id, name: s.blockTypes.name, kind: s.blockTypes.kind }).from(s.blockTypes),
+    db.select().from(s.moves).orderBy(asc(s.moves.position), asc(s.moves.createdAt)),
+    db.select().from(s.tasks).orderBy(asc(s.tasks.position), asc(s.tasks.createdAt)),
+    db.select().from(s.steps).orderBy(asc(s.steps.position), asc(s.steps.createdAt)),
+    db.select().from(s.links).orderBy(asc(s.links.position), asc(s.links.createdAt)),
+    db
+      .select({ title: s.moves.title, doneAt: s.moves.doneAt, campaign: s.campaigns.title })
+      .from(s.moves)
+      .innerJoin(s.campaigns, eq(s.campaigns.id, s.moves.campaignId))
+      .where(eq(s.moves.weekOf, weekOf))
+      .orderBy(asc(s.campaigns.position), asc(s.moves.position), asc(s.moves.createdAt)),
+    db
+      .select()
+      .from(s.highlights)
+      .where(and(gte(s.highlights.date, weekOf), lte(s.highlights.date, addDays(weekOf, 6))))
+      .orderBy(asc(s.highlights.date), asc(s.highlights.position)),
+    db
+      .select({ date: s.dailyNotes.date, journal: s.dailyNotes.journal })
+      .from(s.dailyNotes)
+      .where(ne(sql`trim(${s.dailyNotes.journal})`, ""))
+      .orderBy(desc(s.dailyNotes.date)),
+    db.select().from(s.learningEntries).orderBy(desc(s.learningEntries.date), desc(s.learningEntries.createdAt)),
+    db.select().from(s.weeklyReviews).orderBy(desc(s.weeklyReviews.weekOf)),
+    db.select().from(s.reviewMoves).orderBy(asc(s.reviewMoves.position)),
+    getStructureOn(date),
+  ]);
+
+  const goalTitle = new Map(goalRows.map((g) => [g.id, g.title]));
+  const quarterName = new Map(quarterRows.map((q) => [q.id, quarterLabel({ year: q.year, quarter: q.quarter as QuarterNumber })]));
+  const types = new Map(typeRows.map((t) => [t.id, t]));
+  const linksOf = (owner: { taskId?: string; moveId?: string }) =>
+    linkRows
+      .filter((l) => (owner.taskId ? l.taskId === owner.taskId : l.moveId === owner.moveId))
+      .map((l) => ({ title: l.title, url: l.url }));
+  const contextTask = (task: typeof s.tasks.$inferSelect): ContextTask => ({
+    id: task.id,
+    title: task.title,
+    done: task.doneAt !== null,
+    description: task.description,
+    steps: stepRows.filter((st) => st.taskId === task.id).map((st) => ({ title: st.title, done: st.done })),
+    links: linksOf({ taskId: task.id }),
+    games: normalizeGames(task.games ?? []),
+  });
+
+  return {
+    today: date,
+    quarter: { label: quarterLabel(ref), title: quarter?.title ?? "", body: quarter?.body ?? "" },
+    season: season
+      ? { title: season.title, body: season.body, startedOn: season.startedOn, goals: season.goals.map((g) => g.title) }
+      : null,
+    principles: principles.map((p) => ({ id: p.id, title: p.title, expansion: p.body })),
+    campaigns: campaignRows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      status: c.status,
+      quarter: c.quarterId ? (quarterName.get(c.quarterId) ?? null) : null,
+      seasonGoal: c.seasonGoalId ? (goalTitle.get(c.seasonGoalId) ?? null) : null,
+      blockType: c.blockTypeId ? (types.get(c.blockTypeId)?.name ?? null) : null,
+      games: normalizeGames(c.games ?? []),
+      goal: c.goal,
+      why: c.why,
+      antiGoal: c.antiGoal,
+      moves: moveRows
+        .filter((m) => m.campaignId === c.id)
+        .map((m) => ({
+          title: m.title,
+          done: m.doneAt !== null,
+          weekOf: m.weekOf,
+          description: m.description,
+          links: linksOf({ moveId: m.id }),
+          tasks: taskRows.filter((t) => t.moveId === m.id).map(contextTask),
+        })),
+    })),
+    looseTasks: taskRows.filter((t) => t.moveId === null && t.doneAt === null).map(contextTask),
+    week: {
+      weekOf,
+      moves: chosen.map((m) => ({ title: m.title, done: m.doneAt !== null, campaign: m.campaign })),
+      highlights: highlightRows.map((h) => ({ date: h.date, title: h.title, why: h.why, done: h.done })),
+    },
+    journals: noteRows.map((n) => ({ date: n.date, text: n.journal })),
+    learning: learningRows.map((l) => ({ id: l.id, date: l.date, title: l.title, expansion: l.expansion })),
+    reviews: reviewRows.map((r) => ({
+      weekOf: r.weekOf,
+      feltScore: r.feltScore,
+      notes: r.notes,
+      moves: reviewMoveRows.filter((m) => m.reviewWeek === r.weekOf).map((m) => m.title),
+    })),
+    structure: structure.flatMap((b) => {
+      const type = types.get(b.blockTypeId);
+      return type ? [{ weekday: b.weekday, startMin: b.startMin, endMin: b.endMin, type: type.name, kind: type.kind }] : [];
+    }),
+  };
 }

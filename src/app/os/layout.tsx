@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { auth, isAllowedEmail, signOut } from "@/auth";
+import { auth, isAllowedEmail } from "@/auth";
 import { CycleBadge } from "@/components/cycle-badge";
 import { OsNav } from "@/components/os-nav";
 import { PwaSetup } from "@/components/pwa";
@@ -18,11 +18,6 @@ async function ActiveCycle() {
 }
 
 export default function OsLayout({ children }: LayoutProps<"/os">) {
-  async function logout() {
-    "use server";
-    await signOut({ redirectTo: "/" });
-  }
-
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <PwaSetup />
@@ -36,9 +31,9 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
         <Suspense fallback={null}>
           <ActiveCycle />
         </Suspense>
-        <form action={logout}>
-          <button className="min-h-11 text-xs whitespace-nowrap text-muted hover:underline">Sign out</button>
-        </form>
+        <Link href="/os/profile" className="flex min-h-11 items-center text-xs whitespace-nowrap text-muted hover:underline">
+          Profile
+        </Link>
       </header>
       {/* On a phone the bottom bar covers the last 3.5rem; leave room to scroll past it. */}
       <main className="flex flex-1 flex-col gap-4 p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-4">
