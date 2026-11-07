@@ -433,3 +433,46 @@ export const cycles = pgTable(
   },
   (t) => [check("cycle_times", sql`${t.focusMin} > 0 and ${t.breakMin} >= 0`)],
 );
+
+// ─── Vaults ──────────────────────────────────────────────────────────────────
+// Everything secret here arrives already encrypted by the browser; the server
+// never sees the Passphrase nor a Secret's text. See docs/adr/0003.
+
+/**
+ * The single Passphrase that opens every Vault: its salt, its rounds, the check
+ * that recognizes it, and the hash of the proof every change must bring.
+ */
+export const vaultPassphrase = pgTable(
+  "vault_passphrase",
+  {
+    id: smallint("id").primaryKey().default(1),
+    salt: text("salt").notNull(),
+    iterations: integer("iterations").notNull(),
+    checkIv: text("check_iv").notNull(),
+    checkCiphertext: text("check_ciphertext").notNull(),
+    proofHash: text("proof_hash").notNull(),
+    createdAt: createdAt(),
+    changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("vault_passphrase_single", sql`${t.id} = 1`)],
+);
+
+/** A scope of Secrets; its name is not encrypted. */
+export const vaults = pgTable("vaults", {
+  id: id(),
+  name: text("name").notNull(),
+  createdAt: createdAt(),
+});
+
+/** A title in the clear and its text, sealed with AES-GCM by the browser. */
+export const vaultSecrets = pgTable("vault_secrets", {
+  id: id(),
+  vaultId: uuid("vault_id")
+    .notNull()
+    .references(() => vaults.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  iv: text("iv").notNull(),
+  ciphertext: text("ciphertext").notNull(),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
