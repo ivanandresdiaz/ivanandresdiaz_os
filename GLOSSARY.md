@@ -31,7 +31,7 @@ _Evitar_: Score, Rating, Total.
 
 ## Tiempo
 
-**Season** (Temporada): un capítulo de vida de duración indefinida, definido por la realidad que se vive (p. ej. "working in microfinance at El Alcaraván"). Tiene un título, un texto libre con el contexto de la vida (carrera, estado emocional, preguntas sobre mí), sus Season Goals y su Radar. Siempre hay exactamente una activa; abrir una nueva cierra la anterior.
+**Season** (Temporada): un capítulo de vida de duración indefinida, definido por la realidad que se vive (p. ej. "working in microfinance at El Alcaraván"). Tiene un título, un texto libre sobre la vida que se vive (carrera, estado emocional, preguntas sobre mí), sus Season Goals y su Radar. Ese texto es el texto de la Season, no su "contexto": Context es otra cosa. Siempre hay exactamente una activa; abrir una nueva cierra la anterior.
 _Evitar_: Season como bloque de 3 meses (uso antiguo del manifiesto).
 
 **Quarter** (Trimestre): un trimestre del calendario (ene–mar, abr–jun, jul–sep, oct–dic). Tiene un título, un texto libre sin versionar y contiene las Campaigns. No le pertenece a una Season: la Season lo atraviesa. Si la Season cambia a mitad de camino, el Quarter queda partido y sigue siendo uno solo, porque un cambio de Season no cambia de golpe el plan del trimestre.
@@ -139,6 +139,11 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 **Streak** (Racha): días seguidos cumpliendo un input; hay una por cada Habit y una por elegir el Highlight del día. Regla "never miss twice": un fallo no rompe la racha, dos seguidos sí. Un Habit que una Exception quita ese día no cuenta como fallo.
 
 ## Herramientas
+
+**Context** (Contexto): el Markdown sobre mí que copio a una IA para que me ayude a pensar con lo que soy: mi Season, mis Principles, mis Campaigns, mis últimos Journals y lo que yo elija. Cada vez escojo qué entra, por categoría o pieza por pieza (p. ej. solo una idea olvidada), y puedo dejar al final de qué quiero hablar. Se arma en el Profile, no se guarda en ningún lado y solo sale de Ivan OS cuando lo copio.
+_Evitar_: Prompt, Export, Resumen.
+
+**Profile** (Perfil): mi lugar en Ivan OS, donde armo el Context y cierro sesión.
 
 **Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el por qué de un Highlight, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
