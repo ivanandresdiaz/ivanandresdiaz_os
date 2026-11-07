@@ -154,11 +154,13 @@ export default async function DayPage({ params, searchParams }: PageProps<"/os/d
           </section>
 
           <Highlights
-            date={date}
-            highlights={note.highlights.map(({ id, title, why, done }) => ({ id, title, why, done }))}
-            workOptions={stackItems.map((item) => ({
-              value: `${item.kind}:${item.id}`,
-              label: item.campaignTitle ? `${item.title} (${item.campaignTitle})` : item.title,
+            highlights={note.highlights.map(({ id, date, title, why, done, taskId, moveId }) => ({
+              id,
+              date,
+              title,
+              why,
+              done,
+              work: taskId ? { kind: "task" as const, id: taskId } : moveId ? { kind: "move" as const, id: moveId } : null,
             }))}
           />
 

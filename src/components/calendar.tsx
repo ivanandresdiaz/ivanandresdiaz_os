@@ -16,6 +16,7 @@ import {
 } from "@/server/actions";
 import type { BlockType, CalendarBlock, CalendarDay, CalendarFocus, CalendarSlot } from "@/server/queries";
 import { DayBlockDialog, type DayBlockDraft } from "./day-block-dialog";
+import { HighlightStar } from "./highlight-star";
 import { ReminderBell } from "./reminder-bell";
 import { DetailsMark } from "./work-details";
 import { StartCycleButton } from "./start-cycle-button";
@@ -32,7 +33,7 @@ type BlockItem = GridItem & {
 
 type Item =
   | BlockItem
-  | (GridItem & { layer: "work"; slot: CalendarSlot })
+  | (GridItem & { layer: "work"; slot: CalendarSlot; dayHighlights: number })
   | (GridItem & { layer: "focus"; focus: CalendarFocus });
 
 const stop = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation() };
@@ -91,6 +92,8 @@ export function Calendar({
     return () => clearInterval(timer);
   }, [timeZone]);
   const [draft, setDraft] = useState<DayBlockDraft | null>(null);
+  /** A Warning from the last move of a Slot (a star that could not follow it). */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const single = days.length === 1;
   const editable = (date: IsoDate) => blockTypes !== undefined && isDayEditable(date, today);
@@ -122,6 +125,7 @@ export function Calendar({
           drag: single ? "any" : "mouse",
           crossColumn: true,
           slot,
+          dayHighlights: day.highlightCount,
         }),
       ),
       ...day.focus.map(
@@ -141,6 +145,17 @@ export function Calendar({
 
   return (
     <>
+      {notice && (
+        <div
+          role="status"
+          className="mb-2 flex items-start gap-2 rounded-md border border-amber-500/50 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-300"
+        >
+          <span className="flex-1">⚠ {notice}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="text-muted hover:text-foreground">
+            ×
+          </button>
+        </div>
+      )}
       <TimeGrid<Item>
         columns={days.map((day) => ({
           key: day.date,
@@ -183,7 +198,8 @@ export function Calendar({
         onChange={async (item, next) => {
           if (item.layer === "focus") return;
           if (item.layer === "work") {
-            await updateSlot({ id: item.slot.id, date: next.column, ...pick(next) });
+            const { warning } = await updateSlot({ id: item.slot.id, date: next.column, ...pick(next) });
+            setNotice(warning);
           } else {
             await changeDayBlock(refOf(item.block), pick(next));
           }
@@ -212,6 +228,7 @@ export function Calendar({
               // Until the clock is read, only a past day counts as started.
               started={slotStarted(item.slot, { date: today, minute: minute ?? -1 })}
               calendarConnected={calendarConnected}
+              dayHighlights={item.dayHighlights}
             />
           )
         }
@@ -289,6 +306,7 @@ function SlotView({
   today,
   started,
   calendarConnected,
+  dayHighlights,
 }: {
   slot: CalendarSlot;
   startMin: number;
@@ -297,6 +315,7 @@ function SlotView({
   today: IsoDate;
   started: boolean;
   calendarConnected: boolean;
+  dayHighlights: number;
 }) {
   const { work } = slot;
   const upkeep = useDoneToggle(today);
@@ -322,6 +341,16 @@ function SlotView({
           {work.kind === "secondary" && work.upkeep && <UpkeepMark upkeepId={work.upkeep.id} date={slot.date} />}
           {work.hasDetails && <DetailsMark />}
         </span>
+        {work.kind !== "secondary" && (
+          <HighlightStar
+            slot={{ ...slot, work: { kind: work.kind, id: work.id } }}
+            title={work.title}
+            campaignTitle={work.campaignTitle}
+            done={work.done}
+            today={today}
+            dayCount={dayHighlights}
+          />
+        )}
         <ReminderBell
           slot={slot}
           title={work.title}

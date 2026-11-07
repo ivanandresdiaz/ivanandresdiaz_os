@@ -17,7 +17,7 @@ import {
   MAX_DICTATION_BYTES,
 } from "@/domain/english";
 import { MAX_DAILY_LIKES } from "@/domain/feed";
-import { validateNewHighlight } from "@/domain/highlights";
+import { followSlot, MAX_HIGHLIGHTS, validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
 import { MAX_DESCRIPTION, MAX_LINK_TITLE, MAX_LINK_URL, normalizeLinkUrl } from "@/domain/links";
 import { MAX_REFERENCE_TITLE, referenceKey, referencePrefix, validateReferenceFile } from "@/domain/references";
@@ -1078,7 +1078,7 @@ export async function scheduleWork(input: {
       moveId: v.kind === "move" ? v.id : null,
       secondaryTaskId: v.kind === "secondary" ? v.id : null,
     });
-    if (v.kind === "secondary") await followSlot(tx, v.id, v.date);
+    if (v.kind === "secondary") await secondaryFollowsSlot(tx, v.id, v.date);
   });
   await done();
 }
@@ -1094,22 +1094,30 @@ export async function updateSlot(input: {
     .object({ id: z.uuid(), date: isoDate, startMin: minute, endMin: minute })
     .parse(input);
   timeRange(values);
-  await db.transaction(async (tx) => {
-    const [slot] = await tx
-      .update(s.slots)
-      .set(values)
-      .where(eq(s.slots.id, id))
-      .returning({ secondaryTaskId: s.slots.secondaryTaskId });
-    if (slot?.secondaryTaskId) await followSlot(tx, slot.secondaryTaskId, values.date);
+  const warning = await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(s.slots).where(eq(s.slots.id, id));
+    if (!before) return null;
+    await tx.update(s.slots).set(values).where(eq(s.slots.id, id));
+    if (before.secondaryTaskId) await secondaryFollowsSlot(tx, before.secondaryTaskId, values.date);
+    const work = strategicWorkOf(before);
+    return work && before.date !== values.date ? followHighlight(tx, work, before.date, values.date) : null;
   });
   await syncSlots([id]);
   await done();
+  return { warning };
+}
+
+/** The Task or Move a Slot holds; null for a Secondary Task. */
+function strategicWorkOf(slot: typeof s.slots.$inferSelect): { kind: "task" | "move"; id: string } | null {
+  if (slot.taskId) return { kind: "task", id: slot.taskId };
+  if (slot.moveId) return { kind: "move", id: slot.moveId };
+  return null;
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** A pending Secondary Task moves to the day of its Slot when that postpones it or brings it forward. */
-async function followSlot(tx: Tx, secondaryTaskId: string, slotDate: string) {
+async function secondaryFollowsSlot(tx: Tx, secondaryTaskId: string, slotDate: string) {
   const [task] = await tx
     .select({ day: s.secondaryTasks.day, doneAt: s.secondaryTasks.doneAt })
     .from(s.secondaryTasks)
@@ -1124,7 +1132,11 @@ async function followSlot(tx: Tx, secondaryTaskId: string, slotDate: string) {
 export async function deleteSlot(input: { id: string }) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(input);
-  await db.delete(s.slots).where(eq(s.slots.id, id));
+  await db.transaction(async (tx) => {
+    const [slot] = await tx.delete(s.slots).where(eq(s.slots.id, id)).returning();
+    const work = slot && strategicWorkOf(slot);
+    if (work) await followHighlight(tx, work, slot.date, null);
+  });
   await syncDeletions();
   await done();
 }
@@ -1162,8 +1174,8 @@ export async function retryReminders() {
 
 // ─── Daily Note: Check-in, Highlights, Habits ────────────────────────────────
 
-async function ensureDailyNote(date: string) {
-  await db.insert(s.dailyNotes).values({ date }).onConflictDoNothing();
+async function ensureDailyNote(date: string, conn: Tx | typeof db = db) {
+  await conn.insert(s.dailyNotes).values({ date }).onConflictDoNothing();
 }
 
 export async function addSecondaryTask(fd: FormData) {
@@ -1211,7 +1223,7 @@ export async function moveSecondaryTaskInMonth(input: { id: string; slotId: stri
     if (!move) return;
     if (move.kind === "slot") {
       await tx.update(s.slots).set({ date: move.date }).where(eq(s.slots.id, move.slotId));
-      await followSlot(tx, v.id, move.date);
+      await secondaryFollowsSlot(tx, v.id, move.date);
     } else {
       await tx.update(s.secondaryTasks).set({ day: move.date }).where(eq(s.secondaryTasks.id, v.id));
     }
@@ -1425,39 +1437,90 @@ export async function completeCheckIn(fd: FormData) {
   await done();
 }
 
-export async function addHighlight(fd: FormData) {
+const workColumn = (kind: "task" | "move") => (kind === "task" ? s.highlights.taskId : s.highlights.moveId);
+const slotWorkColumn = (kind: "task" | "move") => (kind === "task" ? s.slots.taskId : s.slots.moveId);
+
+/**
+ * The star of a Slot: makes its work a Highlight of the Slot's day, or edits
+ * the why of the one it already is. The why is an optional Long text.
+ */
+export async function setHighlight(input: { kind: "task" | "move"; id: string; date: string; why: string }) {
   await requireIvan();
-  const v = z
-    .object({
-      date: isoDate,
-      title: text,
-      why: text,
-      work: z
-        .string()
-        .optional()
-        .transform((w) => (w ? w : null))
-        .pipe(
-          z
-            .string()
-            .regex(/^(task|move):[0-9a-f-]{36}$/)
-            .nullable(),
-        ),
-    })
-    .parse(fields(fd));
-  const existing = await db.select().from(s.highlights).where(eq(s.highlights.date, v.date));
-  const problem = validateNewHighlight(existing, v);
+  const v = strategicWorkRef
+    .extend({ date: isoDate, why: text.max(MAX_DESCRIPTION) })
+    .parse(input);
+  const dayHighlights = await db.select().from(s.highlights).where(eq(s.highlights.date, v.date));
+  const own = dayHighlights.find((h) => (v.kind === "task" ? h.taskId : h.moveId) === v.id);
+  if (own) {
+    await db.update(s.highlights).set({ why: v.why }).where(eq(s.highlights.id, own.id));
+    return done();
+  }
+  const table = v.kind === "task" ? s.tasks : s.moves;
+  const [work] = await db.select({ title: table.title, doneAt: table.doneAt }).from(table).where(eq(table.id, v.id));
+  if (!work) throw new Error("Cannot add Highlight: no such work");
+  const [slot] = await db
+    .select({ id: s.slots.id })
+    .from(s.slots)
+    .where(and(eq(s.slots.date, v.date), eq(slotWorkColumn(v.kind), v.id)))
+    .limit(1);
+  const problem = validateNewHighlight({
+    count: dayHighlights.length,
+    date: v.date,
+    today: today(),
+    scheduled: slot !== undefined,
+  });
   if (problem) throw new Error(`Cannot add Highlight: ${problem}`);
-  const [kind, workId] = v.work ? v.work.split(":") : [null, null];
   await ensureDailyNote(v.date);
   await db.insert(s.highlights).values({
     date: v.date,
-    title: v.title,
+    title: work.title,
     why: v.why,
-    taskId: kind === "task" ? workId : null,
-    moveId: kind === "move" ? workId : null,
-    position: existing.length,
+    taskId: v.kind === "task" ? v.id : null,
+    moveId: v.kind === "move" ? v.id : null,
+    done: work.doneAt !== null,
+    position: dayHighlights.length,
   });
   await done();
+}
+
+/**
+ * After a Slot of a Task or Move left `from` (moved to `to`, or removed when
+ * `to` is null), its work's Highlight of `from` follows it. Says when the star
+ * stayed off because `to` is full or past.
+ */
+async function followHighlight(
+  tx: Tx,
+  work: { kind: "task" | "move"; id: string },
+  from: string,
+  to: string | null,
+): Promise<string | null> {
+  const [highlight] = await tx
+    .select({ id: s.highlights.id })
+    .from(s.highlights)
+    .where(and(eq(s.highlights.date, from), eq(workColumn(work.kind), work.id)));
+  if (!highlight) return null;
+  const [left] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(s.slots)
+    .where(and(eq(s.slots.date, from), eq(slotWorkColumn(work.kind), work.id)));
+  const toRows = to ? await tx.select().from(s.highlights).where(eq(s.highlights.date, to)) : [];
+  const outcome = followSlot({
+    slotsLeft: left?.n ?? 0,
+    to,
+    today: today(),
+    toCount: toRows.length,
+    toHasIt: toRows.some((h) => (work.kind === "task" ? h.taskId : h.moveId) === work.id),
+  });
+  if (outcome === "stays") return null;
+  if (outcome === "moves" && to) {
+    await ensureDailyNote(to, tx);
+    await tx.update(s.highlights).set({ date: to, position: toRows.length }).where(eq(s.highlights.id, highlight.id));
+    return null;
+  }
+  await tx.delete(s.highlights).where(eq(s.highlights.id, highlight.id));
+  if (outcome === "drops-full") return `That day already has ${MAX_HIGHLIGHTS} Highlights; the star stayed off.`;
+  if (outcome === "drops-past") return "A past day takes no Highlights; the star stayed off.";
+  return null;
 }
 
 /** A Highlight linked to a Task or Move is done when that work is done. */

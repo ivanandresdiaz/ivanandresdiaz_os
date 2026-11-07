@@ -494,6 +494,8 @@ export type CalendarSlot = {
   endMin: number;
   work: CalendarWorkItem;
   reminder: SlotReminder;
+  /** The Highlight its work is on this Slot's day; null when it is none. */
+  highlight: { id: string; why: string } | null;
 };
 
 function reminderOf(slot: typeof s.slots.$inferSelect): SlotReminder {
@@ -518,6 +520,8 @@ export type CalendarDay = {
   slots: CalendarSlot[];
   habitsDone: string[];
   focus: CalendarFocus[];
+  /** How many Highlights the date has (at most 3). */
+  highlightCount: number;
   /** Whether the date has Exceptions, including Blocks removed from it. */
   changed: boolean;
 };
@@ -525,7 +529,7 @@ export type CalendarDay = {
 export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
   const start = dates[0];
   const end = dates[dates.length - 1];
-  const [types, structureRows, exceptionRows, slotRows, checks, index, cycleRows] = await Promise.all([
+  const [types, structureRows, exceptionRows, slotRows, checks, index, cycleRows, highlightRows] = await Promise.all([
     getBlockTypes(),
     db
       .select()
@@ -551,8 +555,20 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
       .where(and(gte(s.habitChecks.date, start), lte(s.habitChecks.date, end))),
     getWorkIndex(),
     cyclesAround(start, end),
+    db
+      .select()
+      .from(s.highlights)
+      .where(and(gte(s.highlights.date, start), lte(s.highlights.date, end))),
   ]);
   const now = new Date();
+  const highlightOf = (slot: typeof s.slots.$inferSelect) => {
+    const row = highlightRows.find(
+      (h) =>
+        h.date === slot.date &&
+        ((slot.taskId !== null && h.taskId === slot.taskId) || (slot.moveId !== null && h.moveId === slot.moveId)),
+    );
+    return row ? { id: row.id, why: row.why } : null;
+  };
   const structure = structureRows.map(toStructureBlock);
   const exceptions: StructureException[] = exceptionRows;
 
@@ -567,9 +583,20 @@ export async function getCalendar(dates: IsoDate[]): Promise<CalendarDay[]> {
       .flatMap((slot) => {
         const work = index.get(workKey(slot.workKind, slotWorkId(slot)));
         return work
-          ? [{ id: slot.id, date, startMin: slot.startMin, endMin: slot.endMin, work, reminder: reminderOf(slot) }]
+          ? [
+              {
+                id: slot.id,
+                date,
+                startMin: slot.startMin,
+                endMin: slot.endMin,
+                work,
+                reminder: reminderOf(slot),
+                highlight: highlightOf(slot),
+              },
+            ]
           : [];
       }),
+    highlightCount: highlightRows.filter((h) => h.date === date).length,
     habitsDone: checks.filter((c) => c.date === date).map((c) => c.blockTypeId),
     changed: exceptions.some((e) => e.date === date),
     focus: cycleRows.flatMap((cycle) => {
@@ -817,13 +844,17 @@ export async function getUpkeeps(): Promise<UpkeepView[]> {
 }
 
 export async function getDailyNote(date: IsoDate) {
-  const [[note], highlights, secondary, noiseItems, learningEntries, belled] = await Promise.all([
+  const [[note], highlightRows, daySlots, secondary, noiseItems, learningEntries, belled] = await Promise.all([
     db.select().from(s.dailyNotes).where(eq(s.dailyNotes.date, date)),
     db
       .select()
       .from(s.highlights)
       .where(eq(s.highlights.date, date))
       .orderBy(asc(s.highlights.position)),
+    db
+      .select({ taskId: s.slots.taskId, moveId: s.slots.moveId, startMin: s.slots.startMin })
+      .from(s.slots)
+      .where(eq(s.slots.date, date)),
     getSecondaryTasks(),
     db
       .select({ id: s.noiseItems.id, title: s.noiseItems.title })
@@ -843,6 +874,24 @@ export async function getDailyNote(date: IsoDate) {
         ),
       ),
   ]);
+  // In the order of their first Slot that day; one without a Slot (an old one) after them.
+  const firstSlot = (h: (typeof highlightRows)[number]) =>
+    Math.min(
+      ...daySlots
+        .filter((slot) => (h.taskId && slot.taskId === h.taskId) || (h.moveId && slot.moveId === h.moveId))
+        .map((slot) => slot.startMin),
+    );
+  // A starred one shows its work's title as it is now; an old one keeps what was written.
+  const taskIds = highlightRows.flatMap((h) => (h.taskId ? [h.taskId] : []));
+  const moveIds = highlightRows.flatMap((h) => (h.moveId ? [h.moveId] : []));
+  const [taskTitles, moveTitles] = await Promise.all([
+    taskIds.length ? db.select({ id: s.tasks.id, title: s.tasks.title }).from(s.tasks).where(inArray(s.tasks.id, taskIds)) : [],
+    moveIds.length ? db.select({ id: s.moves.id, title: s.moves.title }).from(s.moves).where(inArray(s.moves.id, moveIds)) : [],
+  ]);
+  const titles = new Map([...taskTitles, ...moveTitles].map((row) => [row.id, row.title]));
+  const highlights = [...highlightRows]
+    .sort((a, b) => firstSlot(a) - firstSlot(b) || a.position - b.position)
+    .map((h) => ({ ...h, title: titles.get(h.taskId ?? h.moveId ?? "") ?? h.title }));
   const reminderFor = (id: string): { failed: boolean } | null => {
     const own = belled.filter((row) => row.id === id);
     return own.length ? { failed: own.some((row) => row.failed) } : null;
