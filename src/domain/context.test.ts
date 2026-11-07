@@ -224,4 +224,15 @@ describe("A Context", () => {
   it("counts its words and roughly its tokens", () => {
     expect(contextSize("one two  three\nfour")).toEqual({ words: 4, tokens: 5 });
   });
+
+  it("leaves out a category with nothing to give", () => {
+    const empty = { ...source, journals: [], campaigns: [] };
+    let selection = toggleCategory(empty, defaultSelection(), "journals");
+    selection = toggleCategory(empty, selection, "past");
+    selection = toggleCategory(empty, selection, "quarter");
+    const md = renderContext(empty, selection);
+    expect(md).not.toContain("## Journals");
+    expect(md).not.toContain("## Past Campaigns");
+    expect(md).toContain("## This Quarter: Q4 2026 — Ship\n\nShip Ivan OS and the side hustle.\n\nNo active Campaign picked.");
+  });
 });

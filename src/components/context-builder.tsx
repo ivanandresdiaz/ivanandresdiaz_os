@@ -16,6 +16,7 @@ import {
   toggleCategory,
   toggleItem,
   visibleItems,
+  WHOLE_CATEGORIES,
   WINDOWED,
   type CategoryState,
   type ContextCategory,
@@ -26,8 +27,6 @@ import {
 } from "@/domain/context";
 import { useRemembered } from "./use-remembered";
 
-/** Categories taken whole: they have no pieces to pick one by one. */
-const WHOLE: readonly ContextCategory[] = ["os", "season", "week", "structure"];
 const isWindowed = (key: ContextCategory): key is Windowed => (WINDOWED as readonly string[]).includes(key);
 
 function Check({
@@ -148,7 +147,7 @@ export function ContextBuilder({ source }: { source: ContextSource }) {
           ) : (
             <ul className="flex flex-col gap-1">
               {CONTEXT_CATEGORIES.map(({ key, label }) => {
-                const whole = WHOLE.includes(key);
+                const whole = WHOLE_CATEGORIES.includes(key);
                 const items = whole ? [] : visibleItems(source, selection, key);
                 const all = whole ? 0 : contextItems(source, key).length;
                 const state = categoryState(source, selection, key);

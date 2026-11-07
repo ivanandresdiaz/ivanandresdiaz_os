@@ -79,6 +79,9 @@ export const CONTEXT_CATEGORIES = [
 
 export type ContextCategory = (typeof CONTEXT_CATEGORIES)[number]["key"];
 
+/** Categories taken whole: they have no pieces to pick one by one. */
+export const WHOLE_CATEGORIES: readonly ContextCategory[] = ["os", "season", "week", "structure"];
+
 /** The categories that take only the last N of their items. */
 export const WINDOWED = ["journals", "learning", "reviews"] as const;
 export type Windowed = (typeof WINDOWED)[number];
@@ -337,9 +340,14 @@ function campaignBlock(c: ContextCampaign, level: number): string {
 
 /** The whole Context, ready to paste: an opening line, the picked sections, and what Ivan wants to talk about. */
 export function renderContext(source: ContextSource, selection: ContextSelection): string {
-  const state = (key: ContextCategory) => categoryState(source, selection, key);
   const picked = (key: ContextCategory) =>
     visibleItems(source, selection, key).filter((i) => isPicked(source, selection, key, i.id));
+  // A category of pieces with none picked (or none at all) stays out; the Quarter still has its own text.
+  const state = (key: ContextCategory) => {
+    const found = categoryState(source, selection, key);
+    if (found === "off" || WHOLE_CATEGORIES.includes(key) || key === "quarter") return found;
+    return picked(key).length > 0 ? found : "off";
+  };
   const pickedIds = (key: ContextCategory) => new Set(picked(key).map((i) => i.id));
 
   const where = [
