@@ -11,8 +11,8 @@ _Evitar_: segundo cerebro (eso es Obsidian).
 
 **Principle** (Principio): un recordatorio de por qué hago lo que hago; sirve para alinear la mente, no es una regla fija. Ivan los escribe y los ordena como quiera, y cada uno puede tener su Expansion. Ejemplos: From the inside out, Flow, Play for position, Play for inputs.
 
-**Expansion** (Expansión): el texto opcional de un Principle que lo desarrolla con explicación, ejemplos y referencias (como videos). Se lee a demanda; el título del Principle es el recordatorio.
-_Evitar_: Description, body.
+**Expansion** (Expansión): el texto opcional de un Principle o de una Learning entry que lo desarrolla con explicación, ejemplos y referencias (como videos). Se lee a demanda; el título es el recordatorio.
+_Evitar_: Description, Reflection, body.
 
 **Reference** (Referencia): una imagen, un video o un audio que Ivan sube a un Principle porque lo encarna para él (p. ej. un reel que le cambió la forma de ver algo, o el fragmento de un podcast). Un Principle puede tener cualquier cantidad, en el orden que Ivan elija. Un audio lleva un título, porque no tiene nada que ver.
 _Evitar_: Story, Reel, Media, Podcast.
@@ -119,6 +119,8 @@ _Evitar_: Recurring Task, Chore.
 
 **Learning Log** (¿Qué estoy aprendiendo?): la captura rápida durante el día de ideas, reflexiones y aprendizajes.
 
+**Learning entry** (Entrada del Learning Log): una idea, reflexión o aprendizaje del Learning Log. Se captura con solo su título, en una línea; si quiero más espacio, le escribo su Expansion. En la lista solo se ve el título.
+
 **Journal**: la parte nocturna de la Daily Note; autorreflexión para tener una relación conmigo mismo. Es un solo texto libre por día, sin plantilla de preguntas.
 
 **Weekly Review** (Revisión semanal): el domingo, o el lunes si quedó pendiente. Reviso el Learning Log de la semana y lo que pasó, y elijo los Moves de la semana que viene. Al terminarla guarda el puntaje sentido, unas notas opcionales y los Moves elegidos tal como quedaron; después se pueden corregir el puntaje y las notas, pero no esos Moves. Cada Weekly Review queda en un historial. La que no se hace se queda saltada y no deja deuda.
@@ -138,7 +140,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Herramientas
 
-**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle, la Description de una Task o un Move, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
+**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
 **Dictation** (Dictado): hablar en inglés para que el texto se escriba en un Long text, donde está el cursor y sin borrar lo que ya hay. Transcribe literal, con mis errores, porque corregirlos es trabajo del English Coach. El audio no se guarda.
 _Evitar_: Voice input, audio (un audio es una Reference).
