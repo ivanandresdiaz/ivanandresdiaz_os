@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createTask, deleteMove, setMoveWeek, updateMove } from "@/server/actions";
 import type { LinkView } from "@/server/queries";
 import { AddSection } from "./add-section";
+import { ConfirmDelete } from "./confirm-delete";
 import { TaskList, TitleField } from "./plan-task";
 import { Hidden, WeekChip } from "./ui";
 import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
@@ -79,12 +80,7 @@ export function MovePanel({
             <TitleField id={move.id} title={move.title} label="Move title" action={updateMove} autoFocus />
           </div>
         </details>
-        <form action={deleteMove}>
-          <Hidden id={move.id} />
-          <button className="text-muted hover:text-red-600" title="Delete Move" aria-label={`Delete ${move.title}`}>
-            ×
-          </button>
-        </form>
+        <ConfirmDelete action={deleteMove} id={move.id} what="Move" title={move.title} counts="move" />
       </div>
 
       {hasDescription && <DescriptionPreview description={move.description} onOpen={() => setReading(true)} />}

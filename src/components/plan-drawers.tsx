@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addSeasonGoal, deleteSeasonGoal, saveQuarter, updateSeason, updateSeasonGoal } from "@/server/actions";
 import { LongText } from "./long-text";
+import { ConfirmDelete } from "./confirm-delete";
 import { Markdown } from "./markdown";
 import { Hidden } from "./ui";
 
@@ -128,12 +129,7 @@ function SeasonGoalsEditor({ season }: { season: SeasonText }) {
             <input name="title" defaultValue={goal.title} required aria-label="Season Goal" className="input" />
             <button className="btn">Save</button>
           </form>
-          <form action={deleteSeasonGoal}>
-            <Hidden id={goal.id} />
-            <button className="text-muted hover:text-red-600" title="Delete" aria-label={`Delete ${goal.title}`}>
-              ×
-            </button>
-          </form>
+          <ConfirmDelete action={deleteSeasonGoal} id={goal.id} what="Season Goal" title={goal.title} counts="seasonGoal" />
         </div>
       ))}
       <form action={addSeasonGoal} className="mt-1 flex gap-2">

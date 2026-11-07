@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { deleteCampaign, setCampaignStatus, updateCampaign } from "@/server/actions";
 import { LongText } from "./long-text";
+import { ConfirmDelete } from "./confirm-delete";
 import { Markdown } from "./markdown";
 import { DrawerFrame, ReadButton, SaveForm, useEditMode } from "./plan-drawers";
 import { GamesPicker, GameTags, Hidden } from "./ui";
@@ -191,10 +192,18 @@ function CampaignDrawer({
         )}
         <details className="ml-auto text-sm">
           <summary className="cursor-pointer text-muted">Danger zone</summary>
-          <form action={deleteCampaign} className="mt-2">
-            <Hidden id={campaign.id} />
-            <button className="btn text-red-600">Delete Campaign and all its Moves</button>
-          </form>
+          <div className="mt-2">
+            <ConfirmDelete
+              action={deleteCampaign}
+              id={campaign.id}
+              what="Campaign"
+              title={campaign.title}
+              counts="campaign"
+              className="btn text-red-600"
+            >
+              Delete Campaign and all its Moves
+            </ConfirmDelete>
+          </div>
         </details>
       </div>
     </DrawerFrame>

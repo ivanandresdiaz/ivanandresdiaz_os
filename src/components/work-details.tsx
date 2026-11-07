@@ -4,10 +4,10 @@ import { useEffect, useOptimistic, useRef, useState, useTransition } from "react
 import { linkLabel } from "@/domain/links";
 import { createLink, deleteLink, reorderLinks, setDescription, updateLink } from "@/server/actions";
 import type { LinkView } from "@/server/queries";
+import { ConfirmDelete } from "./confirm-delete";
 import { LongText } from "./long-text";
 import { Markdown } from "./markdown";
 import { DrawerFrame, SaveForm, useEditMode } from "./plan-drawers";
-import { Hidden } from "./ui";
 
 /** The Task or Move that owns a Description and Links. */
 export type DetailOwner = { kind: "task" | "move"; id: string; title: string };
@@ -248,12 +248,13 @@ export function LinkList({ links, className = "" }: { links: LinkView[]; classNa
               <button type="button" onClick={() => setEditing(link.id)} title="Edit Link" aria-label={`Edit ${linkLabel(link)}`} className="hover:text-foreground">
                 ✎
               </button>
-              <form action={deleteLink}>
-                <Hidden id={link.id} />
-                <button title="Delete Link" aria-label={`Delete ${linkLabel(link)}`} className="hover:text-red-600">
-                  ×
-                </button>
-              </form>
+              <ConfirmDelete
+                action={deleteLink}
+                id={link.id}
+                what="Link"
+                title={linkLabel(link)}
+                className="hover:text-red-600"
+              />
             </span>
           </li>
         ),

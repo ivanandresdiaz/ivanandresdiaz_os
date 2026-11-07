@@ -6,8 +6,8 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { useOptimistic, useState, useTransition } from "react";
 import { deletePrinciple, reorderPrinciples } from "@/server/actions";
 import type { PrincipleView } from "@/server/queries";
+import { ConfirmDelete } from "./confirm-delete";
 import { PrincipleDrawer } from "./principle-drawer";
-import { Hidden } from "./ui";
 
 export function PrinciplesList({ principles }: { principles: PrincipleView[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -65,12 +65,7 @@ function PrincipleRow({ principle: p, index, onOpen }: { principle: PrincipleVie
           {p.references.length > 0 && ` · ${p.references.length} Reference${p.references.length === 1 ? "" : "s"}`}
         </div>
       </button>
-      <form action={deletePrinciple}>
-        <Hidden id={p.id} />
-        <button className="text-muted hover:text-red-600" title="Delete">
-          ×
-        </button>
-      </form>
+      <ConfirmDelete action={deletePrinciple} id={p.id} what="Principle" title={p.title} counts="principle" />
     </li>
   );
 }

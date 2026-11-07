@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, gt, inArray, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import {
   MAX_COACH_CHARS,
   MAX_DICTATION_BYTES,
 } from "@/domain/english";
+import type { DeletionImpact } from "@/domain/deletion";
 import { MAX_DAILY_LIKES } from "@/domain/feed";
 import { followSlot, MAX_HIGHLIGHTS, validateNewHighlight } from "@/domain/highlights";
 import { normalizeGames } from "@/domain/infinite-games";
@@ -614,6 +615,61 @@ export async function setMoveWeek(fd: FormData) {
   }
   await db.update(s.moves).set({ weekOf }).where(eq(s.moves.id, id));
   await done();
+}
+
+/** What deleting this would take with it, counted for Ivan to confirm the delete. */
+export async function deletionImpact(input: {
+  kind: "campaign" | "move" | "task" | "principle" | "seasonGoal";
+  id: string;
+}): Promise<DeletionImpact> {
+  await requireIvan();
+  const { kind, id } = z
+    .object({ kind: z.enum(["campaign", "move", "task", "principle", "seasonGoal"]), id: z.uuid() })
+    .parse(input);
+
+  if (kind === "principle") {
+    const refs = await db
+      .select({ id: s.principleReferences.id })
+      .from(s.principleReferences)
+      .where(eq(s.principleReferences.principleId, id));
+    return { references: refs.length };
+  }
+  if (kind === "seasonGoal") {
+    const campaigns = await db.select({ id: s.campaigns.id }).from(s.campaigns).where(eq(s.campaigns.seasonGoalId, id));
+    return { campaigns: campaigns.length };
+  }
+
+  const moveIds =
+    kind === "campaign"
+      ? (await db.select({ id: s.moves.id }).from(s.moves).where(eq(s.moves.campaignId, id))).map((m) => m.id)
+      : kind === "move"
+        ? [id]
+        : [];
+  const taskIds =
+    kind === "task"
+      ? [id]
+      : moveIds.length > 0
+        ? (await db.select({ id: s.tasks.id }).from(s.tasks).where(inArray(s.tasks.moveId, moveIds))).map((t) => t.id)
+        : [];
+  const owned = (taskCol: typeof s.links.taskId | typeof s.slots.taskId, moveCol: typeof s.links.moveId | typeof s.slots.moveId) =>
+    or(
+      taskIds.length > 0 ? inArray(taskCol, taskIds) : sql`false`,
+      moveIds.length > 0 ? inArray(moveCol, moveIds) : sql`false`,
+    );
+  const [steps, links, slots] = await Promise.all([
+    taskIds.length > 0
+      ? db.select({ id: s.steps.id }).from(s.steps).where(inArray(s.steps.taskId, taskIds))
+      : Promise.resolve([]),
+    db.select({ id: s.links.id }).from(s.links).where(owned(s.links.taskId, s.links.moveId)),
+    db.select({ id: s.slots.id }).from(s.slots).where(owned(s.slots.taskId, s.slots.moveId)),
+  ]);
+  return {
+    ...(kind === "campaign" ? { moves: moveIds.length } : {}),
+    ...(kind === "task" ? {} : { tasks: taskIds.length }),
+    steps: steps.length,
+    links: links.length,
+    slots: slots.length,
+  };
 }
 
 export async function deleteMove(fd: FormData) {

@@ -13,6 +13,7 @@ import {
 } from "@/server/actions";
 import type { LinkView } from "@/server/queries";
 import { ClosedList, OrderedList, PriorityList } from "./priority-list";
+import { ConfirmDelete } from "./confirm-delete";
 import { GameTags, Hidden } from "./ui";
 import { AddMenu, DescriptionButton, DescriptionDrawer, DescriptionPreview, LinkForm, LinkList } from "./work-details";
 
@@ -128,12 +129,7 @@ function TaskItem({ task }: { task: TaskItemData }) {
             { label: "Link", onSelect: () => setAdding("link") },
           ]}
         />
-        <form action={deleteTask}>
-          <Hidden id={task.id} />
-          <button className="text-muted hover:text-red-600" title="Delete Task" aria-label={`Delete ${task.title}`}>
-            ×
-          </button>
-        </form>
+        <ConfirmDelete action={deleteTask} id={task.id} what="Task" title={task.title} counts="task" />
       </div>
       {task.games && task.games.length > 0 && (
         <div className="mt-1 ml-6">
@@ -156,12 +152,13 @@ function TaskItem({ task }: { task: TaskItemData }) {
                 <button>{step.done ? "☑" : "☐"}</button>
               </form>
               <span className={`min-w-0 ${step.done ? "line-through opacity-60" : ""}`}>{step.title}</span>
-              <form action={deleteStep} className="ml-auto">
-                <Hidden id={step.id} />
-                <button className="text-muted hover:text-red-600" aria-label={`Delete ${step.title}`}>
-                  ×
-                </button>
-              </form>
+              <ConfirmDelete
+                action={deleteStep}
+                id={step.id}
+                what="Step"
+                title={step.title}
+                className="ml-auto text-muted hover:text-red-600"
+              />
             </>
           )}
         </OrderedList>
