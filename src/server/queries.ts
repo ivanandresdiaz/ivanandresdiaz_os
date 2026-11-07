@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import type { ContextSource, ContextTask } from "@/domain/context";
+import type { PassphraseRecord } from "@/domain/vault";
 import {
   addDays,
   localMoment,
@@ -1330,5 +1331,48 @@ export async function getContextSource(): Promise<ContextSource> {
       const type = types.get(b.blockTypeId);
       return type ? [{ weekday: b.weekday, startMin: b.startMin, endMin: b.endMin, type: type.name, kind: type.kind }] : [];
     }),
+  };
+}
+
+// ─── Vaults ──────────────────────────────────────────────────────────────────
+
+export type VaultSecretView = { id: string; title: string; iv: string; ciphertext: string };
+export type VaultView = { id: string; name: string; secrets: VaultSecretView[] };
+export type VaultsView = { passphrase: PassphraseRecord | null; vaults: VaultView[] };
+
+/**
+ * Everything the Vaults page needs, still sealed: the browser opens it with the
+ * Passphrase. Vaults go alphabetically; their Secrets, newest first.
+ */
+export async function getVaultsView(): Promise<VaultsView> {
+  const [record] = await db.select().from(s.vaultPassphrase).limit(1);
+  const vaults = await db
+    .select({ id: s.vaults.id, name: s.vaults.name })
+    .from(s.vaults)
+    .orderBy(sql`lower(${s.vaults.name})`, asc(s.vaults.createdAt));
+  const secrets = await db
+    .select({
+      id: s.vaultSecrets.id,
+      vaultId: s.vaultSecrets.vaultId,
+      title: s.vaultSecrets.title,
+      iv: s.vaultSecrets.iv,
+      ciphertext: s.vaultSecrets.ciphertext,
+    })
+    .from(s.vaultSecrets)
+    .orderBy(desc(s.vaultSecrets.createdAt));
+  return {
+    passphrase: record
+      ? {
+          salt: record.salt,
+          iterations: record.iterations,
+          check: { iv: record.checkIv, ciphertext: record.checkCiphertext },
+        }
+      : null,
+    vaults: vaults.map((vault) => ({
+      ...vault,
+      secrets: secrets
+        .filter((secret) => secret.vaultId === vault.id)
+        .map(({ id, title, iv, ciphertext }) => ({ id, title, iv, ciphertext })),
+    })),
   };
 }

@@ -8,6 +8,7 @@ export type DeletionImpact = {
   steps?: number;
   links?: number;
   references?: number;
+  secrets?: number;
   slots?: number;
   /** Campaigns that stay but lose the Season Goal being deleted. */
   campaigns?: number;
@@ -19,6 +20,7 @@ const GOES_WITH = [
   ["steps", "Step", "Steps"],
   ["links", "Link", "Links"],
   ["references", "Reference", "References"],
+  ["secrets", "Secret", "Secrets"],
   ["slots", "Slot on the calendar", "Slots on the calendar"],
 ] as const;
 

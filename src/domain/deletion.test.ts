@@ -19,6 +19,11 @@ describe("What a delete takes with it", () => {
     expect(describeDeletion({ references: 2 })).toBe("Its 2 References go too.");
   });
 
+  it("counts the Secrets that go with a Vault", () => {
+    expect(describeDeletion({ secrets: 3 })).toBe("Its 3 Secrets go too.");
+    expect(describeDeletion({ secrets: 0 })).toBeNull();
+  });
+
   it("tells that Campaigns stay when their Season Goal goes", () => {
     expect(describeDeletion({ campaigns: 1 })).toBe("1 Campaign stays, without this Season Goal.");
     expect(describeDeletion({ campaigns: 2 })).toBe("2 Campaigns stay, without this Season Goal.");
