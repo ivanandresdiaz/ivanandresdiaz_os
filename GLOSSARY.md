@@ -143,7 +143,16 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 **Context** (Contexto): el Markdown sobre mí que copio a una IA para que me ayude a pensar con lo que soy: mi Season, mis Principles, mis Campaigns, mis últimos Journals y lo que yo elija. Cada vez escojo qué entra, por categoría o pieza por pieza (p. ej. solo una idea olvidada), y puedo dejar al final de qué quiero hablar. Se arma en el Profile, no se guarda en ningún lado y solo sale de Ivan OS cuando lo copio.
 _Evitar_: Prompt, Export, Resumen.
 
-**Profile** (Perfil): mi lugar en Ivan OS, donde armo el Context y cierro sesión.
+**Profile** (Perfil): mi lugar en Ivan OS, con tres opciones: el Context, los Vaults y cerrar sesión. Cerrar sesión siempre pide confirmación.
+
+**Vault** (Caja fuerte): donde guardo los Secrets que casi nunca abro, como códigos de recuperación o contraseñas que no uso a diario. Puedo tener varios para separar ámbitos (p. ej. uno para la infraestructura de Ivan OS y otro para finanzas), y todos usan la misma Passphrase. Se llega a ellos desde el Profile. Aunque ya haya iniciado sesión, solo se abren con la Passphrase. Abrirlos una vez los abre todos, y se cierran juntos: a mano, tras unos minutos sin usarlos o al salir de ellos. Cerrados, se ven los nombres de los Vaults y los títulos de sus Secrets, pero ningún texto. Ni Ivan OS ni nadie más puede leer lo que guarda. Nada de lo que hay adentro llega a una IA: no entra en el Context y no pasa por Dictation ni por el English Coach.
+_Evitar_: Password manager, Caja de contraseñas.
+
+**Passphrase** (Clave del Vault): la única clave, que solo yo sé, que abre todos los Vaults. La creo la primera vez que entro y solo la uso aquí: no es la de mi cuenta de Google ni la de ningún otro sitio. Puedo cambiarla con los Vaults abiertos. No hay forma de recuperarla: si la olvido, lo que hay en los Vaults se pierde.
+
+**Secret** (Secreto): algo que guardo en un Vault: un título y un texto libre (p. ej. "Vercel recovery codes" y la lista de códigos). El título se ve siempre; el texto, solo con el Vault abierto.
+
+**Backup** (Respaldo): una copia de todos los Vaults en un archivo que descargo con un clic y que se abre sin internet, en cualquier navegador, con la Passphrase que tenía al descargarlo. Es solo para leer: no se vuelve a cargar en Ivan OS. Es una foto de ese momento: lo que agregue después no está en él hasta que descargue otro.
 
 **Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el por qué de un Highlight, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
