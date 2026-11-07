@@ -100,10 +100,10 @@ _Evitar_: Holiday.
 
 **Daily Note** (Nota del día): el registro de un día, en tres momentos: el Check-in por la mañana, el Learning Log durante el día y el Journal por la noche. Se puede navegar de un día a otro (ayer, los journals anteriores).
 
-**Check-in**: el ritual de la mañana. Miro mis Season Goals, mis Campaigns y la semana, elijo los Highlights, capturo y reviso mis Secondary Tasks, anoto los Noise items del día y acomodo el trabajo en los Blocks. Los Principles están a mano para leerlos cuando quiera; no son un paso del ritual.
+**Check-in**: el ritual de la mañana. Miro mis Season Goals, mis Campaigns y la semana, reviso los Highlights (se eligen con la estrella de un Slot), capturo y reviso mis Secondary Tasks, anoto los Noise items del día y acomodo el trabajo en los Blocks. Los Principles están a mano para leerlos cuando quiera; no son un paso del ritual.
 
-**Highlight**: lo que es crítico que quede hecho hoy porque mueve la aguja del progreso. Hay de 1 a 3 por día, y cada uno lleva escrito por qué es crítico. Viene de *Make Time*.
-_Evitar_: 9/10.
+**Highlight**: lo que es clave que quede hecho ese día porque mueve la aguja del progreso. Hay de 1 a 3 por día. Siempre es una Task o un Move agendado: se elige con la estrella de su Slot, para el día de ese Slot (hoy o más adelante, nunca un día pasado), y sigue al Slot si se mueve o se quita. El por qué es opcional, porque el trabajo ya viene alineado con sus Campaigns. Viene de *Make Time*.
+_Evitar_: 9/10, crítico (critical).
 
 **Day Won** (Día ganado): el día en que todos los Highlights quedaron hechos. Los Container Blocks que quedan se ven como libres.
 
@@ -140,7 +140,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 
 ## Herramientas
 
-**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
+**Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el por qué de un Highlight, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.
 
 **Dictation** (Dictado): hablar en inglés para que el texto se escriba en un Long text, donde está el cursor y sin borrar lo que ya hay. Transcribe literal, con mis errores, porque corregirlos es trabajo del English Coach. El audio no se guarda.
 _Evitar_: Voice input, audio (un audio es una Reference).
