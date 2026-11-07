@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { addDays, quarterLabel, startOfWeek, WEEKDAY_NAMES, weekdayOf } from "@/domain/dates";
+import { addDays, quarterLabel, startOfWeek } from "@/domain/dates";
 import { nextReviewDay, type OpenReview, type ReviewMove, type ReviewStep } from "@/domain/reviews";
 import { setMoveWeek } from "@/server/actions";
 import {
@@ -10,6 +10,7 @@ import {
   type LearningEntry,
   type ReviewView,
 } from "@/server/queries";
+import { ReviewLearningEntries } from "./learning-log";
 import { Hidden, WeekChip } from "./ui";
 import { EditReview, FinishReview, ReviewFrame } from "./weekly-review-parts";
 
@@ -167,14 +168,7 @@ function Entries({ entries }: { entries: LearningEntry[] }) {
       {entries.length === 0 ? (
         <Empty>Nothing in the Learning Log this week.</Empty>
       ) : (
-        <ul className="flex flex-col gap-1 text-sm">
-          {entries.map((entry) => (
-            <li key={entry.id} className="flex gap-2">
-              <span className="w-8 shrink-0 text-xs leading-5 text-muted">{WEEKDAY_NAMES[weekdayOf(entry.date)].slice(0, 3)}</span>
-              <span className="min-w-0 flex-1 break-words">{entry.body}</span>
-            </li>
-          ))}
-        </ul>
+        <ReviewLearningEntries entries={entries} />
       )}
     </div>
   );

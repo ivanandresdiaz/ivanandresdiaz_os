@@ -859,7 +859,7 @@ export async function getDailyNote(date: IsoDate) {
   };
 }
 
-export type LearningEntry = { id: string; date: IsoDate; body: string; minute: number };
+export type LearningEntry = { id: string; date: IsoDate; title: string; expansion: string; minute: number };
 
 /** The Learning Log of some days, oldest first. */
 export async function getLearningEntries(start: IsoDate, end: IsoDate): Promise<LearningEntry[]> {
@@ -871,7 +871,8 @@ export async function getLearningEntries(start: IsoDate, end: IsoDate): Promise<
   return rows.map((row) => ({
     id: row.id,
     date: row.date,
-    body: row.body,
+    title: row.title,
+    expansion: row.expansion,
     minute: localMoment(row.createdAt, APP_TIMEZONE).minute,
   }));
 }

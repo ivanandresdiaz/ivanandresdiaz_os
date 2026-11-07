@@ -1335,19 +1335,29 @@ export async function deleteNoiseItem(input: { id: string }) {
 
 // ─── Learning Log, Journal and Weekly Review ─────────────────────────────────
 
-const learningBody = required.max(MAX_LEARNING_ENTRY);
+const learningTitle = required.max(MAX_LEARNING_ENTRY);
+const learningExpansion = text.max(MAX_DESCRIPTION);
 
+/** Captures a Learning entry: its title, and its Expansion when written in the drawer. */
 export async function addLearningEntry(fd: FormData) {
   await requireIvan();
-  const { date, body } = z.object({ date: isoDate, body: learningBody }).parse(fields(fd));
-  await db.insert(s.learningEntries).values({ date, body });
+  const { date, title, expansion } = z
+    .object({ date: isoDate, title: learningTitle, expansion: learningExpansion.default("") })
+    .parse(fields(fd));
+  await db.insert(s.learningEntries).values({ date, title, expansion });
   await done();
 }
 
+/** Edits a Learning entry; its Expansion is left as it is when the form does not send one. */
 export async function updateLearningEntry(fd: FormData) {
   await requireIvan();
-  const { id, body } = z.object({ id: z.uuid(), body: learningBody }).parse(fields(fd));
-  await db.update(s.learningEntries).set({ body }).where(eq(s.learningEntries.id, id));
+  const { id, title, expansion } = z
+    .object({ id: z.uuid(), title: learningTitle, expansion: learningExpansion.optional() })
+    .parse(fields(fd));
+  await db
+    .update(s.learningEntries)
+    .set(expansion === undefined ? { title } : { title, expansion })
+    .where(eq(s.learningEntries.id, id));
   await done();
 }
 
