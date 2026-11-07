@@ -1,0 +1,1 @@
+ALTER TABLE "learning_entries" ADD COLUMN "expansion" text DEFAULT '' NOT NULL;

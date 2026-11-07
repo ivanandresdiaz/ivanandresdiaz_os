@@ -325,11 +325,14 @@ export const dailyNotes = pgTable("daily_notes", {
   createdAt: createdAt(),
 });
 
-/** A quick capture of the Learning Log: an idea, a reflection or something learned. */
+/** A Learning entry: an idea, a reflection or something learned, captured by its title. */
 export const learningEntries = pgTable("learning_entries", {
   id: id(),
   date: isoDate("date").notNull(),
-  body: text("body").notNull(),
+  /** The one line it is captured with (the column predates the Expansion). */
+  title: text("body").notNull(),
+  /** Its Expansion: a Long text in Markdown; empty = none. */
+  expansion: text("expansion").notNull().default(""),
   createdAt: createdAt(),
 });
 
