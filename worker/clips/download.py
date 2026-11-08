@@ -16,6 +16,7 @@ Environment:
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import urllib.request
@@ -89,9 +90,10 @@ def download(url: str, tmp: str, max_seconds: int) -> tuple[dict, str]:
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
-        # h264 and AAC in mp4, at most 720p: it plays on the iPhone and spares the bucket.
+        # h264 before size: a 720p reel in VP9 does not play on the iPhone, a 480p one in h264 does.
+        # When there is no h264 at all, playable() converts the file.
         "format": "bv*+ba/b",
-        "format_sort": ["res:720", "vcodec:h264", "acodec:aac", "ext:mp4:m4a"],
+        "format_sort": ["vcodec:h264", "res:720", "acodec:aac", "ext:mp4:m4a"],
         "merge_output_format": "mp4",
         "postprocessors": [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}],
     }
@@ -123,7 +125,38 @@ def download(url: str, tmp: str, max_seconds: int) -> tuple[dict, str]:
     files = [f for f in os.listdir(tmp) if f.startswith("clip.") and f.endswith(".mp4")]
     if not files:
         raise RuntimeError("yt-dlp finished without an mp4")
-    return info, os.path.join(tmp, files[0])
+    return info, playable(os.path.join(tmp, files[0]), tmp)
+
+
+def probe(path: str, stream: str) -> tuple[str, str]:
+    """The codec and pixel format of the file's first video or audio stream ("" when it has none)."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", f"{stream}:0",
+         "-show_entries", "stream=codec_name,pix_fmt", "-of", "json", path],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    streams = json.loads(out).get("streams") or [{}]
+    return streams[0].get("codec_name", ""), streams[0].get("pix_fmt", "")
+
+
+def playable(path: str, tmp: str) -> str:
+    """The file as h264 in yuv420p, the only video the iPhone is sure to play (VP9 and AV1 are not)."""
+    codec, pix_fmt = probe(path, "v")
+    if codec == "h264" and pix_fmt == "yuv420p":
+        return path
+    audio, _ = probe(path, "a")
+    out = os.path.join(tmp, "playable.mp4")
+    print(f"converting {codec}/{pix_fmt} to h264", file=sys.stderr)
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", path,
+         "-map", "0:v:0", "-map", "0:a:0?",
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-maxrate", "3M", "-bufsize", "6M", "-pix_fmt", "yuv420p",
+         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+         "-c:a", "copy" if audio == "aac" else "aac",
+         "-movflags", "+faststart", out],
+        check=True,
+    )
+    return out
 
 
 def main():
