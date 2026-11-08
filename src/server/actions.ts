@@ -619,17 +619,21 @@ export async function setMoveWeek(fd: FormData) {
 
 /** What deleting this would take with it, counted for Ivan to confirm the delete. */
 export async function deletionImpact(input: {
-  kind: "campaign" | "move" | "task" | "principle" | "seasonGoal" | "vault";
+  kind: "campaign" | "move" | "task" | "principle" | "seasonGoal" | "vault" | "learningPath";
   id: string;
 }): Promise<DeletionImpact> {
   await requireIvan();
   const { kind, id } = z
-    .object({ kind: z.enum(["campaign", "move", "task", "principle", "seasonGoal", "vault"]), id: z.uuid() })
+    .object({ kind: z.enum(["campaign", "move", "task", "principle", "seasonGoal", "vault", "learningPath"]), id: z.uuid() })
     .parse(input);
 
   if (kind === "vault") {
     const secrets = await db.select({ id: s.vaultSecrets.id }).from(s.vaultSecrets).where(eq(s.vaultSecrets.vaultId, id));
     return { secrets: secrets.length };
+  }
+  if (kind === "learningPath") {
+    const chapters = await db.select({ id: s.chapters.id }).from(s.chapters).where(eq(s.chapters.pathId, id));
+    return { chapters: chapters.length };
   }
 
   if (kind === "principle") {

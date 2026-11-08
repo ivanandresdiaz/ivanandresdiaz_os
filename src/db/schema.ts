@@ -36,6 +36,8 @@ export const principleReferences = pgTable("principle_references", {
   contentType: text("content_type").notNull(),
   /** Shown only for audios, which have nothing to look at. */
   title: text("title"),
+  /** The post it came from, when it came from a Clip. */
+  sourceUrl: text("source_url"),
   sizeBytes: integer("size_bytes").notNull(),
   position: integer("position").notNull(),
   createdAt: createdAt(),
@@ -476,3 +478,105 @@ export const vaultSecrets = pgTable("vault_secrets", {
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * A link saved to use later, with its file once downloaded (docs/adr/0004).
+ * `run` names the current download; its file and result live under keys made
+ * from it, so a Retry never reads an older run's result. `title` stays null
+ * until the download names it or Ivan does.
+ */
+export const clips = pgTable(
+  "clips",
+  {
+    id: id(),
+    url: text("url").notNull().unique(),
+    source: text("source").notNull(),
+    title: text("title"),
+    status: text("status").notNull(),
+    run: uuid("run"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    key: text("key"),
+    contentType: text("content_type"),
+    sizeBytes: integer("size_bytes"),
+    durationS: integer("duration_s"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("clips_source", sql`${t.source} in ('instagram', 'youtube')`),
+    check("clips_status", sql`${t.status} in ('link', 'downloading', 'ready', 'failed')`),
+  ],
+);
+
+export const learningPathStatus = pgEnum("learning_path_status", ["candidate", "active", "done", "dropped"]);
+
+/**
+ * Something Ivan chose to learn, with a reason (a course, a book). Its lessons
+ * live in Obsidian; `link` opens them. A Candidate needs only its title; an
+ * Active one has its why now and its Infinite Games.
+ */
+export const learningPaths = pgTable("learning_paths", {
+  id: id(),
+  title: text("title").notNull(),
+  whyNow: text("why_now").notNull().default(""),
+  games: games(),
+  status: learningPathStatus("status").notNull().default("candidate"),
+  /** The Container Block type it is played in. */
+  blockTypeId: uuid("block_type_id").references(() => blockTypes.id, { onDelete: "set null" }),
+  /** An obsidian:// or web link to its notes; empty = none. */
+  link: text("link").notNull().default(""),
+  /** Ivan's priority among the Candidates. */
+  position: integer("position").notNull().default(0),
+  /** When it last became Done or Dropped. */
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+/** The Campaigns a Learning Path serves: any number, or none. */
+export const learningPathCampaigns = pgTable(
+  "learning_path_campaigns",
+  {
+    pathId: uuid("path_id")
+      .notNull()
+      .references(() => learningPaths.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+  },
+  (t) => [unique().on(t.pathId, t.campaignId)],
+);
+
+/** The part of a Learning Path planned for one week. */
+export const chapters = pgTable("chapters", {
+  id: id(),
+  pathId: uuid("path_id")
+    .notNull()
+    .references(() => learningPaths.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  /** An obsidian:// or web link to its lessons; empty = none. */
+  link: text("link").notNull().default(""),
+  /** Monday of the week it was chosen for; null = not chosen. */
+  weekOf: isoDate("week_of"),
+  doneAt: timestamp("done_at", { withTimezone: true }),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+/** Free curiosity with an end date. Open while it has no verdict; only one is open at a time. */
+export const explorations = pgTable(
+  "explorations",
+  {
+    id: id(),
+    title: text("title").notNull(),
+    startedOn: isoDate("started_on").notNull(),
+    endsOn: isoDate("ends_on").notNull(),
+    /** "path": it became a Candidate; "drop": let go. */
+    verdict: text("verdict"),
+    endedOn: isoDate("ended_on"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("explorations_verdict", sql`${t.verdict} is null or ${t.verdict} in ('path', 'drop')`),
+    check("explorations_ended", sql`(${t.verdict} is null) = (${t.endedOn} is null)`),
+  ],
+);

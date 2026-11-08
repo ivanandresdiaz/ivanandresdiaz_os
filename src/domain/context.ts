@@ -41,6 +41,20 @@ export type ContextCampaign = {
   moves: ContextMove[];
 };
 
+/** A Learning Path (or the open Exploration) as a Context tells it. Its lessons live in Obsidian. */
+export type ContextLearningPath = {
+  id: string;
+  title: string;
+  status: "active" | "candidate" | "done" | "exploration";
+  whyNow: string;
+  games: readonly string[];
+  block: string | null;
+  campaigns: string[];
+  chapters: { title: string; done: boolean; weekOf: IsoDate | null }[];
+  /** Only for the Exploration. */
+  endsOn?: IsoDate;
+};
+
 /** Everything a Context can be made of, as Ivan OS holds it today. Lists run newest first. */
 export type ContextSource = {
   today: IsoDate;
@@ -61,6 +75,8 @@ export type ContextSource = {
   learning: { id: string; date: IsoDate; title: string; expansion: string }[];
   reviews: { weekOf: IsoDate; feltScore: number; notes: string; moves: string[] }[];
   structure: { weekday: Weekday; startMin: number; endMin: number; type: string; kind: "habit" | "container" }[];
+  /** Active first, then the Exploration, the Candidates in priority and the Done ones. Dropped ones stay out. */
+  learningPaths: ContextLearningPath[];
 };
 
 export const CONTEXT_CATEGORIES = [
@@ -71,6 +87,7 @@ export const CONTEXT_CATEGORIES = [
   { key: "week", label: "This week" },
   { key: "backlog", label: "Backlog" },
   { key: "past", label: "Past Campaigns" },
+  { key: "paths", label: "Learning Paths" },
   { key: "journals", label: "Journals" },
   { key: "learning", label: "Learning entries" },
   { key: "reviews", label: "Weekly Reviews" },
@@ -171,6 +188,13 @@ export function contextItems(source: ContextSource, key: ContextCategory): Conte
           detail: [c.status === "done" ? "Done" : "Dropped", c.quarter].filter(Boolean).join(" · "),
           text: campaignText(c),
         }));
+    case "paths":
+      return source.learningPaths.map((p) => ({
+        id: p.id,
+        label: p.title,
+        detail: PATH_STATUS[p.status],
+        text: [p.title, p.whyNow, ...p.chapters.map((c) => c.title)].join("\n"),
+      }));
     case "journals":
       return source.journals.map((j) => ({ id: j.date, label: j.date, detail: firstLine(j.text), text: j.text }));
     case "learning":
@@ -190,6 +214,34 @@ export function contextItems(source: ContextSource, key: ContextCategory): Conte
     default:
       return [];
   }
+}
+
+const PATH_STATUS: Record<ContextLearningPath["status"], string> = {
+  active: "Active",
+  exploration: "Exploration",
+  candidate: "Candidate",
+  done: "Done",
+};
+
+const PATH_ORDER: ContextLearningPath["status"][] = ["active", "exploration", "candidate", "done"];
+
+function pathBlock(p: ContextLearningPath): string {
+  const facts = [
+    p.status === "exploration" ? `Exploration, ends on ${p.endsOn}` : PATH_STATUS[p.status],
+    p.block && `played in ${p.block} Blocks`,
+    p.games.length > 0 && `Infinite Games: ${p.games.join(", ")}`,
+    p.campaigns.length > 0 && `serves ${p.campaigns.map((c) => `"${c}"`).join(", ")}`,
+  ].filter(Boolean);
+  const parts = [`### ${p.title}`, facts.join(" · ")];
+  if (p.whyNow.trim()) parts.push(`**Why now:** ${nest(p.whyNow, 3)}`);
+  if (p.chapters.length > 0) {
+    const done = p.chapters.filter((c) => c.done).length;
+    const lines = p.chapters.map(
+      (c) => `- ${box(c.done)} ${c.title}${c.weekOf && !c.done ? ` (week of ${c.weekOf})` : ""}`,
+    );
+    parts.push(`Chapters (${done}/${p.chapters.length} done):\n\n${lines.join("\n")}`);
+  }
+  return parts.join("\n\n");
 }
 
 function campaignText(c: ContextCampaign): string {
@@ -428,6 +480,20 @@ export function renderContext(source: ContextSource, selection: ContextSelection
     const ids = pickedIds("past");
     const past = source.campaigns.filter((c) => (c.status === "done" || c.status === "dropped") && ids.has(c.id));
     sections.push(["## Past Campaigns", ...past.map((c) => campaignBlock(c, 3))].join("\n\n"));
+  }
+
+  if (picked("paths").length > 0) {
+    const ids = pickedIds("paths");
+    const paths = PATH_ORDER.flatMap((status) =>
+      source.learningPaths.filter((p) => p.status === status && ids.has(p.id)),
+    );
+    sections.push(
+      [
+        "## Learning Paths",
+        "What I chose to learn and why now. At most 2 are Active at once; the lessons live in my Obsidian vault.",
+        ...paths.map(pathBlock),
+      ].join("\n\n"),
+    );
   }
 
   if (picked("journals").length > 0) {

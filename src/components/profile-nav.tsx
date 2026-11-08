@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 
 const OPTIONS = [
   { href: "/os/profile/context", label: "Context" },
+  { href: "/os/profile/clips", label: "Clips" },
   { href: "/os/profile/vaults", label: "Vaults" },
 ];
 
@@ -18,28 +19,27 @@ const optionClass = (active: boolean) =>
  * The Profile's options: a vertical sidebar on a computer, a row of tabs on a
  * phone. Sign out is the last option and always asks first.
  */
-export function ProfileNav({ email, logout }: { email: string | null; logout: () => Promise<void> }) {
+type NavProps = {
+  email: string | null;
+  /** How many Clips wait in the bank; null until known. */
+  clips: number | null;
+  logout: () => Promise<void>;
+};
+
+export function ProfileNav(props: NavProps) {
   // The pathname is unknown while prerendering: show the options without the current one until it is.
   return (
-    <Suspense fallback={<Nav email={email} logout={logout} pathname={null} />}>
-      <CurrentNav email={email} logout={logout} />
+    <Suspense fallback={<Nav {...props} pathname={null} />}>
+      <CurrentNav {...props} />
     </Suspense>
   );
 }
 
-function CurrentNav(props: { email: string | null; logout: () => Promise<void> }) {
+function CurrentNav(props: NavProps) {
   return <Nav {...props} pathname={usePathname()} />;
 }
 
-function Nav({
-  email,
-  logout,
-  pathname,
-}: {
-  email: string | null;
-  logout: () => Promise<void>;
-  pathname: string | null;
-}) {
+function Nav({ email, clips, logout, pathname }: NavProps & { pathname: string | null }) {
   const [asking, setAsking] = useState(false);
 
   return (
@@ -58,6 +58,11 @@ function Nav({
             className={optionClass(active)}
           >
             {option.label}
+            {option.label === "Clips" && !!clips && (
+              <span className="ml-2 text-xs text-muted tabular-nums" aria-label={`${clips} waiting`}>
+                {clips}
+              </span>
+            )}
           </Link>
         );
       })}

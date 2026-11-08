@@ -2,6 +2,8 @@ import Link from "next/link";
 import { addDays, quarterLabel, startOfWeek } from "@/domain/dates";
 import { nextReviewDay, type OpenReview, type ReviewMove, type ReviewStep } from "@/domain/reviews";
 import { setMoveWeek } from "@/server/actions";
+import { setChapterWeek } from "@/server/learning-path-actions";
+import { getChapterChoices, getChaptersOfWeek, type WeekChapter } from "@/server/learning-paths";
 import {
   getLookBack,
   getMoveChoices,
@@ -43,7 +45,7 @@ export async function ReviewPanel({
   }
   if (step === "choose" && pending) {
     return (
-      <ReviewFrame heading="Weekly Review" subheading={`Choose Moves · Week of ${pending.plans}`} close={close}>
+      <ReviewFrame heading="Weekly Review" subheading={`Choose Moves and Chapters · Week of ${pending.plans}`} close={close}>
         <ChooseMoves review={pending} today={today} />
         {history}
       </ReviewFrame>
@@ -72,6 +74,7 @@ async function LookBack({ week, plans }: { week: string; plans: string }) {
         <h3 className="label">Moves of this week</h3>
         {moves.length === 0 ? <Empty>No Moves were chosen for this week.</Empty> : <MoveList moves={moves} />}
       </div>
+      <WeekChapters week={week} />
       <Link href={`/os/week/${plans}?review=choose`} className="btn-primary self-start">
         Next →
       </Link>
@@ -132,8 +135,106 @@ async function ChooseMoves({ review, today }: { review: OpenReview; today: strin
           </div>
         ))
       )}
+      <ChooseChapters plans={review.plans} today={today} />
       <FinishReview week={review.week} plans={review.plans} />
     </>
+  );
+}
+
+/** The Chapters chosen for a week, as the Look back shows them. */
+async function WeekChapters({ week }: { week: string }) {
+  const chapters = await getChaptersOfWeek(week);
+  if (chapters.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <h3 className="label">Chapters of this week</h3>
+      <ChapterResults chapters={chapters} />
+    </div>
+  );
+}
+
+function ChapterResults({ chapters }: { chapters: WeekChapter[] }) {
+  return (
+    <ul className="flex flex-col gap-1 text-sm">
+      {chapters.map((c) => (
+        <li key={c.id} className="flex gap-2">
+          <span className={`w-4 shrink-0 ${c.done ? "" : "text-muted"}`} aria-label={c.done ? "Done" : "Not done"}>
+            {c.done ? "✓" : "○"}
+          </span>
+          <span className={`min-w-0 flex-1 break-words ${c.done ? "" : "text-muted"}`}>
+            {c.title} <span className="text-xs text-muted">· {c.pathTitle}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** After the Moves: the Chapter each Active Learning Path works on next week. */
+async function ChooseChapters({ plans, today }: { plans: string; today: string }) {
+  const paths = await getChapterChoices();
+  const thisWeek = startOfWeek(today);
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <div>
+        <h3 className="text-sm font-medium">Learning Paths</h3>
+        <p className="text-xs text-muted">Choose the Chapter each Active Path covers next week.</p>
+      </div>
+      {paths.length === 0 ? (
+        <Empty>
+          No Active Learning Path.{" "}
+          <Link href="/os/learning" className="underline">
+            Activate one
+          </Link>
+          .
+        </Empty>
+      ) : (
+        paths.map((path) => (
+          <div key={path.id} className="flex flex-col gap-1.5">
+            <div>
+              <h4 className="text-sm">{path.title}</h4>
+              {path.block && <p className="text-xs text-muted">Played in {path.block.name}</p>}
+            </div>
+            {path.chapters.length === 0 ? (
+              <Empty>
+                No open Chapters.{" "}
+                <Link href="/os/learning" className="underline">
+                  Add one
+                </Link>
+                .
+              </Empty>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {path.chapters.map((chapter, index) => {
+                  const chosen = chapter.weekOf === plans;
+                  return (
+                    <li key={chapter.id} className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-sm">
+                      <span className="min-w-0 flex-1 break-words">
+                        {chapter.title}
+                        {index === 0 && <span className="ml-2 text-[11px] text-accent">next</span>}
+                      </span>
+                      {chapter.weekOf && !chosen && (
+                        <WeekChip label={chapter.weekOf === thisWeek ? "This week" : `Week of ${chapter.weekOf}`} now={false} />
+                      )}
+                      <form action={setChapterWeek}>
+                        <Hidden id={chapter.id} weekOf={chosen ? "" : plans} />
+                        <button
+                          className={`shrink-0 text-xs hover:underline ${chosen ? "font-medium" : "text-muted"}`}
+                          title={chosen ? `Unchoose ${chapter.title}` : `Choose ${chapter.title}`}
+                          aria-pressed={chosen}
+                        >
+                          {chosen ? "✓ Chosen" : "Choose"}
+                        </button>
+                      </form>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 

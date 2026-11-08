@@ -329,6 +329,17 @@ export function StoryViewer({
           </div>
           <div className="pointer-events-auto flex items-center justify-end gap-4 text-lg leading-none">
             {paused && <span className="mr-auto text-xs text-white/70">Paused</span>}
+            {current.sourceUrl && (
+              <a
+                href={current.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setPaused(true)}
+                className="text-xs text-white/80 hover:text-white"
+              >
+                Open original ↗
+              </a>
+            )}
             {current.kind !== "image" && !failed && (
               <button
                 type="button"

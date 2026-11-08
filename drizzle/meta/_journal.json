@@ -120,6 +120,20 @@
       "when": 1794087380873,
       "tag": "0016_vaults",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794100434386,
+      "tag": "0017_clips",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794102565102,
+      "tag": "0018_learning_paths",
+      "breakpoints": true
     }
   ]
 }

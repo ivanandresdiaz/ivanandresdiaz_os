@@ -4,6 +4,7 @@ import { db } from "@/db";
 import * as s from "@/db/schema";
 import type { ContextSource, ContextTask } from "@/domain/context";
 import type { PassphraseRecord } from "@/domain/vault";
+import { getContextLearningPaths } from "./learning-paths";
 import {
   addDays,
   localMoment,
@@ -56,7 +57,15 @@ export async function getPrinciples() {
   return db.select().from(s.principles).orderBy(asc(s.principles.position));
 }
 
-export type ReferenceView = { id: string; kind: ReferenceKind; contentType: string; title: string; url: string };
+export type ReferenceView = {
+  id: string;
+  kind: ReferenceKind;
+  contentType: string;
+  title: string;
+  url: string;
+  /** The post it came from, for References that were Clips. */
+  sourceUrl: string | null;
+};
 export type PrincipleView = { id: string; title: string; body: string; references: ReferenceView[] };
 
 /** Principles with their References, each signed for viewing. */
@@ -77,6 +86,7 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
         contentType: r.contentType,
         title: r.title ?? "",
         url: await presignView(r.key),
+        sourceUrl: r.sourceUrl,
       },
     })),
   );
@@ -139,6 +149,7 @@ async function feedItems(ids: string[]): Promise<FeedItem[]> {
           contentType: r.contentType,
           title: r.title ?? "",
           url,
+          sourceUrl: r.sourceUrl,
           principleTitle: row.principleTitle,
         })),
       ];
@@ -1233,6 +1244,7 @@ export async function getContextSource(): Promise<ContextSource> {
     reviewRows,
     reviewMoveRows,
     structure,
+    learningPaths,
   ] = await Promise.all([
     getActiveSeason(),
     getQuarter(ref),
@@ -1265,6 +1277,7 @@ export async function getContextSource(): Promise<ContextSource> {
     db.select().from(s.weeklyReviews).orderBy(desc(s.weeklyReviews.weekOf)),
     db.select().from(s.reviewMoves).orderBy(asc(s.reviewMoves.position)),
     getStructureOn(date),
+    getContextLearningPaths(),
   ]);
 
   const goalTitle = new Map(goalRows.map((g) => [g.id, g.title]));
@@ -1331,6 +1344,7 @@ export async function getContextSource(): Promise<ContextSource> {
       const type = types.get(b.blockTypeId);
       return type ? [{ weekday: b.weekday, startMin: b.startMin, endMin: b.endMin, type: type.name, kind: type.kind }] : [];
     }),
+    learningPaths,
   };
 }
 

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Calendar } from "@/components/calendar";
+import { WeekChapters } from "@/components/learning-paths";
 import { Stack } from "@/components/stack";
 import { ReviewPanel } from "@/components/weekly-review";
 import { addDays, isIsoDate, monthOf, startOfWeek, weekDates } from "@/domain/dates";
 import { openReview, reviewStep } from "@/domain/reviews";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
+import { getChaptersOfWeek } from "@/server/learning-paths";
 import { getBlockTypes, getCalendar, getCalendarConnected, getStack, isReviewDone } from "@/server/queries";
 
 export default async function WeekPage({ params, searchParams }: PageProps<"/os/week/[date]">) {
@@ -19,12 +21,13 @@ export default async function WeekPage({ params, searchParams }: PageProps<"/os/
   const now = today();
   const dates = weekDates(monday);
   const open = openReview(now);
-  const [days, stack, blockTypes, calendarConnected, reviewDone] = await Promise.all([
+  const [days, stack, blockTypes, calendarConnected, reviewDone, chapters] = await Promise.all([
     getCalendar(dates),
     getStack(monday),
     getBlockTypes(),
     getCalendarConnected(),
     open ? isReviewDone(open.week) : false,
+    getChaptersOfWeek(monday),
   ]);
   const pending = open && !reviewDone ? open : null;
   const step = reviewStep(typeof review === "string" ? review : undefined, monday, pending);
@@ -75,6 +78,7 @@ export default async function WeekPage({ params, searchParams }: PageProps<"/os/
             loose={stack.loose}
             movesTitle={monday === addDays(startOfWeek(now), 7) ? "Next week's Moves" : undefined}
           />
+          <WeekChapters chapters={chapters} />
         </aside>
       </div>
     </>

@@ -24,6 +24,11 @@ describe("What a delete takes with it", () => {
     expect(describeDeletion({ secrets: 0 })).toBeNull();
   });
 
+  it("counts the Chapters that go with a Learning Path", () => {
+    expect(describeDeletion({ chapters: 11 })).toBe("Its 11 Chapters go too.");
+    expect(describeDeletion({ chapters: 1 })).toBe("Its 1 Chapter goes too.");
+  });
+
   it("tells that Campaigns stay when their Season Goal goes", () => {
     expect(describeDeletion({ campaigns: 1 })).toBe("1 Campaign stays, without this Season Goal.");
     expect(describeDeletion({ campaigns: 2 })).toBe("2 Campaigns stay, without this Season Goal.");

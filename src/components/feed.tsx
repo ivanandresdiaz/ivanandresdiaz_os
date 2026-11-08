@@ -522,6 +522,16 @@ function FeedPlayer({
           {Math.min(active + 1, items.length)} / {items.length}
           {paused && current && <span className="ml-2 text-xs text-white/60">Paused</span>}
         </span>
+        {current?.sourceUrl && (
+          <a
+            href={current.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="pointer-events-auto flex min-h-11 items-center text-xs text-white/80 hover:text-white"
+          >
+            Open original ↗
+          </a>
+        )}
         {current && current.kind !== "image" && (
           <button
             type="button"

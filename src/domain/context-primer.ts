@@ -24,4 +24,6 @@ export const OS_PRIMER = `Ivan OS is the system I use to run my life strategical
 
 **The rituals**: every day has a Daily Note: the **Check-in** in the morning (my goals, my Campaigns, the day's plan), the **Learning Log** during the day (quick ideas, reflections and things I learned), and the **Journal** at night (free self-reflection). Each day I star 1 to 3 **Highlights**: the scheduled work that is key to get done that day. A **Day Won** is a day with every Highlight done. On Sundays the **Weekly Review** looks back on the week, scores how aligned it felt from 1 to 10, and chooses next week's Moves.
 
+**Learning Paths**: what I chose to learn, with a reason: a course, a book, a technology. Each names why it matters now and its Infinite Games, and may serve Campaigns. At most 2 are Active at once; the rest wait as Candidates. A Path is made of **Chapters**, one planned per week in the Weekly Review. An **Exploration** is free curiosity with an end date, ending in a verdict: worth a Path, or drop it. The lessons themselves live in Obsidian.
+
 **Principles**: reminders of why I do what I do, to align my mind; not fixed rules. Each can have an Expansion that develops it.`;

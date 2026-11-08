@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePrinciple } from "@/server/actions";
 import type { PrincipleView } from "@/server/queries";
+import { ClipPicker } from "./clip-picker";
 import { LongText } from "./long-text";
 import { Markdown } from "./markdown";
 import { ReferenceStrip, ReferenceUploader } from "./references";
@@ -122,7 +123,12 @@ function Drawer({
             editing={mode === "edit"}
             onOpen={setStory}
           />
-          {mode === "edit" && <ReferenceUploader principleId={principle.id} />}
+          {mode === "edit" && (
+            <>
+              <ReferenceUploader principleId={principle.id} />
+              <ClipPicker principleId={principle.id} />
+            </>
+          )}
           {mode === "preview" ? (
             body.trim() ? (
               <Markdown>{body}</Markdown>

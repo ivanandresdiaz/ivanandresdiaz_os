@@ -80,6 +80,32 @@ const source: ContextSource = {
   ],
   reviews: [{ weekOf: "2026-11-02", feltScore: 7, notes: "Good focus.", moves: ["SSO login"] }],
   structure: [{ weekday: 1, startMin: 480, endMin: 720, type: "Deep work for the company", kind: "container" }],
+  learningPaths: [
+    {
+      id: "lp2",
+      title: "Fineract",
+      status: "candidate",
+      whyNow: "",
+      games: [],
+      block: null,
+      campaigns: [],
+      chapters: [],
+    },
+    {
+      id: "lp1",
+      title: "Bruno",
+      status: "active",
+      whyNow: "UIF needs its critical routes tested.",
+      games: ["Craft", "Wealth"],
+      block: "Strategic learning",
+      campaigns: ["Build Ivan OS"],
+      chapters: [
+        { title: "Collections", done: true, weekOf: "2026-10-26" },
+        { title: "Workflow testing", done: false, weekOf: "2026-11-02" },
+      ],
+    },
+    { id: "ex1", title: "Remotion", status: "exploration", whyNow: "", games: [], block: null, campaigns: [], chapters: [], endsOn: "2026-12-05" },
+  ],
 };
 
 const take = (selection: ContextSelection, key: Parameters<typeof toggleCategory>[2]) =>
@@ -219,6 +245,19 @@ describe("A Context", () => {
     const md = renderContext(withHeadings, { ...take(defaultSelection(), "journals"), topic: "## Plan\nHelp" });
     expect(md).toContain("### Saturday, 2026-11-07\n\n#### Morning\nCalm.\n```\n# a comment\n```");
     expect(md).toContain("## What I want to talk about\n\n#### Plan\nHelp");
+  });
+
+  it("tells the Learning Paths, Active first, with their why now and Chapters", () => {
+    const md = renderContext(source, take(defaultSelection(), "paths"));
+    expect(md).toContain("## Learning Paths");
+    expect(md).toContain(
+      '### Bruno\n\nActive · played in Strategic learning Blocks · Infinite Games: Craft, Wealth · serves "Build Ivan OS"',
+    );
+    expect(md).toContain("**Why now:** UIF needs its critical routes tested.");
+    expect(md).toContain("Chapters (1/2 done):\n\n- [x] Collections\n- [ ] Workflow testing (week of 2026-11-02)");
+    expect(md).toContain("### Remotion\n\nExploration, ends on 2026-12-05");
+    expect(md.indexOf("### Bruno")).toBeLessThan(md.indexOf("### Remotion"));
+    expect(md.indexOf("### Remotion")).toBeLessThan(md.indexOf("### Fineract"));
   });
 
   it("counts its words and roughly its tokens", () => {

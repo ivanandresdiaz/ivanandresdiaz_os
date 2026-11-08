@@ -43,8 +43,9 @@ async function presign(method: "GET" | "PUT", key: string, ttlSeconds: number, d
   return signed.url;
 }
 
-export function presignUpload(key: string) {
-  return presign("PUT", key, UPLOAD_TTL_SECONDS);
+/** A one-off upload link; a Clip download keeps its links for hours, across Cloud Run's retries. */
+export function presignUpload(key: string, ttlSeconds = UPLOAD_TTL_SECONDS) {
+  return presign("PUT", key, ttlSeconds);
 }
 
 export function presignView(key: string) {
@@ -73,4 +74,21 @@ export async function getObject(key: string): Promise<ArrayBuffer | null> {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`R2 GET failed: ${res.status}`);
   return res.arrayBuffer();
+}
+
+/** Copies an object inside the bucket (a Clip's file becoming a Reference's). */
+export async function copyObject(from: string, to: string) {
+  const { client, base } = config();
+  const bucket = process.env.R2_BUCKET as string;
+  const res = await client.fetch(objectUrl(base, to), {
+    method: "PUT",
+    headers: { "x-amz-copy-source": `/${bucket}/${from.split("/").map(encodeURIComponent).join("/")}` },
+  });
+  if (!res.ok) throw new Error(`R2 COPY failed: ${res.status}`);
+}
+
+/** The text of a stored object, or null when it does not exist. */
+export async function getText(key: string): Promise<string | null> {
+  const bytes = await getObject(key);
+  return bytes && new TextDecoder().decode(bytes);
 }

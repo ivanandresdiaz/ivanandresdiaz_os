@@ -318,6 +318,7 @@ Origen: la página Plan es larga y obliga a hacer scroll (el texto de la Season,
 - English Coach que lee en voz alta (TTS); historial de errores de inglés
 - Dictation en vivo: el texto aparece mientras hablo (hoy aparece al terminar)
 - "Pill of the day" (modelos mentales de Obsidian en el check-in)
+- Learning Path (nombre de trabajo; no es el Roadmap, que es la vista del Quarter): "quiero aprender LangGraph" con un camino para ir clicando. Recibe Clips, también los que son solo enlace (2026-11-07)
 
 ## Rebanada 1 — construida (2026-10-30)
 

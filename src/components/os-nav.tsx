@@ -10,6 +10,7 @@ const NAV = [
   { href: "/os/focus", label: "Focus", also: [] },
   { href: "/os/feed", label: "Feed", also: [] },
   { href: "/os/plan", label: "Plan", also: ["/os/campaigns"] },
+  { href: "/os/learning", label: "Learning", also: [] },
   { href: "/os/structure", label: "Structure", also: [] },
   { href: "/os/principles", label: "Principles", also: [] },
 ];
