@@ -67,7 +67,15 @@ To get `cookies.txt` (about 2 minutes, also when the session expires):
 
 ## YouTube
 
-YouTube blocks Cloud Run ("Sign in to confirm you're not a bot"), tested 2026-11-07.
-So YouTube Clips stay links: `YOUTUBE_DOWNLOADS` in `src/domain/clips.ts` is off.
-The worker already handles YouTube; turning it on needs a way past the block
-(cookies of a throwaway Google account, or a residential proxy).
+YouTube blocks Cloud Run ("Sign in to confirm you're not a bot"), tested 2026-11-07,
+but not Ivan's home connection. So a YouTube Clip downloads on his computer: pressing
+Download marks it `waiting` and leaves a marker at `clips/waiting/<clip id>` in R2.
+`scripts/clips-home.mjs` runs every minute: it writes `clips/computer.json`
+(`{ checkedAt }`, which the Clips page shows), lists the markers, and only when there
+is one opens Neon, claims the Clip and runs this same `download.py` with `uv` (no
+Docker needed). Looking in R2 instead of Neon lets Neon sleep while nothing waits.
+
+- Install the timer once (every minute, while logged in): `scripts/install-clips-home.sh`
+- Run it by hand: `pnpm clips:home`
+- Logs: `journalctl --user -u ivan-os-clips -f`
+- It uses `DATABASE_URL_PROD_MIGRATE` and the `R2_*` keys from `.env`.

@@ -6,13 +6,14 @@ Ivan OS sigue en Vercel con Neon; lo único que corre aparte es la descarga de l
 
 - **Descargar dentro de Vercel**: yt-dlp y ffmpeg no caben bien en una función (tamaño del paquete, límites de tiempo), y un video largo no termina a tiempo.
 - **Mover Ivan OS a Railway** y montar ahí microservicios: rehacer el despliegue, el login, los dominios y los cron sin ganar nada para la app. Un servicio aparte nace solo cuando un trabajo lo pide; este es el primero.
-- **Un worker en el computador de Ivan**: su IP de casa es la que menos bloquean YouTube e Instagram, pero solo descarga mientras el computador está prendido, y el Clip debe bajarse solo, sin pensar en eso.
+- **Un worker en el computador de Ivan**: su IP de casa es la que menos bloquean YouTube e Instagram, pero solo descarga mientras el computador está prendido, y un reel debe bajarse solo, sin pensar en eso. Se quedó solo para YouTube, que bloquea a Cloud Run.
 - **Cobalt** (descargador de código abierto con API, autoalojado): resuelve lo mismo, pero sigue en una IP de datacenter y es otro servicio que mantener vivo.
 - **Que el Job avise a Ivan OS al terminar** (un endpoint con firma): sería inmediato, pero abre una puerta pública y no funciona en local. Leer el resultado de R2 al mirar los Clips basta, porque nadie espera mirando.
 
 ## Consequences
 
 - Ivan OS lanza el Job con la llave de una cuenta de servicio que solo puede ejecutar ese Job. El Job corre con otra cuenta sin ningún rol.
-- Las IP de Google Cloud son de datacenter. Probado el 2026-11-07: YouTube las bloquea ("confirm you're not a bot"), así que sus Clips quedan solo como enlace; Instagram descarga sin sesión, pero a ratos pide login, y por eso cada descarga se reintenta dos veces antes de darse por fallida.
+- Las IP de Google Cloud son de datacenter. Probado el 2026-11-07: YouTube las bloquea ("confirm you're not a bot"), pero no la conexión de la casa de Ivan. Por eso un video de YouTube que Ivan pide descargar espera a su computador: un timer de systemd corre `scripts/clips-home.mjs` cada minuto, toma los Clips en espera y corre el mismo `download.py`. El computador no le pregunta a Neon: busca en R2 la marca que deja el botón Download y solo abre la base de datos cuando hay una, porque una consulta cada minuto no dejaría dormir a Neon y gastaría horas de cómputo. En cada vuelta deja en R2 la hora en que miró, y así un Clip en espera puede decir si el computador está prendido. Se descartaron las cookies de una cuenta de Google desechable (riesgo de bloqueo y una cuenta nueva cada vez) y un proxy residencial (de pago).
+- Instagram descarga sin sesión desde Cloud Run, pero a ratos pide login, y por eso cada descarga se reintenta dos veces antes de darse por fallida.
 - Si Instagram insiste, se le da la sesión de una cuenta desechable, nunca la principal; Instagram puede cerrarla o bloquearla, y renovarla es un paso manual descrito en `worker/clips/README.md`.
 - Cada intento escribe con las llaves de su propia corrida, así que un Retry nunca lee el resultado de una corrida anterior.
