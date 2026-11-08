@@ -494,6 +494,8 @@ export const clips = pgTable(
     title: text("title"),
     status: text("status").notNull(),
     run: uuid("run"),
+    /** The try now running: 0, or 1 and 2 for Cloud Run's retries. */
+    attempt: smallint("attempt").notNull().default(0),
     startedAt: timestamp("started_at", { withTimezone: true }),
     key: text("key"),
     contentType: text("content_type"),
@@ -504,7 +506,7 @@ export const clips = pgTable(
   },
   (t) => [
     check("clips_source", sql`${t.source} in ('instagram', 'youtube')`),
-    check("clips_status", sql`${t.status} in ('link', 'downloading', 'ready', 'failed')`),
+    check("clips_status", sql`${t.status} in ('link', 'waiting', 'downloading', 'ready', 'failed')`),
   ],
 );
 

@@ -21,8 +21,8 @@ const optionClass = (active: boolean) =>
  */
 type NavProps = {
   email: string | null;
-  /** How many Clips wait in the bank; null until known. */
-  clips: number | null;
+  /** How many Clips wait in the bank, and how many have their file; null until known. */
+  clips: { total: number; ready: number } | null;
   logout: () => Promise<void>;
 };
 
@@ -58,9 +58,10 @@ function Nav({ email, clips, logout, pathname }: NavProps & { pathname: string |
             className={optionClass(active)}
           >
             {option.label}
-            {option.label === "Clips" && !!clips && (
-              <span className="ml-2 text-xs text-muted tabular-nums" aria-label={`${clips} waiting`}>
-                {clips}
+            {option.label === "Clips" && !!clips?.total && (
+              <span className="ml-2 text-xs text-muted tabular-nums">
+                {clips.total}
+                {clips.ready > 0 && <span className="text-accent"> · {clips.ready} ready</span>}
               </span>
             )}
           </Link>

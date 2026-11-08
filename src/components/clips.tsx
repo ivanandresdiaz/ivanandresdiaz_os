@@ -1,15 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
-import { canDownload, MAX_CLIP_TITLE, type ClipSource } from "@/domain/clips";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { computerLabel, inFlightLabel, MAX_CLIP_TITLE, type ClipSource } from "@/domain/clips";
 import { formatClock } from "@/domain/references";
 import { addClip, deleteClip, downloadClip, moveClipToPrinciple, renameClip } from "@/server/clip-actions";
 import type { ClipView } from "@/server/clips";
 import { ConfirmDelete } from "./confirm-delete";
+import { useNow } from "./use-now";
 
-/** How often Clips look again while something downloads. */
+/** How often Clips look again while something downloads, or waits for the computer to start it. */
 const POLL_MS = 5000;
+const WAITING_POLL_MS = 30_000;
 
 type Filter = "all" | ClipSource;
 const FILTERS: { value: Filter; label: string }[] = [
@@ -18,17 +20,35 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "youtube", label: "YouTube" },
 ];
 
-export function Clips({ clips, principles }: { clips: ClipView[]; principles: { id: string; title: string }[] }) {
+export function Clips({
+  clips,
+  principles,
+  computerCheckedAt,
+}: {
+  clips: ClipView[];
+  principles: { id: string; title: string }[];
+  /** When Ivan's computer last looked for waiting Clips; only known while one waits. */
+  computerCheckedAt: string | null;
+}) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const downloading = clips.some((clip) => clip.status === "downloading");
+  const waiting = clips.some((clip) => clip.status === "waiting");
   const shown = filter === "all" ? clips : clips.filter((clip) => clip.source === filter);
 
+  // The sidebar counts in the same render the page finishes a download in, so it
+  // can miss it: one more look once the last download ends brings it up to date.
+  const wasDownloading = useRef(downloading);
   useEffect(() => {
-    if (!downloading) return;
-    const timer = window.setInterval(() => router.refresh(), POLL_MS);
-    return () => window.clearInterval(timer);
+    if (wasDownloading.current && !downloading) router.refresh();
+    wasDownloading.current = downloading;
   }, [downloading, router]);
+
+  useEffect(() => {
+    if (!downloading && !waiting) return;
+    const timer = window.setInterval(() => router.refresh(), downloading ? POLL_MS : WAITING_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [downloading, waiting, router]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -55,7 +75,7 @@ export function Clips({ clips, principles }: { clips: ClipView[]; principles: { 
       ) : (
         <ul className="flex flex-col gap-2">
           {shown.map((clip) => (
-            <ClipRow key={clip.id} clip={clip} principles={principles} />
+            <ClipRow key={clip.id} clip={clip} principles={principles} computerCheckedAt={computerCheckedAt} />
           ))}
         </ul>
       )}
@@ -101,13 +121,22 @@ function AddClip() {
         </button>
       </div>
       <p aria-live="polite" className={`text-xs ${message ? "text-red-600" : "text-muted"}`}>
-        {message ?? "Reels download by themselves. YouTube videos stay a link, for now."}
+        {message ?? "Reels download by themselves. A YouTube video downloads on your computer when you ask."}
       </p>
+      <p className="text-xs text-muted">Downloads keep going if you leave this page.</p>
     </form>
   );
 }
 
-function ClipRow({ clip, principles }: { clip: ClipView; principles: { id: string; title: string }[] }) {
+function ClipRow({
+  clip,
+  principles,
+  computerCheckedAt,
+}: {
+  clip: ClipView;
+  principles: { id: string; title: string }[];
+  computerCheckedAt: string | null;
+}) {
   const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -161,7 +190,12 @@ function ClipRow({ clip, principles }: { clip: ClipView; principles: { id: strin
           {facts.join(" · ")}
           {clip.status === "link" && " · Link only"}
         </p>
-        <Status clip={clip} pending={pending} onDownload={() => run(() => downloadClip({ id: clip.id }))} />
+        <Status
+          clip={clip}
+          computerCheckedAt={computerCheckedAt}
+          pending={pending}
+          onDownload={() => run(() => downloadClip({ id: clip.id }))}
+        />
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <a href={clip.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
             Open original ↗
@@ -186,10 +220,19 @@ function ClipRow({ clip, principles }: { clip: ClipView; principles: { id: strin
   );
 }
 
-function Status({ clip, pending, onDownload }: { clip: ClipView; pending: boolean; onDownload: () => void }) {
-  if (clip.status === "downloading") {
-    return <p className="animate-pulse text-xs text-muted motion-reduce:animate-none">Downloading…</p>;
-  }
+function Status({
+  clip,
+  computerCheckedAt,
+  pending,
+  onDownload,
+}: {
+  clip: ClipView;
+  computerCheckedAt: string | null;
+  pending: boolean;
+  onDownload: () => void;
+}) {
+  if (clip.status === "waiting") return <Waiting computerCheckedAt={computerCheckedAt} />;
+  if (clip.status === "downloading") return <InFlight clip={clip} />;
   if (clip.status === "failed") {
     return (
       <p className="flex flex-wrap items-center gap-2 text-xs">
@@ -201,11 +244,10 @@ function Status({ clip, pending, onDownload }: { clip: ClipView; pending: boolea
     );
   }
   if (clip.status === "link") {
-    if (!clip.error && !canDownload(clip.source)) return null;
     return (
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
         {clip.error && <span>{clip.error}</span>}
-        {canDownload(clip.source) && !clip.error && (
+        {!clip.error && (
           <button type="button" className="btn py-0.5 text-xs" disabled={pending} onClick={onDownload}>
             Download
           </button>
@@ -214,6 +256,41 @@ function Status({ clip, pending, onDownload }: { clip: ClipView; pending: boolea
     );
   }
   return null;
+}
+
+/** Where the download runs, which try, and a time that ticks. */
+function InFlight({ clip }: { clip: ClipView }) {
+  const now = useNow(1000);
+  const label = now
+    ? inFlightLabel(
+        { source: clip.source, attempt: clip.attempt, startedAt: clip.startedAt ? new Date(clip.startedAt) : null },
+        now,
+      )
+    : "Downloading…";
+  return (
+    <p className="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
+      <span className="size-1.5 animate-pulse rounded-full bg-accent motion-reduce:animate-none" aria-hidden />
+      {label}
+    </p>
+  );
+}
+
+/** A YouTube video waiting for the computer, and whether the computer is around to take it. */
+function Waiting({ computerCheckedAt }: { computerCheckedAt: string | null }) {
+  const now = useNow(15_000);
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-muted">
+      <p>Waiting for your computer</p>
+      {now && <p>{computerLabel(computerCheckedAt ? new Date(computerCheckedAt) : null, now, momentLabel)}</p>}
+    </div>
+  );
+}
+
+/** `6:40 PM` today, `Nov 6, 6:40 PM` before. */
+function momentLabel(at: Date): string {
+  const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (at.toDateString() === new Date().toDateString()) return time;
+  return `${at.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
 }
 
 function Thumbnail({ clip }: { clip: ClipView }) {

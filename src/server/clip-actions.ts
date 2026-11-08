@@ -6,9 +6,11 @@ import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import {
-  canDownload,
+  downloadPlace,
+  downloadsOnSave,
   clipFileKey,
   clipResultKey,
+  clipWaitingKey,
   LINK_PROBLEM_TEXT,
   MAX_CLIP_SECONDS,
   MAX_CLIP_TITLE,
@@ -17,7 +19,7 @@ import {
 } from "@/domain/clips";
 import { referenceKey } from "@/domain/references";
 import { startClipRun } from "@/lib/clip-runner";
-import { copyObject, deleteObject, presignUpload } from "@/lib/r2";
+import { copyObject, deleteObject, presignUpload, putText } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { getReadyClips, type ClipView } from "./clips";
 
@@ -53,7 +55,7 @@ async function startDownload(clipId: string, url: string) {
   ]);
   await db
     .update(s.clips)
-    .set({ status: "downloading", run, startedAt: new Date(), error: null, key: null })
+    .set({ status: "downloading", run, attempt: 0, startedAt: new Date(), error: null, key: null })
     .where(eq(s.clips.id, clipId));
   try {
     await startClipRun({ url, fileUploadUrl, resultUploadUrl, maxSeconds: MAX_CLIP_SECONDS });
@@ -89,12 +91,15 @@ export async function addClip(input: { link: string }): Promise<AddClipResult> {
     .returning({ id: s.clips.id });
   if (!clip) return { ok: false, message: "Already in Clips." };
 
-  if (canDownload(parsed.source)) await startDownload(clip.id, parsed.url);
+  if (downloadsOnSave(parsed.source)) await startDownload(clip.id, parsed.url);
   await done();
   return { ok: true };
 }
 
-/** Retry after a failure, or download a Clip saved as a link. */
+/**
+ * Retry after a failure, or download a Clip saved as a link. A reel goes to
+ * Cloud Run now; a YouTube video waits for Ivan's computer to pick it up.
+ */
 export async function downloadClip(input: { id: string }) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse(input);
@@ -102,8 +107,17 @@ export async function downloadClip(input: { id: string }) {
     .select()
     .from(s.clips)
     .where(and(eq(s.clips.id, id), inArray(s.clips.status, ["failed", "link"])));
-  if (!clip || !canDownload(clip.source as ClipSource)) return;
-  await startDownload(clip.id, clip.url);
+  if (!clip) return;
+  if (downloadPlace(clip.source as ClipSource) === "computer") {
+    await db
+      .update(s.clips)
+      .set({ status: "waiting", error: null, run: null, attempt: 0, startedAt: null, key: null })
+      .where(eq(s.clips.id, clip.id));
+    // The computer looks only for this marker, so Neon can sleep while nothing waits.
+    await putText(clipWaitingKey(clip.id), "");
+  } else {
+    await startDownload(clip.id, clip.url);
+  }
   await done();
 }
 
@@ -123,6 +137,7 @@ export async function deleteClip(fd: FormData) {
     clip.key && deleteObject(clip.key),
     clip.run && deleteObject(clipFileKey(clip.id, clip.run)),
     clip.run && deleteObject(clipResultKey(clip.id, clip.run)),
+    clip.status === "waiting" && deleteObject(clipWaitingKey(clip.id)),
   ]);
   await done();
 }

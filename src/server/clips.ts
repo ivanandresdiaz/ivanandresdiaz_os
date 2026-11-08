@@ -6,6 +6,8 @@ import * as s from "@/db/schema";
 import {
   clipFileKey,
   clipResultKey,
+  COMPUTER_CHECK_KEY,
+  downloadPlace,
   fallbackClipTitle,
   settleClip,
   youtubeIdOf,
@@ -13,6 +15,7 @@ import {
   type ClipResult,
   type ClipSource,
   type ClipStatus,
+  type DownloadPlace,
 } from "@/domain/clips";
 import { deleteObject, getText, objectSize, presignView } from "@/lib/r2";
 
@@ -23,6 +26,12 @@ export type ClipView = {
   /** What to show: Ivan's title, the post's, or what it is. */
   title: string;
   status: ClipStatus;
+  /** Where it downloads: Cloud Run, or Ivan's computer. */
+  place: DownloadPlace;
+  /** When the download running now started (ISO), for the time that ticks. */
+  startedAt: string | null;
+  /** The try now running: 0, or 1 and 2 for the retries. */
+  attempt: number;
   error: string | null;
   durationS: number | null;
   thumbnail: string | null;
@@ -73,8 +82,13 @@ export async function settleDownloads(now = new Date()) {
         }
       }
       const outcome = settleClip(parsed, clip.startedAt, now);
-      if (outcome.status === "downloading") return;
       const same = and(eq(s.clips.id, clip.id), eq(s.clips.run, clip.run), eq(s.clips.status, "downloading"));
+      if (outcome.status === "downloading") {
+        if (outcome.attempt !== null && outcome.attempt !== clip.attempt) {
+          await db.update(s.clips).set({ attempt: outcome.attempt }).where(same);
+        }
+        return;
+      }
 
       if (outcome.status === "ready") {
         const fileKey = clipFileKey(clip.id, clip.run);
@@ -132,6 +146,9 @@ async function clipView(row: typeof s.clips.$inferSelect): Promise<ClipView> {
     source,
     title: row.title ?? fallbackClipTitle(source),
     status: row.status as ClipStatus,
+    place: downloadPlace(source),
+    startedAt: row.startedAt?.toISOString() ?? null,
+    attempt: row.attempt,
     error: row.error,
     durationS: row.durationS,
     thumbnail: youtubeId ? youtubeThumbnail(youtubeId) : null,
@@ -139,8 +156,22 @@ async function clipView(row: typeof s.clips.$inferSelect): Promise<ClipView> {
   };
 }
 
-/** How many Clips wait in the bank. */
-export async function countClips(): Promise<number> {
-  const [row] = await db.select({ n: count() }).from(s.clips);
-  return row?.n ?? 0;
+/** How many Clips wait in the bank, and how many of them have their file. */
+export async function countClips(): Promise<{ total: number; ready: number }> {
+  const [row] = await db
+    .select({ total: count(), ready: count(sql`case when ${s.clips.status} = 'ready' then 1 end`) })
+    .from(s.clips);
+  return { total: row?.total ?? 0, ready: row?.ready ?? 0 };
+}
+
+/** When Ivan's computer last looked for waiting Clips (ISO), or null if it never did. */
+export async function getComputerCheckedAt(): Promise<string | null> {
+  const text = await getText(COMPUTER_CHECK_KEY);
+  if (!text) return null;
+  try {
+    const { checkedAt } = JSON.parse(text) as { checkedAt?: unknown };
+    return typeof checkedAt === "string" && !Number.isNaN(Date.parse(checkedAt)) ? checkedAt : null;
+  } catch {
+    return null;
+  }
 }

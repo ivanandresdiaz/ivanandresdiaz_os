@@ -1,0 +1,1 @@
+ALTER TABLE "clips" ADD COLUMN "attempt" smallint DEFAULT 0 NOT NULL;

@@ -1,0 +1,2 @@
+ALTER TABLE "clips" DROP CONSTRAINT "clips_status";--> statement-breakpoint
+ALTER TABLE "clips" ADD CONSTRAINT "clips_status" CHECK ("clips"."status" in ('link', 'waiting', 'downloading', 'ready', 'failed'));

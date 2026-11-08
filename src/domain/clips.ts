@@ -6,7 +6,8 @@
  */
 
 export type ClipSource = "instagram" | "youtube";
-export type ClipStatus = "link" | "downloading" | "ready" | "failed";
+/** `waiting`: a YouTube video asked to download, until Ivan's computer picks it up. */
+export type ClipStatus = "link" | "waiting" | "downloading" | "ready" | "failed";
 
 export const MAX_CLIP_TITLE = 200;
 
@@ -14,10 +15,15 @@ export const MAX_CLIP_TITLE = 200;
 export const MAX_CLIP_SECONDS = 30 * 60;
 
 /**
- * YouTube refuses Cloud Run ("Sign in to confirm you're not a bot"), so for now
- * a YouTube Clip stays a link. Turning this on brings back its Download button.
+ * Where a Clip downloads. YouTube refuses Cloud Run ("Sign in to confirm you're
+ * not a bot") but not Ivan's home connection, so a YouTube video waits for his
+ * computer (scripts/clips-home.mjs). See docs/adr/0004.
  */
-export const YOUTUBE_DOWNLOADS = false;
+export type DownloadPlace = "cloud" | "computer";
+
+export function downloadPlace(source: ClipSource): DownloadPlace {
+  return source === "youtube" ? "computer" : "cloud";
+}
 
 /** A first run and Cloud Run's two retries. */
 export const CLIP_ATTEMPTS = 3;
@@ -110,7 +116,8 @@ export type ClipResult =
     };
 
 export type ClipOutcome =
-  | { status: "downloading" }
+  /** `attempt`: the one now running, when a failed one says so (0 is the first). */
+  | { status: "downloading"; attempt: number | null }
   | { status: "ready"; title: string | null; durationS: number | null; contentType: string }
   | { status: "link" | "failed"; error: string; title: string | null; durationS: number | null };
 
@@ -127,7 +134,7 @@ export function settleClip(result: ClipResult | null, startedAt: Date, now: Date
     if (now.getTime() - startedAt.getTime() > CLIP_GIVE_UP_MS) {
       return { status: "failed", error: "The download never finished.", title: null, durationS: null };
     }
-    return { status: "downloading" };
+    return { status: "downloading", attempt: null };
   }
   if (result.ok) {
     return { status: "ready", title: result.title, durationS: result.durationS, contentType: result.contentType };
@@ -141,7 +148,8 @@ export function settleClip(result: ClipResult | null, startedAt: Date, now: Date
   if (result.reason === "unavailable") {
     return { status: "failed", error: "The post is gone or private.", title, durationS };
   }
-  if (!result.final && result.attempt < CLIP_ATTEMPTS - 1) return { status: "downloading" };
+  if (!result.final && result.attempt < CLIP_ATTEMPTS - 1)
+    return { status: "downloading", attempt: result.attempt + 1 };
   const error = REFUSED_TEXT[result.reason as keyof typeof REFUSED_TEXT] ?? "Couldn't download.";
   return { status: "failed", error, title, durationS };
 }
@@ -151,6 +159,58 @@ export function fallbackClipTitle(source: ClipSource): string {
   return source === "instagram" ? "Instagram reel" : "YouTube video";
 }
 
-export function canDownload(source: ClipSource): boolean {
-  return source === "instagram" || YOUTUBE_DOWNLOADS;
+/** A reel downloads as soon as it is saved; a YouTube video only when Ivan asks. */
+export function downloadsOnSave(source: ClipSource): boolean {
+  return source === "instagram";
+}
+
+/**
+ * Pressing Download on a YouTube Clip leaves this marker in R2. Ivan's computer
+ * looks only for markers, which costs nothing, and opens the database only when
+ * one is there, so Neon can sleep while the laptop is on.
+ */
+export const CLIP_WAITING_PREFIX = "clips/waiting/";
+export function clipWaitingKey(clipId: string): string {
+  return `${CLIP_WAITING_PREFIX}${clipId}`;
+}
+
+/** Ivan's computer leaves `{ checkedAt }` here every time it looks. */
+export const COMPUTER_CHECK_KEY = "clips/computer.json";
+
+/** How often the computer looks (scripts/install-clips-home.sh). */
+export const COMPUTER_CHECK_EVERY_MS = 60_000;
+
+/** Three missed looks: the computer is off, asleep, or logged out. */
+export function computerAway(checkedAt: Date | null, now: Date): boolean {
+  return !checkedAt || now.getTime() - checkedAt.getTime() > 3 * COMPUTER_CHECK_EVERY_MS;
+}
+
+/** `20 s`, `4 min`, `1 h 5 min`. */
+export function elapsedLabel(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s} s`;
+  const min = Math.floor(s / 60);
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${min % 60} min`;
+}
+
+/** What a Clip in flight says: where it runs, which try, and for how long. */
+export function inFlightLabel(
+  clip: { source: ClipSource; startedAt: Date | null; attempt: number },
+  now: Date,
+): string {
+  const where = downloadPlace(clip.source) === "computer" ? "on your computer" : "in the cloud";
+  const doing =
+    clip.attempt > 0 ? `Retrying ${where} (${clip.attempt + 1} of ${CLIP_ATTEMPTS})` : `Downloading ${where}`;
+  return clip.startedAt ? `${doing} · ${elapsedLabel(now.getTime() - clip.startedAt.getTime())}` : doing;
+}
+
+/** What a waiting Clip says about the computer it waits for. `time` formats a moment for Ivan. */
+export function computerLabel(checkedAt: Date | null, now: Date, time: (at: Date) => string): string {
+  if (!checkedAt) return "Your computer hasn't checked in yet.";
+  if (computerAway(checkedAt, now)) {
+    return `Your computer hasn't checked in since ${time(checkedAt)}. It downloads when it's back on.`;
+  }
+  const ago = now.getTime() - checkedAt.getTime();
+  return ago < 60_000 ? "Your computer checked just now." : `Your computer checked ${elapsedLabel(ago)} ago.`;
 }

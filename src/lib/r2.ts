@@ -92,3 +92,14 @@ export async function getText(key: string): Promise<string | null> {
   const bytes = await getObject(key);
   return bytes && new TextDecoder().decode(bytes);
 }
+
+/** Stores a small text object, such as a marker. */
+export async function putText(key: string, text: string, contentType = "text/plain") {
+  const { client, base } = config();
+  const res = await client.fetch(objectUrl(base, key), {
+    method: "PUT",
+    body: text,
+    headers: { "Content-Type": contentType },
+  });
+  if (!res.ok) throw new Error(`R2 PUT failed: ${res.status}`);
+}
