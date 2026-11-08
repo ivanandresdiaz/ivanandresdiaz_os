@@ -21,8 +21,8 @@ GCP_CLIPS_LAUNCHER_KEY=<base64 of the clips-launcher JSON key>
 
 ```sh
 cd worker/clips
-gcloud builds submit . --tag us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v3 --project andresdiaz --region us-central1
-gcloud run jobs deploy clips-download --image us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v3 --region us-central1 --project andresdiaz
+gcloud builds submit . --tag us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v4 --project andresdiaz --region us-central1
+gcloud run jobs deploy clips-download --image us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v4 --region us-central1 --project andresdiaz
 ```
 
 Bump the yt-dlp version in the `Dockerfile` when Instagram or YouTube change and
