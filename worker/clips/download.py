@@ -70,6 +70,15 @@ def title_of(info: dict) -> str | None:
     return title[:MAX_TITLE] or None
 
 
+def author_of(info: dict) -> str | None:
+    """The account that posted it: an Instagram username, or a YouTube channel."""
+    for field in ("channel", "uploader_id", "uploader"):
+        value = (info.get(field) or "").strip() if isinstance(info.get(field), str) else ""
+        if value:
+            return value[:120]
+    return None
+
+
 def cookies_file(tmp: str) -> str | None:
     # yt-dlp writes cookies back, and a mounted secret is read-only.
     source = os.environ.get("INSTAGRAM_COOKIES")
@@ -182,6 +191,7 @@ def main():
             {
                 "ok": True,
                 "title": title_of(info),
+                "author": author_of(info),
                 "durationS": round(duration) if duration else None,
                 "contentType": "video/mp4",
                 "sizeBytes": os.path.getsize(path),
