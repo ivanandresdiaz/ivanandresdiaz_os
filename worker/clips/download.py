@@ -1,4 +1,4 @@
-"""Downloads one Clip and leaves. See docs/adr/0004.
+"""Downloads one Clip and leaves. See docs/adr/0004. With TASK=trim it trims a file instead (trim.py).
 
 It holds no keys: Ivan OS hands it two one-off upload links, one for the file and
 one for the result, and reads the result back from R2. Cloud Run retries a run
@@ -203,4 +203,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.environ.get("TASK") == "trim":
+        import trim
+
+        sys.exit(trim.main())
     sys.exit(main())

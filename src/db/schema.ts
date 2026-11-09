@@ -7,6 +7,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  real,
   smallint,
   text,
   timestamp,
@@ -561,6 +562,42 @@ export const samples = pgTable("samples", {
   position: integer("position").notNull(),
   createdAt: createdAt(),
 });
+
+/**
+ * A Trim on its way: Cloud Run cuts the file of a Sample or a Reference
+ * (`fromKey`) and uploads the cut one to `key`; once it is in, the Sample or
+ * Reference takes the new file and the old one is thrown away. `startS` and
+ * `endS` are what is kept (null: from the beginning, to the end). A deleted
+ * Sample or Reference leaves its Trim with neither, until its files are cleaned.
+ */
+export const trims = pgTable(
+  "trims",
+  {
+    id: id(),
+    sampleId: uuid("sample_id")
+      .unique()
+      .references(() => samples.id, { onDelete: "set null" }),
+    referenceId: uuid("reference_id")
+      .unique()
+      .references(() => principleReferences.id, { onDelete: "set null" }),
+    fromKey: text("from_key").notNull(),
+    key: text("key").notNull(),
+    contentType: text("content_type").notNull(),
+    startS: real("start_s"),
+    endS: real("end_s"),
+    status: text("status").notNull(),
+    run: uuid("run").notNull(),
+    /** The try now running: 0, or 1 and 2 for Cloud Run's retries. */
+    attempt: smallint("attempt").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("trims_one_item", sql`${t.sampleId} is null or ${t.referenceId} is null`),
+    check("trims_status", sql`${t.status} in ('trimming', 'failed')`),
+  ],
+);
 
 export const learningPathStatus = pgEnum("learning_path_status", ["candidate", "active", "done", "dropped"]);
 

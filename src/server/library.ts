@@ -5,6 +5,7 @@ import * as s from "@/db/schema";
 import { sampleKindOf, type SampleKind } from "@/domain/library";
 import { presignView } from "@/lib/r2";
 import { getIncoming, settleDownloads, type ClipView } from "./clips";
+import { getTrimViews, settleTrims, type TrimView } from "./trims";
 
 export type SampleView = {
   id: string;
@@ -14,6 +15,8 @@ export type SampleView = {
   url: string;
   /** The post it came from, for Samples that were Clips. */
   sourceUrl: string | null;
+  /** A Trim on its way, or the one that failed. */
+  trim?: TrimView | null;
 };
 export type CreatorView = {
   id: string;
@@ -28,13 +31,14 @@ export type TopicView = { id: string; title: string; creators: CreatorView[] };
 
 /** The whole Library in Ivan's order: Topics, their Creators, their Samples (newest first unless he dragged them). */
 export async function getLibrary(): Promise<TopicView[]> {
-  // Links pasted here whose file is in become Samples before anything is read.
-  await settleDownloads();
-  const [topics, creators, samples, incoming] = await Promise.all([
+  // Links pasted here whose file is in become Samples, and finished Trims swap their file, before anything is read.
+  await Promise.all([settleDownloads(), settleTrims()]);
+  const [topics, creators, samples, incoming, trims] = await Promise.all([
     db.select().from(s.topics).orderBy(asc(s.topics.position), asc(s.topics.createdAt)),
     db.select().from(s.creators).orderBy(asc(s.creators.position), asc(s.creators.createdAt)),
     db.select().from(s.samples).orderBy(asc(s.samples.position), asc(s.samples.createdAt)),
     getIncoming(),
+    getTrimViews(),
   ]);
   const views = await Promise.all(
     samples.map(async (row) => {
@@ -47,6 +51,7 @@ export async function getLibrary(): Promise<TopicView[]> {
         title: row.title ?? "",
         url: await presignView(row.key),
         sourceUrl: row.sourceUrl,
+        trim: trims.get(row.id) ?? null,
       };
       return { creatorId: row.creatorId, view };
     }),

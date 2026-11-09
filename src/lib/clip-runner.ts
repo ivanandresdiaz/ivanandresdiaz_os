@@ -52,21 +52,46 @@ export function clipDownloadsConfigured(): boolean {
 }
 
 export async function startClipRun(run: ClipRun): Promise<void> {
+  await runJob([
+    { name: "CLIP_URL", value: run.url },
+    { name: "FILE_UPLOAD_URL", value: run.fileUploadUrl },
+    { name: "RESULT_UPLOAD_URL", value: run.resultUploadUrl },
+    { name: "MAX_SECONDS", value: String(run.maxSeconds) },
+  ]);
+}
+
+/** A Trim runs on the same job (TASK=trim): it reads the file and uploads the cut one. See worker/clips/trim.py. */
+export type TrimRun = {
+  sourceUrl: string;
+  fileUploadUrl: string;
+  resultUploadUrl: string;
+  kind: "video" | "audio";
+  startS: number | null;
+  endS: number | null;
+};
+
+export async function startTrimRun(run: TrimRun): Promise<void> {
+  await runJob([
+    { name: "TASK", value: "trim" },
+    { name: "SOURCE_URL", value: run.sourceUrl },
+    { name: "FILE_UPLOAD_URL", value: run.fileUploadUrl },
+    { name: "RESULT_UPLOAD_URL", value: run.resultUploadUrl },
+    { name: "TRIM_KIND", value: run.kind },
+    { name: "TRIM_START", value: run.startS === null ? "" : String(run.startS) },
+    { name: "TRIM_END", value: run.endS === null ? "" : String(run.endS) },
+  ]);
+}
+
+async function runJob(env: { name: string; value: string }[]): Promise<void> {
   const { CLIPS_JOB, GCP_CLIPS_LAUNCHER_KEY } = process.env;
   if (!CLIPS_JOB || !GCP_CLIPS_LAUNCHER_KEY) {
     throw new Error("Clip downloads are not set up: set CLIPS_JOB and GCP_CLIPS_LAUNCHER_KEY");
   }
   const key = JSON.parse(Buffer.from(GCP_CLIPS_LAUNCHER_KEY, "base64").toString("utf8")) as Key;
-  const env = [
-    { name: "CLIP_URL", value: run.url },
-    { name: "FILE_UPLOAD_URL", value: run.fileUploadUrl },
-    { name: "RESULT_UPLOAD_URL", value: run.resultUploadUrl },
-    { name: "MAX_SECONDS", value: String(run.maxSeconds) },
-  ];
   const res = await fetch(`https://run.googleapis.com/v2/${CLIPS_JOB}:run`, {
     method: "POST",
     headers: { Authorization: `Bearer ${await accessToken(key)}`, "Content-Type": "application/json" },
     body: JSON.stringify({ overrides: { containerOverrides: [{ env }] } }),
   });
-  if (!res.ok) throw new Error(`Cloud Run did not start the download: ${res.status}`);
+  if (!res.ok) throw new Error(`Cloud Run did not start the run: ${res.status}`);
 }

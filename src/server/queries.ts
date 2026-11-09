@@ -35,6 +35,7 @@ import type { UpkeepRef } from "@/domain/upkeeps";
 import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
 import { getIncoming, settleDownloads, type ClipView } from "./clips";
+import { getTrimViews, settleTrims, type TrimView } from "./trims";
 import { isConnected } from "./google-calendar";
 
 export type BlockType = {
@@ -66,6 +67,8 @@ export type ReferenceView = {
   url: string;
   /** The post it came from, for References that were Clips. */
   sourceUrl: string | null;
+  /** A Trim on its way, or the one that failed. */
+  trim?: TrimView | null;
 };
 export type PrincipleView = {
   id: string;
@@ -78,15 +81,16 @@ export type PrincipleView = {
 
 /** Principles with their References, each signed for viewing. */
 export async function getPrincipleViews(): Promise<PrincipleView[]> {
-  // Links pasted here whose file is in become References before anything is read.
-  await settleDownloads();
-  const [principles, references, incoming] = await Promise.all([
+  // Links pasted here whose file is in become References, and finished Trims swap their file, before anything is read.
+  await Promise.all([settleDownloads(), settleTrims()]);
+  const [principles, references, incoming, trims] = await Promise.all([
     getPrinciples(),
     db
       .select()
       .from(s.principleReferences)
       .orderBy(asc(s.principleReferences.position), asc(s.principleReferences.createdAt)),
     getIncoming(),
+    getTrimViews(),
   ]);
   const signed = await Promise.all(
     references.map(async (r) => ({
@@ -98,6 +102,7 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
         title: r.title ?? "",
         url: await presignView(r.key),
         sourceUrl: r.sourceUrl,
+        trim: trims.get(r.id) ?? null,
       },
     })),
   );

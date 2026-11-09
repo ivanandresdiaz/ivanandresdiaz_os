@@ -19,6 +19,8 @@ import {
   reorderReferences,
 } from "@/server/actions";
 import type { ReferenceView } from "@/server/queries";
+import { trimReference } from "@/server/trim-actions";
+import { TrimButton, TrimState } from "./trim";
 
 const TILE_MIME = "application/x-ivan-reference";
 
@@ -123,7 +125,18 @@ export function ReferenceStrip({
                 ×
               </button>
             )}
+            {editing && reference.kind !== "image" && (
+              <TrimButton
+                url={reference.url}
+                kind={reference.kind}
+                title={reference.title || (reference.kind === "audio" ? UNTITLED_AUDIO : `Reference ${i + 1}`)}
+                trim={reference.trim}
+                onTrim={(range) => trimReference({ id: reference.id, ...range })}
+                className="absolute top-1 left-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-xs leading-none text-white hover:bg-accent disabled:opacity-40"
+              />
+            )}
           </div>
+          <TrimState trim={reference.trim} className="text-[10px] leading-tight" />
           {editing && reference.kind === "audio" && (
             <TitleInput title={reference.title} onRename={(title) => rename(reference.id, title)} />
           )}

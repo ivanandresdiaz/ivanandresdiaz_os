@@ -37,6 +37,9 @@ _Evitar_: Area, Category, Infinite Game (ese es una dimensión de la vida).
 **Sample** (Muestra): un reel, un video o una imagen de un Creator que guardo en la Library para verlo una y otra vez. Siempre es de un Creator y siempre tiene su archivo: un enlace pegado en un Creator se baja solo y, mientras tanto, aparece ahí como bajando (o fallido, para reintentar); un video de más de 30 minutos no puede ser Sample. Lleva un título, que puedo cambiar, y el enlace del post si vino de un Clip. No lleva Likes.
 _Evitar_: Reference (esa encarna un Principle), Clip, Post.
 
+**Trim** (Recortar): quitarle a un video o a un audio de un Sample o de una Reference su principio, su final o ambos (p. ej. la publicidad o el logo del final), cuando lo edito. Es la excepción, no la regla. Lo recortado sale del archivo para siempre, sin copia, y se puede volver a recortar pero no a alargar. Se hace solo, sin que tenga que estar pendiente: mientras tanto se sigue viendo entero, y si falla queda como estaba, para reintentar. Una imagen no se recorta, y un Clip tampoco: se recorta después de llegar a donde vive.
+_Evitar_: Cut, Clip, Range.
+
 **Practice** (Práctica): una sesión en la que veo los Samples de un Topic, de los Creators que elija (uno, varios o todos), al azar o en el orden de la Library. Al azar, cada Sample sale una vez antes de repetirse; en orden, al llegar al último vuelve al primero. Sigue mientras yo quiera y no deja registro: cada Practice empieza de nuevo. Se elige desde el Feed, pero no cambia la ronda diaria de los Principles.
 _Evitar_: Feed, Top 10, Review.
 

@@ -1,3 +1,4 @@
 *
 !Dockerfile
 !download.py
+!trim.py

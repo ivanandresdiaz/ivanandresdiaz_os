@@ -5,10 +5,13 @@ import { describeDeletion, type DeletionImpact } from "@/domain/deletion";
 import { deletionImpact } from "@/server/actions";
 
 /** Events stop here, so the dialog never starts a drag or closes the drawer it opened from. */
-const keep = {
+export const keepEvents = {
   onPointerDown: (event: React.SyntheticEvent) => event.stopPropagation(),
   onClick: (event: React.SyntheticEvent) => event.stopPropagation(),
   onKeyDown: (event: React.SyntheticEvent) => event.stopPropagation(),
+  // React passes a dialog's close and cancel up to the dialog around it (a drawer), which would close too.
+  onClose: (event: React.SyntheticEvent) => event.stopPropagation(),
+  onCancel: (event: React.SyntheticEvent) => event.stopPropagation(),
 };
 
 /**
@@ -43,7 +46,7 @@ export function ConfirmDelete({
     <>
       <button
         type="button"
-        {...keep}
+        {...keepEvents}
         onClick={(event) => {
           event.stopPropagation();
           setOpen(true);
@@ -117,7 +120,7 @@ function ConfirmDeleteDialog({
   const goesWith = impact && describeDeletion(impact);
 
   return (
-    <div className="contents" {...keep}>
+    <div className="contents" {...keepEvents}>
       <dialog
         ref={dialog}
         role="alertdialog"

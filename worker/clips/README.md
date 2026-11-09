@@ -21,12 +21,20 @@ GCP_CLIPS_LAUNCHER_KEY=<base64 of the clips-launcher JSON key>
 
 ```sh
 cd worker/clips
-gcloud builds submit . --tag us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v5 --project andresdiaz --region us-central1
-gcloud run jobs deploy clips-download --image us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v5 --region us-central1 --project andresdiaz
+gcloud builds submit . --tag us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v6 --project andresdiaz --region us-central1
+gcloud run jobs deploy clips-download --image us-central1-docker.pkg.dev/andresdiaz/ivan-os/clips:v6 --region us-central1 --project andresdiaz
 ```
 
 Bump the yt-dlp version in the `Dockerfile` when Instagram or YouTube change and
 downloads start failing; yt-dlp follows them within days.
+
+## Trims
+
+The same job also trims a Sample's or Reference's file (`TASK=trim`, see
+`trim.py`): it reads the file from a signed R2 link, re-encodes only the part
+Ivan kept (h264 video, or AAC audio), and uploads it and a `result.json`. Ivan OS
+swaps the file in when the Library or the Principles are looked at
+(`src/server/trims.ts`). Trims never run on his computer: they need no YouTube.
 
 ## Run it locally
 
@@ -35,6 +43,8 @@ Docker here only reaches the internet on the host network:
 ```sh
 docker build --network host -t ivan-os-clips worker/clips
 docker run --rm --network host -e CLIP_URL=… -e FILE_UPLOAD_URL=… -e RESULT_UPLOAD_URL=… ivan-os-clips
+docker run --rm --network host -e TASK=trim -e TRIM_KIND=video -e TRIM_START=2 -e TRIM_END=14.3 \
+  -e SOURCE_URL=… -e FILE_UPLOAD_URL=… -e RESULT_UPLOAD_URL=… ivan-os-clips
 ```
 
 ## When Instagram wants a login

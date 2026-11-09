@@ -48,6 +48,11 @@ export function presignUpload(key: string, ttlSeconds = UPLOAD_TTL_SECONDS) {
   return presign("PUT", key, ttlSeconds);
 }
 
+/** A read link that lasts as long as asked, for a Cloud Run run that reads the file hours later. */
+export function presignDownload(key: string, ttlSeconds: number) {
+  return presign("GET", key, ttlSeconds);
+}
+
 export function presignView(key: string) {
   return presign("GET", key, VIEW_TTL_SECONDS, startOfHourStamp());
 }

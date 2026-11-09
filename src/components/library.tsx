@@ -11,6 +11,7 @@ import {
 } from "@/domain/library";
 import { referenceContentType } from "@/domain/references";
 import { pasteLink } from "@/server/clip-actions";
+import { trimSample } from "@/server/trim-actions";
 import {
   confirmSampleUpload,
   createCreator,
@@ -34,6 +35,7 @@ import { ConfirmDelete } from "./confirm-delete";
 import { IncomingList, PasteLink } from "./incoming";
 import { Handle, Reorderable } from "./priority-list";
 import { MediaUploader } from "./references";
+import { TrimButton, TrimState } from "./trim";
 import { AddIconButton } from "./ui";
 
 const SAMPLE_PROBLEM = {
@@ -357,7 +359,19 @@ function SampleRow({ sample, index }: { sample: SampleView; index: number }) {
       <a href={sample.url} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Open ${title}`}>
         <SampleThumb sample={sample} />
       </a>
-      <SampleTitle sample={sample} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <SampleTitle sample={sample} />
+        <TrimState trim={sample.trim} className="px-1 text-xs" />
+      </div>
+      {sample.kind === "video" && (
+        <TrimButton
+          url={sample.url}
+          kind="video"
+          title={title}
+          trim={sample.trim}
+          onTrim={(range) => trimSample({ id: sample.id, ...range })}
+        />
+      )}
       <ConfirmDelete action={deleteSample} id={sample.id} what="Sample" title={title} />
     </li>
   );
@@ -403,7 +417,7 @@ function SampleTitle({ sample }: { sample: SampleView }) {
         setValue(next);
         if (next !== sample.title) renameSample({ id: sample.id, title: next });
       }}
-      className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm hover:border-line focus:border-line"
+      className="w-full min-w-0 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm hover:border-line focus:border-line"
     />
   );
 }
