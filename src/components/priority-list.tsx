@@ -8,7 +8,7 @@ import { useOptimistic, useTransition } from "react";
 type Save = (ids: string[]) => Promise<unknown>;
 
 /** Drag and drop for one list: the new order shows at once and `save` keeps it. */
-function Reorderable<T extends { id: string }>({
+export function Reorderable<T extends { id: string }>({
   items,
   save,
   children,
@@ -37,7 +37,7 @@ function Reorderable<T extends { id: string }>({
   );
 }
 
-function Handle({
+export function Handle({
   ref,
   title,
   className,

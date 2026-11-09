@@ -206,6 +206,39 @@ function VideoTile({ url }: { url: string }) {
 type Upload = { id: string; name: string; progress: number; error: string | null };
 
 export function ReferenceUploader({ principleId }: { principleId: string }) {
+  return (
+    <MediaUploader
+      accept={ACCEPTED_REFERENCE_TYPES}
+      label="Drop images, videos or audio, or click to choose"
+      check={(file) => {
+        const contentType = referenceContentType(file);
+        const problem = validateReferenceFile({ contentType, size: file.size });
+        return { contentType, problem: problem && PROBLEM_TEXT[problem] };
+      }}
+      create={(contentType, size) => createReferenceUpload({ principleId, contentType, size })}
+      confirm={(key, contentType, title) => confirmReferenceUpload({ principleId, key, contentType, title })}
+    />
+  );
+}
+
+/**
+ * Drop or pick files; each one goes straight to R2 through a signed link, one
+ * at a time, then `confirm` records it.
+ */
+export function MediaUploader({
+  accept,
+  label,
+  check,
+  create,
+  confirm,
+}: {
+  accept: readonly string[];
+  label: string;
+  /** The type to store the file under, and what is wrong with it (null when nothing). */
+  check: (file: File) => { contentType: string; problem: string | null };
+  create: (contentType: string, size: number) => Promise<{ key: string; uploadUrl: string }>;
+  confirm: (key: string, contentType: string, title: string) => Promise<void>;
+}) {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [over, setOver] = useState(false);
   const queue = useRef(Promise.resolve());
@@ -216,9 +249,9 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
 
   async function upload(file: File, contentType: string, id: string) {
     try {
-      const { key, uploadUrl } = await createReferenceUpload({ principleId, contentType, size: file.size });
+      const { key, uploadUrl } = await create(contentType, file.size);
       await putFile(uploadUrl, file, contentType, (progress) => patch(id, { progress }));
-      await confirmReferenceUpload({ principleId, key, contentType, title: titleFromFileName(file.name) });
+      await confirm(key, contentType, titleFromFileName(file.name));
       setUploads((all) => all.filter((u) => u.id !== id));
     } catch (error) {
       patch(id, { error: error instanceof Error ? error.message : "Upload failed" });
@@ -228,9 +261,8 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
   function add(files: FileList | null) {
     for (const file of Array.from(files ?? [])) {
       const id = crypto.randomUUID();
-      const contentType = referenceContentType(file);
-      const problem = validateReferenceFile({ contentType, size: file.size });
-      setUploads((all) => [...all, { id, name: file.name, progress: 0, error: problem && PROBLEM_TEXT[problem] }]);
+      const { contentType, problem } = check(file);
+      setUploads((all) => [...all, { id, name: file.name, progress: 0, error: problem }]);
       if (!problem) queue.current = queue.current.then(() => upload(file, contentType, id));
     }
   }
@@ -254,12 +286,12 @@ export function ReferenceUploader({ principleId }: { principleId: string }) {
           over ? "border-accent text-foreground" : "border-line text-muted hover:border-accent"
         }`}
       >
-        <span>Drop images, videos or audio, or click to choose</span>
+        <span>{label}</span>
         <span className="text-xs">Up to 200 MB each · MP4 (H.264) plays everywhere</span>
         <input
           type="file"
           multiple
-          accept={ACCEPTED_REFERENCE_TYPES.join(",")}
+          accept={accept.join(",")}
           className="sr-only"
           onChange={(event) => {
             add(event.currentTarget.files);

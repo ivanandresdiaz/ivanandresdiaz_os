@@ -1,5 +1,5 @@
 import "server-only";
-import { count, desc, eq, and, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
@@ -10,6 +10,7 @@ import {
   downloadPlace,
   fallbackClipTitle,
   settleClip,
+  TOO_LONG_TO_KEEP,
   youtubeIdOf,
   youtubeThumbnail,
   type ClipResult,
@@ -18,6 +19,7 @@ import {
   type DownloadPlace,
 } from "@/domain/clips";
 import { deleteObject, getText, objectSize, presignView } from "@/lib/r2";
+import { landClip } from "./clip-landing";
 
 export type ClipView = {
   id: string;
@@ -37,12 +39,20 @@ export type ClipView = {
   thumbnail: string | null;
   /** The downloaded file, signed for viewing. */
   videoUrl: string | null;
+  /** Where a link pasted where content lives is going; both null for a Clip in the bank. */
+  creatorId: string | null;
+  principleId: string | null;
+  /** The account that posted it, when the downloader said. */
+  author: string | null;
+  /** For a pasted link waiting for the computer: when the computer last looked. */
+  computerCheckedAt?: string | null;
 };
 
 const result: z.ZodType<ClipResult> = z.union([
   z.object({
     ok: z.literal(true),
     title: z.string().nullable(),
+    author: z.string().nullable().optional(),
     durationS: z.number().nullable(),
     contentType: z.string(),
     sizeBytes: z.number(),
@@ -105,16 +115,19 @@ export async function settleDownloads(now = new Date()) {
               sizeBytes: size,
               durationS: outcome.durationS,
               title: sql`coalesce(${s.clips.title}, ${trimTitle(outcome.title)})`,
+              author: outcome.author?.trim().slice(0, 120) || null,
               error: null,
             })
             .where(same);
         }
       } else {
+        // A link pasted where content lives must have its file; a long video can't stay there as a link.
+        const pasted = clip.creatorId !== null || clip.principleId !== null;
         await db
           .update(s.clips)
           .set({
             status: outcome.status,
-            error: outcome.error,
+            error: pasted && outcome.status === "link" ? TOO_LONG_TO_KEEP : outcome.error,
             durationS: outcome.durationS,
             title: sql`coalesce(${s.clips.title}, ${trimTitle(outcome.title)})`,
           })
@@ -123,12 +136,40 @@ export async function settleDownloads(now = new Date()) {
       await deleteObject(resultKey);
     }),
   );
+  await landArrived();
+}
+
+const addressed = or(isNotNull(s.clips.creatorId), isNotNull(s.clips.principleId));
+const banked = and(isNull(s.clips.creatorId), isNull(s.clips.principleId));
+
+/** Links pasted where content lives whose file is in: each becomes a Sample or a Reference there. */
+async function landArrived() {
+  const arrived = await db
+    .select()
+    .from(s.clips)
+    .where(and(eq(s.clips.status, "ready"), addressed));
+  for (const clip of arrived) {
+    const destination = clip.creatorId ? { creatorId: clip.creatorId } : { principleId: clip.principleId as string };
+    try {
+      await landClip(clip, destination);
+    } catch (error) {
+      // Another look may have landed it first; if not, the next look tries again.
+      console.error("A pasted link did not land", error);
+    }
+  }
+}
+
+/** Links on their way to where they will live, settled, oldest first. */
+export async function getIncoming(): Promise<ClipView[]> {
+  const rows = await db.select().from(s.clips).where(addressed).orderBy(s.clips.createdAt);
+  const checkedAt = rows.some((row) => row.status === "waiting") ? await getComputerCheckedAt() : null;
+  return Promise.all(rows.map(async (row) => ({ ...(await clipView(row)), computerCheckedAt: checkedAt })));
 }
 
 /** Clips, newest first, settled. */
 export async function getClipsView(): Promise<ClipView[]> {
   await settleDownloads();
-  const rows = await db.select().from(s.clips).orderBy(desc(s.clips.createdAt));
+  const rows = await db.select().from(s.clips).where(banked).orderBy(desc(s.clips.createdAt));
   return Promise.all(rows.map(clipView));
 }
 
@@ -153,6 +194,9 @@ async function clipView(row: typeof s.clips.$inferSelect): Promise<ClipView> {
     durationS: row.durationS,
     thumbnail: youtubeId ? youtubeThumbnail(youtubeId) : null,
     videoUrl: row.status === "ready" && row.key ? await presignView(row.key) : null,
+    author: row.author,
+    creatorId: row.creatorId,
+    principleId: row.principleId,
   };
 }
 
@@ -160,7 +204,8 @@ async function clipView(row: typeof s.clips.$inferSelect): Promise<ClipView> {
 export async function countClips(): Promise<{ total: number; ready: number }> {
   const [row] = await db
     .select({ total: count(), ready: count(sql`case when ${s.clips.status} = 'ready' then 1 end`) })
-    .from(s.clips);
+    .from(s.clips)
+    .where(banked);
   return { total: row?.total ?? 0, ready: row?.ready ?? 0 };
 }
 

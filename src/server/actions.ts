@@ -41,6 +41,7 @@ import { aiAvailability, CoachError, reviewEnglish, transcribe } from "@/lib/ai"
 import { deleteObject, getObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { APP_TIMEZONE, today } from "@/lib/today";
+import { deleteIncomingFiles } from "./clip-landing";
 import { isConnected } from "./google-calendar";
 import { getMovesChosenFor } from "./queries";
 import { retryFailedReminders, syncDeletions, syncSlots, syncWork } from "./reminders";
@@ -217,6 +218,7 @@ export async function deletePrinciple(fd: FormData) {
     .from(s.principleReferences)
     .where(eq(s.principleReferences.principleId, id));
   await Promise.all(references.map((r) => deleteObject(r.key)));
+  await deleteIncomingFiles({ principleId: id });
   await db.delete(s.principles).where(eq(s.principles.id, id));
   await done();
 }
@@ -619,13 +621,37 @@ export async function setMoveWeek(fd: FormData) {
 
 /** What deleting this would take with it, counted for Ivan to confirm the delete. */
 export async function deletionImpact(input: {
-  kind: "campaign" | "move" | "task" | "principle" | "seasonGoal" | "vault" | "learningPath";
+  kind: "campaign" | "move" | "task" | "principle" | "seasonGoal" | "vault" | "learningPath" | "topic" | "creator";
   id: string;
 }): Promise<DeletionImpact> {
   await requireIvan();
   const { kind, id } = z
-    .object({ kind: z.enum(["campaign", "move", "task", "principle", "seasonGoal", "vault", "learningPath"]), id: z.uuid() })
+    .object({
+      kind: z.enum(["campaign", "move", "task", "principle", "seasonGoal", "vault", "learningPath", "topic", "creator"]),
+      id: z.uuid(),
+    })
     .parse(input);
+
+  // Links still on their way count as what they will be.
+  if (kind === "creator") {
+    const [samples, incoming] = await Promise.all([
+      db.select({ id: s.samples.id }).from(s.samples).where(eq(s.samples.creatorId, id)),
+      db.select({ id: s.clips.id }).from(s.clips).where(eq(s.clips.creatorId, id)),
+    ]);
+    return { samples: samples.length + incoming.length };
+  }
+  if (kind === "topic") {
+    const creators = await db.select({ id: s.creators.id }).from(s.creators).where(eq(s.creators.topicId, id));
+    const ids = creators.map((c) => c.id);
+    const [samples, incoming] =
+      ids.length > 0
+        ? await Promise.all([
+            db.select({ id: s.samples.id }).from(s.samples).where(inArray(s.samples.creatorId, ids)),
+            db.select({ id: s.clips.id }).from(s.clips).where(inArray(s.clips.creatorId, ids)),
+          ])
+        : [[], []];
+    return { creators: creators.length, samples: samples.length + incoming.length };
+  }
 
   if (kind === "vault") {
     const secrets = await db.select({ id: s.vaultSecrets.id }).from(s.vaultSecrets).where(eq(s.vaultSecrets.vaultId, id));
@@ -637,11 +663,14 @@ export async function deletionImpact(input: {
   }
 
   if (kind === "principle") {
-    const refs = await db
-      .select({ id: s.principleReferences.id })
-      .from(s.principleReferences)
-      .where(eq(s.principleReferences.principleId, id));
-    return { references: refs.length };
+    const [refs, incoming] = await Promise.all([
+      db
+        .select({ id: s.principleReferences.id })
+        .from(s.principleReferences)
+        .where(eq(s.principleReferences.principleId, id)),
+      db.select({ id: s.clips.id }).from(s.clips).where(eq(s.clips.principleId, id)),
+    ]);
+    return { references: refs.length + incoming.length };
   }
   if (kind === "seasonGoal") {
     const campaigns = await db.select({ id: s.campaigns.id }).from(s.campaigns).where(eq(s.campaigns.seasonGoalId, id));

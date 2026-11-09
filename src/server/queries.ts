@@ -34,6 +34,7 @@ import { type SecondaryTask, secondaryTaskDate, secondaryTasksForDate } from "@/
 import type { UpkeepRef } from "@/domain/upkeeps";
 import { presignView } from "@/lib/r2";
 import { APP_TIMEZONE, today } from "@/lib/today";
+import { getIncoming, settleDownloads, type ClipView } from "./clips";
 import { isConnected } from "./google-calendar";
 
 export type BlockType = {
@@ -66,16 +67,26 @@ export type ReferenceView = {
   /** The post it came from, for References that were Clips. */
   sourceUrl: string | null;
 };
-export type PrincipleView = { id: string; title: string; body: string; references: ReferenceView[] };
+export type PrincipleView = {
+  id: string;
+  title: string;
+  body: string;
+  references: ReferenceView[];
+  /** Links pasted here, still on their way. */
+  incoming: ClipView[];
+};
 
 /** Principles with their References, each signed for viewing. */
 export async function getPrincipleViews(): Promise<PrincipleView[]> {
-  const [principles, references] = await Promise.all([
+  // Links pasted here whose file is in become References before anything is read.
+  await settleDownloads();
+  const [principles, references, incoming] = await Promise.all([
     getPrinciples(),
     db
       .select()
       .from(s.principleReferences)
       .orderBy(asc(s.principleReferences.position), asc(s.principleReferences.createdAt)),
+    getIncoming(),
   ]);
   const signed = await Promise.all(
     references.map(async (r) => ({
@@ -95,6 +106,7 @@ export async function getPrincipleViews(): Promise<PrincipleView[]> {
     title: p.title,
     body: p.body,
     references: signed.filter((r) => r.principleId === p.id).map((r) => r.view),
+    incoming: incoming.filter((clip) => clip.principleId === p.id),
   }));
 }
 

@@ -2,6 +2,7 @@ import { Clips } from "@/components/clips";
 import { PageTitle } from "@/components/ui";
 import { requireIvan } from "@/lib/session";
 import { getClipsView, getComputerCheckedAt } from "@/server/clips";
+import { getCreatorChoices } from "@/server/library";
 import { getPrinciples } from "@/server/queries";
 
 export const metadata = { title: "Clips" };
@@ -9,7 +10,7 @@ export const metadata = { title: "Clips" };
 /** The bank of links to pass through: paste and forget, then move each one where it belongs. */
 export default async function ClipsPage() {
   await requireIvan();
-  const [clips, principles] = await Promise.all([getClipsView(), getPrinciples()]);
+  const [clips, principles, library] = await Promise.all([getClipsView(), getPrinciples(), getCreatorChoices()]);
   // Only a waiting Clip needs to know whether the computer is there.
   const computerCheckedAt = clips.some((clip) => clip.status === "waiting") ? await getComputerCheckedAt() : null;
 
@@ -22,6 +23,7 @@ export default async function ClipsPage() {
       <Clips
         clips={clips}
         principles={principles.map((p) => ({ id: p.id, title: p.title }))}
+        library={library}
         computerCheckedAt={computerCheckedAt}
       />
     </>

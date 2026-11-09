@@ -5,7 +5,16 @@ import { listReadyClips, moveClipToPrinciple } from "@/server/clip-actions";
 import type { ClipView } from "@/server/clips";
 
 /** Add Reference → From Clips: a Clip with its file leaves the bank and becomes a Reference here. */
-export function ClipPicker({ principleId }: { principleId: string }) {
+export function ClipPicker({
+  principleId,
+  what = "Reference",
+  move = (clipId) => moveClipToPrinciple({ clipId, principleId: principleId as string }),
+}: {
+  principleId?: string;
+  /** What the Clip becomes here. */
+  what?: "Reference" | "Sample";
+  move?: (clipId: string) => Promise<void>;
+}) {
   const [clips, setClips] = useState<ClipView[] | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +38,7 @@ export function ClipPicker({ principleId }: { principleId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await moveClipToPrinciple({ clipId: clip.id, principleId });
+        await move(clip.id);
         setClips((all) => all?.filter((c) => c.id !== clip.id) ?? null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't move it.");
@@ -80,7 +89,7 @@ export function ClipPicker({ principleId }: { principleId: string }) {
                 className="btn py-0.5 text-xs"
                 disabled={pending}
                 onClick={() => take(clip)}
-                aria-label={`Add ${clip.title} as a Reference`}
+                aria-label={`Add ${clip.title} as a ${what}`}
               >
                 {movingId === clip.id ? "Adding…" : "Add"}
               </button>

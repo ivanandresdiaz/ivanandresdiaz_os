@@ -15,15 +15,37 @@ type LikeChange = { id: string; delta: 1 | -1 };
 
 function applyLike(likes: FeedLikes, { id, delta }: LikeChange): FeedLikes {
   const current = likes[id] ?? NO_LIKES;
-  return { ...likes, [id]: { ...current, today: stepLikes(current.today, delta) } };
+  return {
+    ...likes,
+    [id]: { ...current, today: stepLikes(current.today, delta) },
+  };
 }
 
 const ENDINGS = {
-  today: { title: "Done for today", note: "That was today’s Feed. No more until tomorrow.", leave: "See your Top 10" },
+  today: {
+    title: "Done for today",
+    note: "That was today’s Feed. No more until tomorrow.",
+    leave: "See your Top 10",
+  },
   top: { title: "That was your Top 10", note: null, leave: "Back" },
 };
 
-type Round = { kind: keyof typeof ENDINGS; list: FeedItem[]; from: number };
+type Round = { kind: keyof typeof ENDINGS; list: PlayerItem[]; from: number };
+
+/** What the full-screen player shows: a Reference of the Feed, or a Sample of a Practice. */
+export type PlayerItem = {
+  id: string;
+  /** Unique within the list, when the same item comes back (a Practice's next lap). */
+  key?: string;
+  kind: "image" | "video" | "audio";
+  url: string;
+  title: string;
+  sourceUrl: string | null;
+  /** The quiet line at the bottom: its Principle, or its Creator. */
+  caption: string;
+};
+
+const toPlayer = (list: FeedItem[]): PlayerItem[] => list.map((item) => ({ ...item, caption: item.principleTitle }));
 
 /**
  * Today's Feed. A start card, then a full-screen vertical feed (swipe up for the
@@ -55,18 +77,9 @@ export function Feed({ feed }: { feed: FeedView }) {
 
   /** Runs inside the tap: on iPhone, a media element may play with sound only once a tap has played it. */
   function begin(kind: Round["kind"], list: FeedItem[], from: number) {
-    const el = player ?? createPlayer();
+    const el = unlockPlayer(player, list, from);
     setPlayer(el);
-    const unlockWith = list[from]?.kind !== "image" ? list[from] : list.find((i) => i.kind !== "image");
-    if (unlockWith && el.dataset.id !== unlockWith.id) {
-      el.src = unlockWith.url;
-      el.dataset.id = unlockWith.id;
-    }
-    el.muted = false;
-    el.play().catch(() => {});
-    // Starting on an image: the play above only unlocks the sound, so nothing should be heard yet.
-    if (list[from]?.kind === "image") el.pause();
-    setRound({ kind, list, from });
+    setRound({ kind, list: toPlayer(list), from });
   }
 
   /** Reaching a Reference counts as seeing it. A rewatch changes nothing, so nothing is saved. */
@@ -112,8 +125,8 @@ export function Feed({ feed }: { feed: FeedView }) {
         <section className="card flex flex-col items-start gap-3">
           <h1 className="text-xl font-semibold tracking-tight">Done for today</h1>
           <p className="text-sm text-muted">
-            You saw today’s {items.length} Reference{items.length === 1 ? "" : "s"}. There is no more Feed until
-            tomorrow.
+            You saw today’s {items.length} Reference
+            {items.length === 1 ? "" : "s"}. There is no more Feed until tomorrow.
           </p>
           <button type="button" className="btn" onClick={() => begin("today", items, 0)}>
             Watch today’s again
@@ -139,6 +152,28 @@ export function Feed({ feed }: { feed: FeedView }) {
   );
 }
 
+/**
+ * Runs inside the tap: on iPhone, a media element may play with sound only once
+ * a tap has played it. Returns the one player every item then moves into.
+ */
+export function unlockPlayer(
+  player: HTMLVideoElement | null,
+  list: readonly { id: string; kind: string; url: string }[],
+  from: number,
+) {
+  const el = player ?? createPlayer();
+  const unlockWith = list[from]?.kind !== "image" ? list[from] : list.find((i) => i.kind !== "image");
+  if (unlockWith && el.dataset.id !== unlockWith.id) {
+    el.src = unlockWith.url;
+    el.dataset.id = unlockWith.id;
+  }
+  el.muted = false;
+  el.play().catch(() => {});
+  // Starting on an image: the play above only unlocks the sound, so nothing should be heard yet.
+  if (list[from]?.kind === "image") el.pause();
+  return el;
+}
+
 function createPlayer() {
   const el = document.createElement("video");
   el.playsInline = true;
@@ -148,22 +183,31 @@ function createPlayer() {
   return el;
 }
 
-function FeedPlayer({
+/**
+ * The full-screen vertical player. With `onLike`, it carries the Feed's heart;
+ * without `ending`, it has no last screen (a Practice keeps adding laps).
+ */
+export function FeedPlayer({
   items,
   player,
   startAt,
-  likes,
+  likes = {},
   ending,
+  noun = "Reference",
+  counter,
   onLike,
   onReach,
   onClose,
 }: {
-  items: FeedItem[];
+  items: PlayerItem[];
   player: HTMLVideoElement;
   startAt: number;
-  likes: FeedLikes;
-  ending: (typeof ENDINGS)[Round["kind"]];
-  onLike: (id: string, delta: 1 | -1) => boolean;
+  likes?: FeedLikes;
+  ending?: (typeof ENDINGS)[Round["kind"]];
+  noun?: string;
+  /** The top-left count, e.g. "3 / 10". */
+  counter?: (active: number) => string;
+  onLike?: (id: string, delta: 1 | -1) => boolean;
   onReach?: (index: number) => void;
   onClose: (index: number) => void;
 }) {
@@ -184,7 +228,10 @@ function FeedPlayer({
   const goTo = useCallback((index: number, smooth = true) => {
     const el = scroller.current;
     if (!el) return;
-    el.scrollTo({ top: index * el.clientHeight, behavior: smooth ? "smooth" : "instant" });
+    el.scrollTo({
+      top: index * el.clientHeight,
+      behavior: smooth ? "smooth" : "instant",
+    });
   }, []);
 
   const next = useCallback(() => goTo(active + 1), [goTo, active]);
@@ -295,20 +342,20 @@ function FeedPlayer({
   }
 
   /** One more Like, with the burst only when it counted (none past the daily max). An image stays while Likes keep coming. */
-  function likeOnce(item: FeedItem) {
-    if (!onLike(item.id, 1)) return;
+  function likeOnce(item: PlayerItem) {
+    if (!onLike?.(item.id, 1)) return;
     setBurst((b) => b + 1);
     elapsed.current = 0;
   }
 
   // Holding the heart takes back one of today's Likes; the click that ends the hold then gives none.
   const hold = useRef({ timer: 0, fired: false });
-  function startHold(item: FeedItem) {
+  function startHold(item: PlayerItem) {
     window.clearTimeout(hold.current.timer);
     hold.current.fired = false;
     hold.current.timer = window.setTimeout(() => {
       hold.current.fired = true;
-      onLike(item.id, -1);
+      onLike?.(item.id, -1);
     }, UNLIKE_HOLD_MS);
   }
   function endHold() {
@@ -316,7 +363,9 @@ function FeedPlayer({
   }
 
   /** One tap pauses; a second tap within a moment is a double tap and gives a Like instead. */
-  function onTap(item: FeedItem) {
+  function onTap(item: PlayerItem) {
+    // With no Likes there is no double tap to wait for.
+    if (!onLike) return setPaused((p) => !p);
     if (tap.current) {
       window.clearTimeout(tap.current);
       tap.current = 0;
@@ -342,8 +391,8 @@ function FeedPlayer({
           const listening = item.kind === "audio" && !(isActive && failed);
           return (
             <section
-              key={item.id}
-              aria-label={`Reference ${i + 1} of ${items.length}`}
+              key={item.key ?? item.id}
+              aria-label={`${noun} ${i + 1} of ${items.length}`}
               onClick={() => isActive && onTap(item)}
               onContextMenu={(event) => event.preventDefault()}
               className={`relative flex h-dvh snap-start snap-always touch-manipulation items-center justify-center overflow-hidden ${
@@ -407,43 +456,45 @@ function FeedPlayer({
                 </span>
               )}
 
-              <button
-                type="button"
-                onPointerDown={() => startHold(item)}
-                onPointerUp={endHold}
-                onPointerLeave={endHold}
-                onPointerCancel={endHold}
-                onContextMenu={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (hold.current.fired) hold.current.fired = false;
-                  else likeOnce(item);
-                }}
-                aria-label={`Like (${like.today} of ${MAX_DAILY_LIKES} today). Hold to take one back.`}
-                className={`absolute right-2 flex min-w-11 flex-col items-center gap-0.5 text-xs drop-shadow [-webkit-touch-callout:none] ${
-                  listening
-                    ? "bottom-[max(11rem,calc(env(safe-area-inset-bottom)+10rem))]"
-                    : "bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))]"
-                }`}
-              >
-                <span className={`text-3xl leading-none ${like.today > 0 ? "text-red-500" : "text-white"}`}>
-                  {like.today > 0 ? "♥" : "♡"}
-                </span>
-                {like.average !== null && <span className="tabular-nums">{like.average.toFixed(1)}</span>}
-                {/* Only the Likes given: empty dots would ask to be filled. Six rows held open, so the heart stays still. */}
-                <span aria-hidden className="grid h-[2.875rem] grid-cols-[repeat(5,0.375rem)] content-start gap-0.5">
-                  {Array.from({ length: like.today }, (_, n) => (
-                    <span key={n} className="size-1.5 rounded-full bg-red-500" />
-                  ))}
-                </span>
-              </button>
+              {onLike && (
+                <button
+                  type="button"
+                  onPointerDown={() => startHold(item)}
+                  onPointerUp={endHold}
+                  onPointerLeave={endHold}
+                  onPointerCancel={endHold}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (hold.current.fired) hold.current.fired = false;
+                    else likeOnce(item);
+                  }}
+                  aria-label={`Like (${like.today} of ${MAX_DAILY_LIKES} today). Hold to take one back.`}
+                  className={`absolute right-2 flex min-w-11 flex-col items-center gap-0.5 text-xs drop-shadow [-webkit-touch-callout:none] ${
+                    listening
+                      ? "bottom-[max(11rem,calc(env(safe-area-inset-bottom)+10rem))]"
+                      : "bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))]"
+                  }`}
+                >
+                  <span className={`text-3xl leading-none ${like.today > 0 ? "text-red-500" : "text-white"}`}>
+                    {like.today > 0 ? "♥" : "♡"}
+                  </span>
+                  {like.average !== null && <span className="tabular-nums">{like.average.toFixed(1)}</span>}
+                  {/* Only the Likes given: empty dots would ask to be filled. Six rows held open, so the heart stays still. */}
+                  <span aria-hidden className="grid h-[2.875rem] grid-cols-[repeat(5,0.375rem)] content-start gap-0.5">
+                    {Array.from({ length: like.today }, (_, n) => (
+                      <span key={n} className="size-1.5 rounded-full bg-red-500" />
+                    ))}
+                  </span>
+                </button>
+              )}
 
               {listening ? (
                 <div
                   onClick={(event) => event.stopPropagation()}
                   className="absolute inset-x-0 bottom-0 flex flex-col gap-4 bg-gradient-to-t from-black/60 to-transparent px-6 pt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
                 >
-                  <PrincipleCaption title={item.principleTitle} />
+                  <PrincipleCaption title={item.caption} />
                   {isActive && (
                     <>
                       <input
@@ -488,38 +539,40 @@ function FeedPlayer({
                 </div>
               ) : (
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-4 pt-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  <PrincipleCaption title={item.principleTitle} />
+                  <PrincipleCaption title={item.caption} />
                 </div>
               )}
             </section>
           );
         })}
 
-        <section className="flex h-dvh snap-start snap-always flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-2xl font-semibold">{ending.title}</p>
-          {ending.note && <p className="text-sm text-white/70">{ending.note}</p>}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => goTo(0)}
-              className="rounded-md border border-white/30 px-3 py-1.5 text-sm"
-            >
-              Watch again
-            </button>
-            <button
-              type="button"
-              onClick={() => onClose(items.length)}
-              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-black"
-            >
-              {ending.leave}
-            </button>
-          </div>
-        </section>
+        {ending && (
+          <section className="flex h-dvh snap-start snap-always flex-col items-center justify-center gap-4 px-6 text-center">
+            <p className="text-2xl font-semibold">{ending.title}</p>
+            {ending.note && <p className="text-sm text-white/70">{ending.note}</p>}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => goTo(0)}
+                className="rounded-md border border-white/30 px-3 py-1.5 text-sm"
+              >
+                Watch again
+              </button>
+              <button
+                type="button"
+                onClick={() => onClose(items.length)}
+                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-black"
+              >
+                {ending.leave}
+              </button>
+            </div>
+          </section>
+        )}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-4 bg-gradient-to-b from-black/50 to-transparent px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-6 text-sm">
         <span className="mr-auto text-white/80 tabular-nums">
-          {Math.min(active + 1, items.length)} / {items.length}
+          {counter ? counter(active) : `${Math.min(active + 1, items.length)} / ${items.length}`}
           {paused && current && <span className="ml-2 text-xs text-white/60">Paused</span>}
         </span>
         {current?.sourceUrl && (

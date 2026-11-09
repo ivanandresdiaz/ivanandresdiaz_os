@@ -1,11 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { computerLabel, inFlightLabel, MAX_CLIP_TITLE, type ClipSource } from "@/domain/clips";
+import { creatorForAccount, MAX_LIBRARY_NAME } from "@/domain/library";
 import { formatClock } from "@/domain/references";
 import { addClip, deleteClip, downloadClip, moveClipToPrinciple, renameClip } from "@/server/clip-actions";
 import type { ClipView } from "@/server/clips";
+import { moveClipToCreator } from "@/server/library-actions";
+import type { CreatorChoice } from "@/server/library";
 import { ConfirmDelete } from "./confirm-delete";
 import { useNow } from "./use-now";
 
@@ -20,13 +24,18 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "youtube", label: "YouTube" },
 ];
 
+export type LibraryChoices = { topics: { id: string; title: string }[]; creators: CreatorChoice[] };
+
 export function Clips({
   clips,
   principles,
+  library,
   computerCheckedAt,
 }: {
   clips: ClipView[];
   principles: { id: string; title: string }[];
+  /** Where a Clip can go in the Library. */
+  library: LibraryChoices;
   /** When Ivan's computer last looked for waiting Clips; only known while one waits. */
   computerCheckedAt: string | null;
 }) {
@@ -75,7 +84,13 @@ export function Clips({
       ) : (
         <ul className="flex flex-col gap-2">
           {shown.map((clip) => (
-            <ClipRow key={clip.id} clip={clip} principles={principles} computerCheckedAt={computerCheckedAt} />
+            <ClipRow
+              key={clip.id}
+              clip={clip}
+              principles={principles}
+              library={library}
+              computerCheckedAt={computerCheckedAt}
+            />
           ))}
         </ul>
       )}
@@ -131,14 +146,16 @@ function AddClip() {
 function ClipRow({
   clip,
   principles,
+  library,
   computerCheckedAt,
 }: {
   clip: ClipView;
   principles: { id: string; title: string }[];
+  library: LibraryChoices;
   computerCheckedAt: string | null;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const [moving, setMoving] = useState(false);
+  const [moving, setMoving] = useState<"principle" | "library" | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -190,7 +207,7 @@ function ClipRow({
           {facts.join(" · ")}
           {clip.status === "link" && " · Link only"}
         </p>
-        <Status
+        <DownloadStatus
           clip={clip}
           computerCheckedAt={computerCheckedAt}
           pending={pending}
@@ -201,17 +218,31 @@ function ClipRow({
             Open original ↗
           </a>
           {clip.status === "ready" && !moving && principles.length > 0 && (
-            <button type="button" className="text-accent hover:underline" onClick={() => setMoving(true)}>
+            <button type="button" className="text-accent hover:underline" onClick={() => setMoving("principle")}>
               Move to a Principle
             </button>
           )}
+          {clip.status === "ready" && !moving && (
+            <button type="button" className="text-accent hover:underline" onClick={() => setMoving("library")}>
+              Move to the Library
+            </button>
+          )}
         </div>
-        {moving && (
+        {moving === "principle" && (
           <MoveForm
             principles={principles}
             pending={pending}
-            onCancel={() => setMoving(false)}
+            onCancel={() => setMoving(null)}
             onMove={(principleId) => run(() => moveClipToPrinciple({ clipId: clip.id, principleId }))}
+          />
+        )}
+        {moving === "library" && (
+          <LibraryMoveForm
+            clip={clip}
+            library={library}
+            pending={pending}
+            onCancel={() => setMoving(null)}
+            onMove={(target) => run(() => moveClipToCreator({ clipId: clip.id, ...target }))}
           />
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}
@@ -220,7 +251,7 @@ function ClipRow({
   );
 }
 
-function Status({
+export function DownloadStatus({
   clip,
   computerCheckedAt,
   pending,
@@ -397,6 +428,121 @@ function MoveForm({
       </select>
       <div className="flex gap-2">
         <button className="btn-primary text-sm disabled:opacity-50" disabled={!principleId || pending}>
+          {pending ? "Moving…" : "Move"}
+        </button>
+        <button type="button" className="btn text-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const NEW_CREATOR = "new";
+
+/**
+ * Where the Clip goes in the Library: the Creator that already posts from its
+ * account, picked by itself, or a new Creator named after the account.
+ */
+function LibraryMoveForm({
+  clip,
+  library,
+  pending,
+  onMove,
+  onCancel,
+}: {
+  clip: ClipView;
+  library: LibraryChoices;
+  pending: boolean;
+  onMove: (target: { creatorId: string } | { newCreator: { topicId: string; name: string } }) => void;
+  onCancel: () => void;
+}) {
+  const known = creatorForAccount(library.creators, clip.author);
+  const [creatorId, setCreatorId] = useState(known?.id ?? (library.creators.length === 0 ? NEW_CREATOR : ""));
+  const [name, setName] = useState(clip.author ?? "");
+  const [topicId, setTopicId] = useState(library.topics.length === 1 ? library.topics[0].id : "");
+
+  if (library.topics.length === 0) {
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-line p-2 text-xs text-muted">
+        <p>
+          The Library has no Topics yet. Make one in{" "}
+          <Link href="/os/feed/library" className="text-accent hover:underline">
+            Feed → Library
+          </Link>
+          , then come back.
+        </p>
+        <button type="button" className="btn self-start text-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  const isNew = creatorId === NEW_CREATOR;
+  const ready = isNew ? Boolean(name.trim() && topicId) : Boolean(creatorId);
+  const byTopic = library.topics.map((t) => ({ ...t, creators: library.creators.filter((c) => c.topicId === t.id) }));
+
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-md border border-line p-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!ready) return;
+        onMove(isNew ? { newCreator: { topicId, name: name.trim() } } : { creatorId });
+      }}
+    >
+      <p className="text-xs text-muted">
+        It leaves Clips and becomes a Sample of:
+        {clip.author && <span> (posted by @{clip.author})</span>}
+      </p>
+      <select
+        value={creatorId}
+        onChange={(event) => setCreatorId(event.target.value)}
+        aria-label="Creator"
+        className="input text-sm"
+      >
+        <option value="">Choose a Creator</option>
+        {byTopic
+          .filter((t) => t.creators.length > 0)
+          .map((t) => (
+            <optgroup key={t.id} label={t.title}>
+              {t.creators.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        <option value={NEW_CREATOR}>New Creator…</option>
+      </select>
+      {isNew && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={MAX_LIBRARY_NAME}
+            placeholder="Creator's name"
+            aria-label="Creator's name"
+            className="input min-w-0 flex-1 text-sm"
+          />
+          <select
+            value={topicId}
+            onChange={(event) => setTopicId(event.target.value)}
+            aria-label="Topic"
+            className="input text-sm"
+          >
+            <option value="">In which Topic?</option>
+            {library.topics.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button className="btn-primary text-sm disabled:opacity-50" disabled={!ready || pending}>
           {pending ? "Moving…" : "Move"}
         </button>
         <button type="button" className="btn text-sm" onClick={onCancel}>

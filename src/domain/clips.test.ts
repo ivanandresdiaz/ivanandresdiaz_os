@@ -77,9 +77,23 @@ describe("What a download's result means", () => {
     expect(settleClip(result, started, soon)).toEqual({
       status: "ready",
       title: "Me",
+      author: null,
       durationS: 19,
       contentType: "video/mp4",
     });
+  });
+
+  it("keeps the account that posted it", () => {
+    const result: ClipResult = {
+      ok: true,
+      title: "Me",
+      author: "vendedorx",
+      durationS: 19,
+      contentType: "video/mp4",
+      sizeBytes: 9,
+      attempt: 0,
+    };
+    expect(settleClip(result, started, soon)).toMatchObject({ status: "ready", author: "vendedorx" });
   });
 
   it("keeps waiting while Cloud Run still has a retry", () => {

@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { updatePrinciple } from "@/server/actions";
 import type { PrincipleView } from "@/server/queries";
+import { pasteLink } from "@/server/clip-actions";
 import { ClipPicker } from "./clip-picker";
+import { IncomingList, PasteLink } from "./incoming";
 import { LongText } from "./long-text";
 import { Markdown } from "./markdown";
 import { ReferenceStrip, ReferenceUploader } from "./references";
@@ -123,8 +125,10 @@ function Drawer({
             editing={mode === "edit"}
             onOpen={setStory}
           />
+          <IncomingList incoming={principle.incoming} />
           {mode === "edit" && (
             <>
+              <PasteLink paste={(link) => pasteLink({ link, principleId: principle.id })} />
               <ReferenceUploader principleId={principle.id} />
               <ClipPicker principleId={principle.id} />
             </>

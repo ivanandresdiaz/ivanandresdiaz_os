@@ -99,6 +99,8 @@ export type ClipResult =
   | {
       ok: true;
       title: string | null;
+      /** The account that posted it; older downloaders leave it out. */
+      author?: string | null;
       durationS: number | null;
       contentType: string;
       sizeBytes: number;
@@ -118,7 +120,7 @@ export type ClipResult =
 export type ClipOutcome =
   /** `attempt`: the one now running, when a failed one says so (0 is the first). */
   | { status: "downloading"; attempt: number | null }
-  | { status: "ready"; title: string | null; durationS: number | null; contentType: string }
+  | { status: "ready"; title: string | null; author: string | null; durationS: number | null; contentType: string }
   | { status: "link" | "failed"; error: string; title: string | null; durationS: number | null };
 
 /** What Instagram's refusals mean, once the retries ran out. */
@@ -137,7 +139,13 @@ export function settleClip(result: ClipResult | null, startedAt: Date, now: Date
     return { status: "downloading", attempt: null };
   }
   if (result.ok) {
-    return { status: "ready", title: result.title, durationS: result.durationS, contentType: result.contentType };
+    return {
+      status: "ready",
+      title: result.title,
+      author: result.author ?? null,
+      durationS: result.durationS,
+      contentType: result.contentType,
+    };
   }
   const title = result.title ?? null;
   const durationS = result.durationS ?? null;
@@ -153,6 +161,9 @@ export function settleClip(result: ClipResult | null, startedAt: Date, now: Date
   const error = REFUSED_TEXT[result.reason as keyof typeof REFUSED_TEXT] ?? "Couldn't download.";
   return { status: "failed", error, title, durationS };
 }
+
+/** Why a long video pasted where content lives fails: a Sample or a Reference needs its file. */
+export const TOO_LONG_TO_KEEP = "Longer than 30 minutes, so it can't be kept here.";
 
 /** A Clip's title until it has one: what it is and where it came from. */
 export function fallbackClipTitle(source: ClipSource): string {

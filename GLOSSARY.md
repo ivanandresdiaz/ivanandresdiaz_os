@@ -14,7 +14,7 @@ _Evitar_: segundo cerebro (eso es Obsidian).
 **Expansion** (Expansión): el texto opcional de un Principle o de una Learning entry que lo desarrolla con explicación, ejemplos y referencias (como videos). Se lee a demanda; el título es el recordatorio.
 _Evitar_: Description, Reflection, body.
 
-**Reference** (Referencia): una imagen, un video o un audio que Ivan sube a un Principle, o que pasa ahí desde un Clip, porque lo encarna para él (p. ej. un reel que le cambió la forma de ver algo, o el fragmento de un podcast). Un Principle puede tener cualquier cantidad, en el orden que Ivan elija. Un audio lleva un título, porque no tiene nada que ver.
+**Reference** (Referencia): una imagen, un video o un audio que Ivan sube a un Principle, pega ahí como enlace o pasa ahí desde un Clip, porque lo encarna para él (p. ej. un reel que le cambió la forma de ver algo, o el fragmento de un podcast). Un Principle puede tener cualquier cantidad, en el orden que Ivan elija. Un audio lleva un título, porque no tiene nada que ver.
 _Evitar_: Story, Reel, Media, Podcast.
 
 **Feed**: la ronda diaria de hasta 10 References de cualquier Principle, que paso a mi ritmo. Las 9 primeras salen al azar y la última sale del Top 10, sin repetir ninguna en el día. Se elige una vez al día y no cambia. Queda terminada al llegar a la última Reference y sigue terminada todo el día: no hay más hasta mañana, aunque puedo volver a ver las de hoy desde la primera, como práctica, sin que eso deje registro. Es opcional: no da ni quita XP, no tiene Streak y no es Task ni Habit.
@@ -25,6 +25,20 @@ _Evitar_: Story, Reel, Media, Podcast.
 
 **Like Average** (Promedio de Likes): cuánto me mueve una Reference cada vez que me llega. Es el promedio de Likes por día, contando solo días ya terminados: cada día que llegó a mí en el Feed, aunque no le diera Likes (ese día vale 0), y cada día que le di Likes. Ver el Top 10 sin dar Likes no cuenta. No mide cuánto me ha influido en total.
 _Evitar_: Score, Rating, Total.
+
+**Library** (Biblioteca): mis Topics, con sus Creators y sus Samples: el contenido bueno que elijo yo, en vez del que me elige el algoritmo de Instagram. Es distinta de los Principles: no es lo core, sino oficios que estoy desarrollando o que quizá algún día desarrolle. No tiene metas, ni Likes, ni Top 10, y no se conecta con los Principles: nada pasa de uno al otro.
+_Evitar_: Feed (el Feed es la ronda diaria de los Principles), Learning Path, Clips.
+
+**Topic** (Tema): un área de la Library que puedo practicar por repetición, viendo cómo la hacen otros (p. ej. Sales, Spirituality). No necesita una Campaign ni una Learning Path.
+_Evitar_: Area, Category, Infinite Game (ese es una dimensión de la vida).
+
+**Creator** (Creador): una persona cuyo contenido guardo dentro de un Topic (p. ej. un vendedor que admiro). Vive en un solo Topic y se puede mover a otro; si alguien me sirve en dos Topics, es un Creator en cada uno. Le subo Samples, le pego el enlace de un reel o de un video, o le paso un Clip. Para lo que no tiene autor conocido, creo uno yo (p. ej. "Varios").
+
+**Sample** (Muestra): un reel, un video o una imagen de un Creator que guardo en la Library para verlo una y otra vez. Siempre es de un Creator y siempre tiene su archivo: un enlace pegado en un Creator se baja solo y, mientras tanto, aparece ahí como bajando (o fallido, para reintentar); un video de más de 30 minutos no puede ser Sample. Lleva un título, que puedo cambiar, y el enlace del post si vino de un Clip. No lleva Likes.
+_Evitar_: Reference (esa encarna un Principle), Clip, Post.
+
+**Practice** (Práctica): una sesión en la que veo los Samples de un Topic, de los Creators que elija (uno, varios o todos), al azar o en el orden de la Library. Al azar, cada Sample sale una vez antes de repetirse; en orden, al llegar al último vuelve al primero. Sigue mientras yo quiera y no deja registro: cada Practice empieza de nuevo. Se elige desde el Feed, pero no cambia la ronda diaria de los Principles.
+_Evitar_: Feed, Top 10, Review.
 
 **Input**: lo que hago en el presente (un hábito cumplido, un bloque de trabajo). Se juega por inputs; solo los inputs suman puntos y rachas.
 **Output**: el resultado que llega después (ingresos, kilos, features en producción). No se persigue directamente, porque trae ansiedad y saca del presente. Puede ser el objetivo declarado, pero nunca da puntos.
@@ -164,7 +178,7 @@ _Evitar_: Password manager, Caja de contraseñas.
 
 **Backup** (Respaldo): una copia de todos los Vaults en un archivo que descargo con un clic y que se abre sin internet, en cualquier navegador, con la Passphrase que tenía al descargarlo. Es solo para leer: no se vuelve a cargar en Ivan OS. Es una foto de ese momento: lo que agregue después no está en él hasta que descargue otro.
 
-**Clip**: algo que guardo de internet pegando su enlace, para darle uso después (por ahora, un reel de Instagram o un video de YouTube). Pego el enlace y me olvido: lo que haya que bajar se baja solo. Siempre conserva el enlace; los reels siempre traen además su archivo, y un video de YouTube solo si lo elijo y dura como máximo 30 minutos; ese se baja en mi computador, la próxima vez que esté prendido. Su archivo siempre se puede ver en mi iPhone, aunque eso cueste calidad. Lleva un título, que nace del título del post o del video y puedo cambiar. Clips es un banco de paso, no un archivo: un Clip con su archivo se pasa a un Principle como Reference y deja de ser Clip, sin quedar copia.
+**Clip**: algo que guardo de internet pegando su enlace sin decidir todavía dónde vive, para darle uso después (por ahora, un reel de Instagram o un video de YouTube). Pego el enlace y me olvido: lo que haya que bajar se baja solo. Siempre conserva el enlace; los reels siempre traen además su archivo, y un video de YouTube solo si lo elijo y dura como máximo 30 minutos; ese se baja en mi computador, la próxima vez que esté prendido. Su archivo siempre se puede ver en mi iPhone, aunque eso cueste calidad. Lleva un título, que nace del título del post o del video y puedo cambiar. Clips es un banco de paso, no un archivo: un Clip con su archivo se pasa a un Principle como Reference o a un Creator como Sample, y deja de ser Clip, sin quedar copia. Lo que ya sé dónde vive no pasa por Clips: pego el enlace directamente en el Creator o en el Principle, y si ese enlace estaba en Clips, sale de ahí.
 _Evitar_: Capture (capturar es del Learning Log y de las Secondary Tasks), Reference, Link, Media.
 
 **Long text** (Texto largo): un campo donde escribo con calma algo extenso (el contexto de la Season, el texto del Quarter, el GPS de una Campaign, la Expansion de un Principle o de una Learning entry, la Description de una Task o un Move, el por qué de un Highlight, el Journal, las notas de la Weekly Review). Siempre trae Dictation y English Coach. Los títulos y los campos cortos no lo son.

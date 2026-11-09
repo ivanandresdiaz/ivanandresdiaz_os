@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -502,13 +503,64 @@ export const clips = pgTable(
     sizeBytes: integer("size_bytes"),
     durationS: integer("duration_s"),
     error: text("error"),
+    /** The account that posted it, as the downloader saw it; it picks the Creator a Clip moves to. */
+    author: text("author"),
+    /**
+     * Where a link pasted where content lives is going: it is not in the Clips
+     * bank, and it lands there by itself once its file is downloaded.
+     */
+    creatorId: uuid("creator_id").references((): AnyPgColumn => creators.id, { onDelete: "cascade" }),
+    principleId: uuid("principle_id").references(() => principles.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
   (t) => [
     check("clips_source", sql`${t.source} in ('instagram', 'youtube')`),
+    check("clips_one_destination", sql`${t.creatorId} is null or ${t.principleId} is null`),
     check("clips_status", sql`${t.status} in ('link', 'waiting', 'downloading', 'ready', 'failed')`),
   ],
 );
+
+// ─── Library ─────────────────────────────────────────────────────────────────
+
+/** An area Ivan practices by watching how others do it, in the order he drags. */
+export const topics = pgTable("topics", {
+  id: id(),
+  title: text("title").notNull(),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * Someone whose content Ivan keeps, in exactly one Topic. `account` is the
+ * Instagram or YouTube account it posts from, learnt from the first Clip moved
+ * to it, so later Clips from that account find it by themselves.
+ */
+export const creators = pgTable("creators", {
+  id: id(),
+  topicId: uuid("topic_id")
+    .notNull()
+    .references(() => topics.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  account: text("account"),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
+
+/** A reel, video or image of a Creator, stored in R2 under `key`. New ones take the lowest position, so they show first. */
+export const samples = pgTable("samples", {
+  id: id(),
+  creatorId: uuid("creator_id")
+    .notNull()
+    .references(() => creators.id, { onDelete: "cascade" }),
+  key: text("key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  title: text("title"),
+  /** The post it came from, when it came from a Clip. */
+  sourceUrl: text("source_url"),
+  sizeBytes: integer("size_bytes").notNull(),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
 
 export const learningPathStatus = pgEnum("learning_path_status", ["candidate", "active", "done", "dropped"]);
 
