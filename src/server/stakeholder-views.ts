@@ -14,6 +14,8 @@ import {
   type Stage,
   STALE_THINKING_MS,
   stagesFor,
+  stepsDone,
+  themeSteps,
 } from "@/domain/discovery";
 import { presignView } from "@/lib/r2";
 import { currentRound, loadInterview, type Turn } from "./interview-engine";
@@ -118,6 +120,8 @@ export async function stakeholderInterview(
   stakeholder: Stakeholder,
   themeId: string,
   otherLabel: string,
+  /** The Theme they came straight from, to celebrate; kept only if it is theirs and done. */
+  celebrate: string | null = null,
 ): Promise<InterviewProps | null> {
   const [row] = await db
     .select({ theme: s.discoveryThemes, interviewId: s.interviews.id })
@@ -129,11 +133,19 @@ export async function stakeholderInterview(
     )
     .where(and(eq(s.stakeholderThemes.stakeholderId, stakeholder.id), eq(s.stakeholderThemes.themeId, themeId)));
   if (!row) return null;
+  const stages = stagesFor(stakeholder);
+  const themes = (await themeCards(stakeholder)).map((t) => ({
+    id: t.id,
+    title: t.title,
+    done: t.interview?.phase === "done",
+    steps: { done: stepsDone(stages, t.interview), total: themeSteps(stages) },
+  }));
   const base = {
     language: discovery.language as Language,
     isTest: stakeholder.isTest,
     firstName: firstName(stakeholder.name),
-    themes: (await themeCards(stakeholder)).map((t) => ({ id: t.id, title: t.title, done: t.interview?.phase === "done" })),
+    themes,
+    celebrate: celebrate && themes.some((t) => t.id === celebrate && t.done) ? celebrate : null,
     theme: { id: row.theme.id, title: row.theme.title, description: row.theme.description },
     stages: stagesFor(stakeholder),
   };

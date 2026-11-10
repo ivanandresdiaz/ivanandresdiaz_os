@@ -9,6 +9,9 @@ import {
   maskSensitive,
   nextStage,
   nextTheme,
+  stepsDone,
+  themeRound,
+  themeSteps,
   pdfPageCount,
   quoteFound,
   type Round,
@@ -300,5 +303,41 @@ describe("nextTheme", () => {
 
   it("never offers the Theme just finished", () => {
     expect(nextTheme([{ id: "a", done: false }], "a")).toBeNull();
+  });
+});
+
+describe("Theme progress", () => {
+  const both = ["needs", "vision"] as const;
+
+  it("counts each round and each stage's closing as a step", () => {
+    expect(themeSteps(both)).toBe(7);
+    expect(themeSteps(["needs"])).toBe(4);
+    expect(themeSteps(["vision"])).toBe(3);
+  });
+
+  it("is zero before the Interview starts, and full once it is done", () => {
+    expect(stepsDone(both, null)).toBe(0);
+    expect(stepsDone(both, { stage: "vision", round: 2, phase: "done" })).toBe(7);
+  });
+
+  it("counts the rounds already answered", () => {
+    expect(stepsDone(both, { stage: "needs", round: 1, phase: "answering" })).toBe(0);
+    expect(stepsDone(both, { stage: "needs", round: 3, phase: "thinking" })).toBe(2);
+    expect(stepsDone(both, { stage: "needs", round: 3, phase: "closing" })).toBe(3);
+  });
+
+  it("adds the stages before, closing included", () => {
+    expect(stepsDone(both, { stage: "vision", round: 1, phase: "thinking" })).toBe(4);
+    expect(stepsDone(both, { stage: "vision", round: 2, phase: "answering" })).toBe(5);
+  });
+
+  it("never reaches full before the last closing is sent", () => {
+    expect(stepsDone(both, { stage: "vision", round: 2, phase: "closing" })).toBe(6);
+  });
+
+  it("numbers rounds across the whole Theme, so Vision doesn't start over", () => {
+    expect(themeRound(both, "needs", 3)).toEqual({ n: 3, of: 5 });
+    expect(themeRound(both, "vision", 1)).toEqual({ n: 4, of: 5 });
+    expect(themeRound(["vision"], "vision", 2)).toEqual({ n: 2, of: 2 });
   });
 });

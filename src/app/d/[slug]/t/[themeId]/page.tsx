@@ -11,15 +11,18 @@ import { stakeholderInterview } from "@/server/stakeholder-views";
 export const maxDuration = 300;
 
 /** One Theme's Interview. Someone signed out, or a closed Discovery, goes back to the link's home. */
-export default async function ThemePage({ params }: PageProps<"/d/[slug]/t/[themeId]">) {
+export default async function ThemePage({ params, searchParams }: PageProps<"/d/[slug]/t/[themeId]">) {
   const { slug, themeId } = await params;
+  // ?listo=<Theme> when they came straight from finishing it (Ronda 57).
+  const listo = (await searchParams).listo;
+  const celebrate = typeof listo === "string" && z.uuid().safeParse(listo).success ? listo : null;
   if (!SLUG.test(slug) || !z.uuid().safeParse(themeId).success) notFound();
   await connection();
   const found = await access(slug);
   if (found.kind === "missing") notFound();
   if (found.kind !== "in") redirect(`/d/${slug}`);
   const copy = copyFor(found.discovery.language);
-  const props = await stakeholderInterview(found.discovery, found.stakeholder, themeId, copy.other);
+  const props = await stakeholderInterview(found.discovery, found.stakeholder, themeId, copy.other, celebrate);
   if (!props) notFound();
   return (
     <div lang={found.discovery.language} className="flex flex-1 flex-col">

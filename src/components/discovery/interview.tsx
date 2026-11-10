@@ -8,18 +8,19 @@ import {
   type Language,
   type Masked,
   type Phase,
-  ROUNDS,
   type Round,
   displayOptions,
   isNoneOption,
   nextTheme,
   type RoundQuestion,
+  themeRound,
   type Stage,
 } from "@/domain/discovery";
 import { addMore, finishStage, retryRound, startInterview, submitAnswers } from "@/server/stakeholder-actions";
 import { useRemembered } from "../use-remembered";
 import { Attachments, type PendingFile } from "./attachments";
 import { type Copy, copyFor } from "./copy";
+import { type ThemeProgress, ThemeCheer, ThemesBar } from "./progress";
 import { SignOutButton } from "./sign-out-button";
 import { VoiceField } from "./voice-field";
 
@@ -33,8 +34,10 @@ export type InterviewProps = {
   isTest: boolean;
   firstName: string;
   theme: { id: string; title: string; description: string };
-  /** This person's Themes in Ivan's order, to say what comes next. */
-  themes: { id: string; title: string; done: boolean }[];
+  /** This person's Themes in Ivan's order, to say what comes next and how far they are. */
+  themes: ThemeProgress[];
+  /** The Theme they just finished, when they came straight from it: celebrate it on top (Ronda 57). */
+  celebrate: string | null;
   stages: Stage[];
   interview: {
     id: string;
@@ -58,6 +61,19 @@ export function InterviewScreen(props: InterviewProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, startStarting] = useTransition();
   const [waiting, setWaiting] = useState(false);
+  /** The Theme they just finished, celebrated on top until they start or answer (Ronda 57). */
+  const [cheer, setCheer] = useState(props.celebrate);
+  /** Finishing this Theme and on the way to the next one. */
+  const [leaving, setLeaving] = useState(false);
+  const sending = (on: boolean) => {
+    if (on) setCheer(null);
+    setWaiting(on);
+  };
+
+  // A reload shouldn't celebrate again: drop the mark from the address.
+  useEffect(() => {
+    if (props.celebrate) window.history.replaceState(null, "", `/d/${props.slug}/t/${props.theme.id}`);
+  }, [props.celebrate, props.slug, props.theme.id]);
 
   // A notice is read once, then gets out of the way.
   useEffect(() => {
@@ -82,6 +98,9 @@ export function InterviewScreen(props: InterviewProps) {
   };
 
   const stageLabel = interview ? (interview.stage === "needs" ? copy.needs : copy.vision) : null;
+  const themeNumber = props.themes.filter((t) => t.done && t.id !== props.theme.id).length + 1;
+  const roundOfTheme = interview ? themeRound(props.stages, interview.stage, interview.round) : null;
+  const next = nextTheme(props.themes, props.theme.id);
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 px-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
@@ -96,14 +115,18 @@ export function InterviewScreen(props: InterviewProps) {
           <h1 className="text-2xl font-semibold tracking-tight">{props.theme.title}</h1>
           {props.theme.description && <p className="text-sm text-muted">{props.theme.description}</p>}
         </div>
-        {interview && interview.phase !== "done" && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {props.stages.length > 1 && (
-              <span className="rounded-full bg-accent/10 px-2.5 py-1 font-medium text-accent">{stageLabel}</span>
-            )}
-            {interview.phase !== "closing" && (
-              <span className="text-muted">{copy.round(interview.round, ROUNDS[interview.stage])}</span>
-            )}
+        {interview?.phase !== "done" && !leaving && !cheer && (
+          <div className="flex flex-col gap-2">
+            <ThemesBar themes={props.themes} label={copy.progressLabel} current={props.theme.id} size="thin" />
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {interview && props.stages.length > 1 && (
+                <span className="rounded-full bg-accent/10 px-2.5 py-1 font-medium text-accent">{stageLabel}</span>
+              )}
+              <span className="font-medium text-muted">{copy.themeOf(themeNumber, props.themes.length)}</span>
+              {interview && roundOfTheme && interview.phase !== "closing" && (
+                <span className="text-muted">· {copy.round(roundOfTheme.n, roundOfTheme.of)}</span>
+              )}
+            </div>
           </div>
         )}
         {interview && interview.phase !== "done" && interview.phase !== "closing" && interview.understood.length > 0 && (
@@ -120,6 +143,12 @@ export function InterviewScreen(props: InterviewProps) {
         </p>
       )}
 
+      {cheer && props.themes.some((t) => t.id === cheer && t.done) && (
+        <ThemeCheer copy={copy} name={props.firstName} themes={props.themes} finished={cheer} />
+      )}
+
+      {leaving && <p className="py-8 text-center text-sm text-muted">{copy.movingOn}</p>}
+
       {!interview &&
         (starting ? (
           <Thinking copy={copy} title={copy.starting} understood={[]} />
@@ -129,7 +158,10 @@ export function InterviewScreen(props: InterviewProps) {
             <p className="text-sm leading-relaxed text-muted">{copy.startHint}</p>
             <button
               type="button"
-              onClick={() => startStarting(() => startInterview({ slug: props.slug, themeId: props.theme.id }))}
+              onClick={() => {
+                setCheer(null);
+                startStarting(() => startInterview({ slug: props.slug, themeId: props.theme.id }));
+              }}
               className="min-h-12 rounded-full bg-accent px-6 text-base font-medium text-white shadow-sm active:scale-[0.99]"
             >
               {copy.start}
@@ -155,12 +187,12 @@ export function InterviewScreen(props: InterviewProps) {
           roundNumber={interview.round}
           round={props.round}
           pending={props.pending}
-          onSending={setWaiting}
+          onSending={sending}
           onResult={onResult}
         />
       )}
 
-      {interview && !waiting && interview.phase === "closing" && (
+      {interview && !waiting && !leaving && interview.phase === "closing" && (
         <Closing
           slug={props.slug}
           copy={copy}
@@ -168,12 +200,17 @@ export function InterviewScreen(props: InterviewProps) {
           understood={interview.understood}
           pending={props.pending}
           goesOn={props.stages.indexOf(interview.stage) < props.stages.length - 1}
-          onSending={setWaiting}
+          next={next}
+          onSending={sending}
           onResult={onResult}
+          onNextTheme={(id) => {
+            setLeaving(true);
+            router.push(`/d/${props.slug}/t/${id}?listo=${props.theme.id}`);
+          }}
         />
       )}
 
-      {interview && interview.phase === "done" && (
+      {interview && interview.phase === "done" && !leaving && (
         <Done
           slug={props.slug}
           copy={copy}
@@ -181,19 +218,15 @@ export function InterviewScreen(props: InterviewProps) {
           pending={props.pending}
           onResult={onResult}
           isTest={props.isTest}
-          next={nextTheme(props.themes, props.theme.id)}
-          left={props.themes.filter((t) => !t.done).length}
-          total={props.themes.length}
+          next={next}
+          themes={props.themes}
+          themeId={props.theme.id}
+          firstName={props.firstName}
         />
       )}
 
-      {interview && props.history.length > 0 && (
-        <Conversation
-          key={interview.phase === "done" ? "done" : "going"}
-          copy={copy}
-          history={props.history}
-          open={interview.phase === "done"}
-        />
+      {interview && !leaving && props.history.length > 0 && (
+        <Conversation copy={copy} history={props.history} stages={props.stages} />
       )}
     </div>
   );
@@ -491,17 +524,23 @@ function Closing({
   understood,
   pending,
   goesOn,
+  next,
   onSending,
   onResult,
+  onNextTheme,
 }: {
   slug: string;
   copy: Copy;
   interviewId: string;
   understood: string[];
   pending: PendingFile[];
+  /** Another stage of this Theme follows. */
   goesOn: boolean;
+  /** The Theme to go on with once this one ends; null on the last. */
+  next: { id: string } | null;
   onSending: (sending: boolean) => void;
   onResult: (result: { ok: true; masked: Masked[] } | { ok: false; error: string }) => void;
+  onNextTheme: (themeId: string) => void;
 }) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(false);
@@ -531,19 +570,25 @@ function Closing({
           if (goesOn) onSending(true);
           start(async () => {
             const result = await finishStage({ slug, interviewId, text, input: voice ? "voice" : "text" });
+            // "Terminar y pasar al siguiente tema" does what it says (Ronda 57, Q13).
+            if (result.ok && !goesOn && next) onNextTheme(next.id);
             onSending(false);
             onResult(result);
           });
         }}
         className="min-h-12 rounded-full bg-accent px-6 text-base font-medium text-white shadow-sm disabled:opacity-50"
       >
-        {sending ? copy.sendingRound : goesOn ? copy.closingNext : copy.finish}
+        {sending ? copy.sendingRound : goesOn ? copy.closingNext : next ? copy.finishAndNext : copy.finish}
       </button>
     </section>
   );
 }
 
-/** The end of a Theme: thanks, what comes next (another Theme, or finishing), and room to add more (Q27). */
+/**
+ * A finished Theme (Q55–Q57, Ronda 57): while Themes are left, the progress
+ * and the next one, so it never feels like the end of everything; after the
+ * last, finishing. Adding more stays possible (Q27), behind a link until the end.
+ */
 function Done({
   slug,
   copy,
@@ -552,8 +597,9 @@ function Done({
   onResult,
   isTest,
   next,
-  left,
-  total,
+  themes,
+  themeId,
+  firstName,
 }: {
   slug: string;
   copy: Copy;
@@ -563,81 +609,112 @@ function Done({
   isTest: boolean;
   /** The Theme to go on with; null once every Theme is done. */
   next: { id: string; title: string } | null;
-  left: number;
-  total: number;
+  themes: ThemeProgress[];
+  themeId: string;
+  firstName: string;
+}) {
+  const [adding, setAdding] = useState(!next);
+  return (
+    <>
+      {next ? (
+        <ThemeCheer copy={copy} name={firstName} themes={themes} finished={themeId}>
+          <div className="flex w-full flex-col items-center gap-1">
+            <Link
+              href={`/d/${slug}/t/${next.id}`}
+              className="flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-6 text-sm font-medium text-white shadow-sm active:scale-[0.99]"
+            >
+              {copy.nextTheme(next.title)} →
+            </Link>
+            <SignOutButton slug={slug} look="quiet" label={isTest ? copy.finishTest : copy.finishForNow} />
+          </div>
+        </ThemeCheer>
+      ) : (
+        <section className="card-in flex flex-col items-center gap-2 rounded-3xl border border-line bg-surface px-6 py-8 text-center shadow-sm">
+          <span className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-2xl text-accent">✓</span>
+          <h2 className="text-xl font-semibold">{copy.allDoneTitle}</h2>
+          <p className="max-w-sm text-sm text-muted">{copy.doneBody}</p>
+          <div className="mt-4 flex w-full flex-col items-center gap-1">
+            <SignOutButton slug={slug} look="primary" label={isTest ? copy.finishTest : copy.finishAndSignOut} />
+            <Link href={`/d/${slug}`} className="flex min-h-11 w-full items-center justify-center text-sm font-medium text-accent">
+              {copy.backToMenu}
+            </Link>
+          </div>
+        </section>
+      )}
+      {adding ? (
+        <AddMore slug={slug} copy={copy} interviewId={interviewId} pending={pending} onResult={onResult} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="min-h-11 self-start text-sm text-muted underline underline-offset-4"
+        >
+          + {copy.addMoreLink}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** Something more for a finished Theme: text, voice or files (Q27). */
+function AddMore({
+  slug,
+  copy,
+  interviewId,
+  pending,
+  onResult,
+}: {
+  slug: string;
+  copy: Copy;
+  interviewId: string;
+  pending: PendingFile[];
+  onResult: (result: { ok: true; masked: Masked[] } | { ok: false; error: string }) => void;
 }) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(false);
   const [sent, setSent] = useState(false);
   const [sending, start] = useTransition();
   return (
-    <>
-      <section className="card-in flex flex-col items-center gap-2 rounded-3xl border border-line bg-surface px-6 py-8 text-center shadow-sm">
-        <span className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-2xl text-accent">✓</span>
-        <h2 className="text-xl font-semibold">{next ? copy.doneTitle : copy.allDoneTitle}</h2>
-        <p className="max-w-sm text-sm text-muted">{copy.doneBody}</p>
-        {next && <p className="text-xs font-medium text-accent">{copy.themesLeft(left, total)}</p>}
-        <div className="mt-4 flex w-full flex-col items-center gap-1">
-          {next ? (
-            <>
-              <Link
-                href={`/d/${slug}/t/${next.id}`}
-                className="flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-6 text-sm font-medium text-white shadow-sm active:scale-[0.99]"
-              >
-                {copy.nextTheme(next.title)} →
-              </Link>
-              <SignOutButton slug={slug} look="quiet" label={isTest ? copy.finishTest : copy.finishForNow} />
-            </>
-          ) : (
-            <>
-              <SignOutButton slug={slug} look="primary" label={isTest ? copy.finishTest : copy.finishAndSignOut} />
-              <Link href={`/d/${slug}`} className="flex min-h-11 w-full items-center justify-center text-sm font-medium text-accent">
-                {copy.backToMenu}
-              </Link>
-            </>
-          )}
-        </div>
-      </section>
-      <section className="flex flex-col gap-3 rounded-3xl border border-line bg-surface p-5">
-        <h3 className="font-medium">{copy.addMoreTitle}</h3>
-        <VoiceField
-          slug={slug}
-          copy={copy}
-          label={copy.addMoreTitle}
-          value={text}
-          onChange={(next, fromVoice) => {
-            setText(next);
-            setSent(false);
-            if (fromVoice) setVoice(true);
-          }}
-        />
-        <Attachments slug={slug} interviewId={interviewId} copy={copy} pending={pending} />
-        {sent && <p className="text-sm text-accent">{copy.added}</p>}
-        <button
-          type="button"
-          disabled={sending || (!text.trim() && pending.length === 0)}
-          onClick={() =>
-            start(async () => {
-              const result = await addMore({ slug, interviewId, text, input: voice ? "voice" : "text" });
-              if (result.ok) {
-                setText("");
-                setVoice(false);
-                setSent(true);
-              }
-              onResult(result);
-            })
-          }
-          className="min-h-11 self-end rounded-full bg-accent px-6 text-sm font-medium text-white disabled:opacity-40"
-        >
-          {sending ? copy.sendingRound : copy.addMoreSend}
-        </button>
-      </section>
-    </>
+    <section className="card-in flex flex-col gap-3 rounded-3xl border border-line bg-surface p-5">
+      <h3 className="font-medium">{copy.addMoreTitle}</h3>
+      <VoiceField
+        slug={slug}
+        copy={copy}
+        label={copy.addMoreTitle}
+        value={text}
+        onChange={(next, fromVoice) => {
+          setText(next);
+          setSent(false);
+          if (fromVoice) setVoice(true);
+        }}
+      />
+      <Attachments slug={slug} interviewId={interviewId} copy={copy} pending={pending} />
+      {sent && <p className="text-sm text-accent">{copy.added}</p>}
+      <button
+        type="button"
+        disabled={sending || (!text.trim() && pending.length === 0)}
+        onClick={() =>
+          start(async () => {
+            const result = await addMore({ slug, interviewId, text, input: voice ? "voice" : "text" });
+            if (result.ok) {
+              setText("");
+              setVoice(false);
+              setSent(true);
+            }
+            onResult(result);
+          })
+        }
+        className="min-h-11 self-end rounded-full bg-accent px-6 text-sm font-medium text-white disabled:opacity-40"
+      >
+        {sending ? copy.sendingRound : copy.addMoreSend}
+      </button>
+    </section>
   );
 }
 
-function Conversation({ copy, history, open: startOpen }: { copy: Copy; history: HistoryBlock[]; open: boolean }) {
-  const [open, setOpen] = useState(startOpen);
+/** What they said, closed until they ask for it: reading it shouldn't pull them out of the flow (Ronda 57). */
+function Conversation({ copy, history, stages }: { copy: Copy; history: HistoryBlock[]; stages: Stage[] }) {
+  const [open, setOpen] = useState(false);
   return (
     <section className="flex flex-col gap-3">
       <button type="button" onClick={() => setOpen((o) => !o)} className="self-start text-sm text-muted underline underline-offset-4">
@@ -649,7 +726,8 @@ function Conversation({ copy, history, open: startOpen }: { copy: Copy; history:
             block.kind === "round" ? (
               <div key={i} className="flex flex-col gap-2">
                 <p className="text-xs font-medium tracking-wide text-muted uppercase">
-                  {block.stage === "needs" ? copy.needs : copy.vision} · {copy.round(block.round, ROUNDS[block.stage])}
+                  {block.stage === "needs" ? copy.needs : copy.vision} ·{" "}
+                  {copy.round(themeRound(stages, block.stage, block.round).n, themeRound(stages, block.stage, block.round).of)}
                 </p>
                 {block.intro && <p className="rounded-2xl rounded-tl-md bg-accent/10 px-3 py-2 text-sm">{block.intro}</p>}
                 {block.qa.map((item, j) => (

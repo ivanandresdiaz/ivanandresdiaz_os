@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { firstName, ROUNDS, type Stage } from "@/domain/discovery";
+import { firstName, type Stage, stepsDone, themeRound, themeSteps } from "@/domain/discovery";
 import type { ThemeCard } from "@/server/stakeholder-views";
 import { Markdown } from "../markdown";
 import type { Copy } from "./copy";
 import { IvanSays } from "./ivan-says";
 import { OpeningPanel } from "./opening-panel";
+import { ThemesBar } from "./progress";
 import { SignOutButton } from "./sign-out-button";
 
 /** The frame every Stakeholder screen shares: who invites, the Discovery's name, and what comes below. */
@@ -52,12 +53,13 @@ export function PromiseNote({ copy }: { copy: Copy }) {
   );
 }
 
-function status(copy: Copy, i: ThemeCard["interview"]) {
+function status(copy: Copy, i: ThemeCard["interview"], stages: Stage[]) {
   if (!i) return { label: copy.notStarted, action: copy.start, tone: "text-muted" };
   if (i.phase === "done") return { label: copy.finished, action: copy.view, tone: "text-accent" };
   if (i.phase === "failed") return { label: copy.stuck, action: copy.continue, tone: "text-amber-700" };
   if (i.phase === "closing") return { label: copy.closing, action: copy.continue, tone: "text-accent" };
-  return { label: copy.inProgress(i.round, ROUNDS[i.stage]), action: copy.continue, tone: "text-accent" };
+  const r = themeRound(stages, i.stage, i.round);
+  return { label: copy.inProgress(r.n, r.of), action: copy.continue, tone: "text-accent" };
 }
 
 export function StakeholderHome({
@@ -98,6 +100,16 @@ export function StakeholderHome({
             ? copy.ivanProgress(firstName(name), left, themes.length)
             : copy.ivanStart(firstName(name))}
       </IvanSays>
+      <ThemesBar
+        label={copy.progressLabel}
+        size="big"
+        themes={themes.map((t) => ({
+          id: t.id,
+          title: t.title,
+          done: t.interview?.phase === "done",
+          steps: { done: stepsDone(stages, t.interview), total: themeSteps(stages) },
+        }))}
+      />
       {allDone && <SignOutButton slug={slug} look="primary" label={isTest ? copy.finishTest : copy.finishAndSignOut} />}
       <PromiseNote copy={copy} />
 
@@ -126,7 +138,7 @@ export function StakeholderHome({
           <p className="text-sm text-muted">{copy.themesHint}</p>
         </div>
         {themes.map((theme) => {
-          const st = status(copy, theme.interview);
+          const st = status(copy, theme.interview, stages);
           return (
             <Link
               key={theme.id}

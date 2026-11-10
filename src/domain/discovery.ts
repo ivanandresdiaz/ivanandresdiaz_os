@@ -44,6 +44,36 @@ export function nextStage(s: { wantsNeeds: boolean; wantsVision: boolean }, curr
   return stages[stages.indexOf(current) + 1] ?? null;
 }
 
+// ─── Progress (Ronda 57) ─────────────────────────────────────────────────────
+
+const stepsOf = (stages: readonly Stage[]) => stages.reduce((n, stage) => n + ROUNDS[stage] + 1, 0);
+
+/** The steps of one Theme for this person: every round, and each stage's closing. */
+export function themeSteps(stages: readonly Stage[]) {
+  return stepsOf(stages);
+}
+
+/** How many of a Theme's steps are behind them; full only once the Interview is done. */
+export function stepsDone(
+  stages: readonly Stage[],
+  interview: { stage: Stage; round: number; phase: Phase } | null,
+) {
+  if (!interview) return 0;
+  const total = stepsOf(stages);
+  if (interview.phase === "done") return total;
+  const at = stages.indexOf(interview.stage);
+  const before = stepsOf(stages.slice(0, Math.max(at, 0)));
+  const here = interview.phase === "closing" ? ROUNDS[interview.stage] : interview.round - 1;
+  return Math.min(total - 1, before + here);
+}
+
+/** "Ronda 4 de 5": the round counted across the whole Theme, so Vision doesn't start over. */
+export function themeRound(stages: readonly Stage[], stage: Stage, round: number) {
+  const at = stages.indexOf(stage);
+  const before = stages.slice(0, Math.max(at, 0)).reduce((n, s) => n + ROUNDS[s], 0);
+  return { n: before + round, of: stages.reduce((n, s) => n + ROUNDS[s], 0) };
+}
+
 /**
  * Where a Stakeholder goes after finishing a Theme: the next one not done, in
  * Ivan's order, wrapping around to any left half-answered earlier. Null when
