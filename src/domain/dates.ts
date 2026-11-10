@@ -139,6 +139,77 @@ export function quarterLabel({ year, quarter }: QuarterRef): string {
   return `Q${quarter} ${year}`;
 }
 
+/** Whole days from `from` to `to` (negative when `to` comes first). */
+function daysBetween(from: IsoDate, to: IsoDate): number {
+  return Math.round((fromIso(to).getTime() - fromIso(from).getTime()) / 86_400_000);
+}
+
+/** "October 1 – December 31, 2026". */
+export function quarterSpan(ref: QuarterRef): string {
+  const { start, end } = quarterRange(ref);
+  const day = (date: IsoDate) => {
+    const [, m, d] = date.split("-").map(Number);
+    return `${MONTH_NAMES[m - 1]} ${d}`;
+  };
+  return `${day(start)} – ${day(end)}, ${ref.year}`;
+}
+
+/**
+ * How much of a Quarter is left, as Ivan plans with it. Today counts as left,
+ * because the last day of a Quarter is still a day to play. Weeks are the
+ * Monday-to-Sunday weeks that touch what is left, this week included, since
+ * Campaign work moves one week of Moves at a time.
+ */
+export type QuarterClock =
+  | { phase: "ahead"; startsIn: number; weeks: number }
+  | { phase: "running"; daysLeft: number; weeksLeft: number; used: number }
+  | { phase: "ended" };
+
+/** The weeks, Monday to Sunday, that touch the days from `from` to `to`. */
+function weeksTouching(from: IsoDate, to: IsoDate): number {
+  return Math.floor(daysBetween(startOfWeek(from), to) / 7) + 1;
+}
+
+export function quarterClock(ref: QuarterRef, today: IsoDate): QuarterClock {
+  const { start, end } = quarterRange(ref);
+  if (today < start) return { phase: "ahead", startsIn: daysBetween(today, start), weeks: weeksTouching(start, end) };
+  if (today > end) return { phase: "ended" };
+  const total = daysBetween(start, end) + 1;
+  return {
+    phase: "running",
+    daysLeft: daysBetween(today, end) + 1,
+    weeksLeft: weeksTouching(today, end),
+    used: daysBetween(start, today) / total,
+  };
+}
+
+const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+
+/** "53 days · 8 weeks left", "Last day", "Starts in 53 days · 14 weeks", "Ended". */
+export function quarterClockText(clock: QuarterClock): string {
+  switch (clock.phase) {
+    case "ahead":
+      return `Starts in ${plural(clock.startsIn, "day")} · ${plural(clock.weeks, "week")}`;
+    case "running":
+      return clock.daysLeft === 1
+        ? "Last day"
+        : `${plural(clock.daysLeft, "day")} · ${plural(clock.weeksLeft, "week")} left`;
+    case "ended":
+      return "Ended";
+  }
+}
+
+/** Where each Monday falls along the Quarter, from 0 (its first day) to 1 (past its last). */
+export function quarterWeekMarks(ref: QuarterRef): number[] {
+  const { start, end } = quarterRange(ref);
+  const total = daysBetween(start, end) + 1;
+  const marks: number[] = [];
+  for (let monday = addDays(startOfWeek(start), 7); monday <= end; monday = addDays(monday, 7)) {
+    marks.push(daysBetween(start, monday) / total);
+  }
+  return marks;
+}
+
 /** Minutes since midnight, e.g. 450 = 07:30. */
 export type Minutes = number;
 

@@ -11,8 +11,12 @@ import {
   monthLabel,
   monthOf,
   parseMinutes,
+  quarterClock,
+  quarterClockText,
   quarterOf,
   quarterRange,
+  quarterSpan,
+  quarterWeekMarks,
   startOfWeek,
   todayIn,
   weekDates,
@@ -69,6 +73,53 @@ describe("dates", () => {
     expect(quarterRange({ year: 2026, quarter: 1 })).toEqual({
       start: "2026-01-01",
       end: "2026-03-31",
+    });
+  });
+
+  it("spells a Quarter's dates out", () => {
+    expect(quarterSpan({ year: 2026, quarter: 4 })).toBe("October 1 – December 31, 2026");
+    expect(quarterSpan({ year: 2027, quarter: 1 })).toBe("January 1 – March 31, 2027");
+  });
+
+  describe("how much of a Quarter is left", () => {
+    const q4 = { year: 2026, quarter: 4 } as const;
+
+    it("counts today as left, in days and in the weeks that touch what is left", () => {
+      expect(quarterClock(q4, "2026-11-09")).toEqual({ phase: "running", daysLeft: 53, weeksLeft: 8, used: 39 / 92 });
+      expect(quarterClockText(quarterClock(q4, "2026-11-09"))).toBe("53 days · 8 weeks left");
+    });
+
+    it("starts with nothing used and the whole first week counted", () => {
+      // October 1, 2026 is a Thursday: its week began on September 28.
+      expect(quarterClock(q4, "2026-10-01")).toEqual({ phase: "running", daysLeft: 92, weeksLeft: 14, used: 0 });
+    });
+
+    it("calls the final day the last day", () => {
+      expect(quarterClock(q4, "2026-12-31")).toEqual({ phase: "running", daysLeft: 1, weeksLeft: 1, used: 91 / 92 });
+      expect(quarterClockText(quarterClock(q4, "2026-12-31"))).toBe("Last day");
+      expect(quarterClockText(quarterClock(q4, "2026-12-30"))).toBe("2 days · 1 week left");
+    });
+
+    it("counts down to a Quarter ahead, across the new year, with all its weeks", () => {
+      const q1 = { year: 2027, quarter: 1 } as const;
+      expect(quarterClock(q1, "2026-11-09")).toEqual({ phase: "ahead", startsIn: 53, weeks: 14 });
+      expect(quarterClockText(quarterClock(q1, "2026-11-09"))).toBe("Starts in 53 days · 14 weeks");
+      expect(quarterClockText(quarterClock(q1, "2026-12-31"))).toBe("Starts in 1 day · 14 weeks");
+    });
+
+    it("says a past Quarter has ended", () => {
+      const clock = quarterClock({ year: 2026, quarter: 3 }, "2026-11-09");
+      expect(clock).toEqual({ phase: "ended" });
+      expect(quarterClockText(clock)).toBe("Ended");
+    });
+
+    it("marks where each week starts along the Quarter", () => {
+      const marks = quarterWeekMarks(q4);
+      expect(marks).toHaveLength(13); // Mondays October 5 … December 28
+      expect(marks[0]).toBe(4 / 92);
+      expect(marks.at(-1)).toBe(88 / 92);
+      // January 1, 2029 is a Monday: no mark sits on the Quarter's first day.
+      expect(quarterWeekMarks({ year: 2029, quarter: 1 })[0]).toBe(7 / 90);
     });
   });
 
