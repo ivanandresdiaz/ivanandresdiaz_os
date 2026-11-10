@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  type CoachReview,
-  diffWords,
-  insertDictation,
-  MAX_DICTATION_SECONDS,
-  MISTAKE_LABEL,
-  type Selection,
-} from "@/domain/english";
+import { type CoachReview, diffWords, insertDictation, MISTAKE_LABEL } from "@/domain/english";
 import { coachEnglish, createDictationUpload, discardDictation, transcribeDictation } from "@/server/actions";
 import { aiTools } from "./ai-tools";
+import { type Dictation, useDictation } from "./use-dictation";
+
+const IVAN_DICTATION = {
+  createUpload: createDictationUpload,
+  transcribe: transcribeDictation,
+  discard: discardDictation,
+};
 
 type Props = {
   /** Submitted with the surrounding form under this name. */
@@ -71,7 +71,7 @@ export function LongText({
     return () => form.removeEventListener("reset", reset);
   }, [controlled, defaultValue]);
 
-  const dictation = useDictation((spoken, at) => {
+  const dictation = useDictation(IVAN_DICTATION, (spoken, at) => {
     // The field itself holds the latest text, even if it changed while recording.
     const { text, caret } = insertDictation(field.current?.value ?? value, spoken, at);
     change(text);
@@ -202,139 +202,6 @@ function Toolbar({
 }
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-
-// ─── Dictation ───────────────────────────────────────────────────────────────
-
-type Phase =
-  | { kind: "idle" }
-  | { kind: "recording"; seconds: number }
-  | { kind: "working"; step: "Uploading" | "Transcribing" }
-  | { kind: "failed"; error: string; canRetry: boolean };
-
-type Dictation = ReturnType<typeof useDictation>;
-
-/** The recording that failed to become text, kept so it can be retried. */
-type Pending = { blob: Blob; contentType: string; key: string | null; at: Selection | null };
-
-const RECORDING_TYPES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
-
-function useDictation(onText: (spoken: string, at: Selection | null) => void) {
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  const session = useRef<{
-    recorder: MediaRecorder;
-    stream: MediaStream;
-    chunks: Blob[];
-    at: Selection | null;
-    timer: number;
-    cancelled: boolean;
-  } | null>(null);
-  const pending = useRef<Pending | null>(null);
-
-  function release() {
-    const s = session.current;
-    if (!s) return;
-    window.clearInterval(s.timer);
-    s.stream.getTracks().forEach((track) => track.stop());
-    session.current = null;
-  }
-
-  // Leaving the page mid-recording turns the microphone off.
-  useEffect(() => () => release(), []);
-
-  async function start(at: Selection | null) {
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setPhase({ kind: "failed", error: "The microphone is not available.", canRetry: false });
-      return;
-    }
-    const mimeType = RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
-    const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64_000 });
-    const startedAt = Date.now();
-    const s = {
-      recorder,
-      stream,
-      chunks: [] as Blob[],
-      at,
-      cancelled: false,
-      timer: window.setInterval(() => {
-        const seconds = Math.floor((Date.now() - startedAt) / 1000);
-        if (seconds >= MAX_DICTATION_SECONDS) recorder.stop();
-        else setPhase({ kind: "recording", seconds });
-      }, 250),
-    };
-    session.current = s;
-    recorder.ondataavailable = (event) => event.data.size > 0 && s.chunks.push(event.data);
-    recorder.onstop = () => {
-      release();
-      if (s.cancelled) return;
-      const contentType = recorder.mimeType || mimeType || "audio/webm";
-      pending.current = { blob: new Blob(s.chunks, { type: contentType }), contentType, key: null, at: s.at };
-      void send();
-    };
-    recorder.start();
-    setPhase({ kind: "recording", seconds: 0 });
-  }
-
-  function stop() {
-    const s = session.current;
-    if (s && s.recorder.state !== "inactive") s.recorder.stop();
-  }
-
-  function cancel() {
-    const s = session.current;
-    if (!s) return;
-    s.cancelled = true;
-    if (s.recorder.state !== "inactive") s.recorder.stop();
-    release();
-    setPhase({ kind: "idle" });
-  }
-
-  /** Uploads the recording (unless it already is) and turns it into text. */
-  async function send() {
-    const p = pending.current;
-    if (!p) return;
-    try {
-      if (!p.key) {
-        setPhase({ kind: "working", step: "Uploading" });
-        const upload = await createDictationUpload({ contentType: p.contentType, size: p.blob.size });
-        if (!upload.ok) {
-          pending.current = null;
-          setPhase({ kind: "failed", error: upload.error, canRetry: false });
-          return;
-        }
-        const res = await fetch(upload.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": p.contentType.split(";")[0] },
-          body: p.blob,
-        });
-        if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-        p.key = upload.key;
-      }
-      setPhase({ kind: "working", step: "Transcribing" });
-      const result = await transcribeDictation({ key: p.key, contentType: p.contentType });
-      if (!result.ok) {
-        setPhase({ kind: "failed", error: result.error, canRetry: true });
-        return;
-      }
-      pending.current = null;
-      setPhase({ kind: "idle" });
-      onText(result.text, p.at);
-    } catch {
-      setPhase({ kind: "failed", error: "The connection failed.", canRetry: true });
-    }
-  }
-
-  function discard() {
-    const key = pending.current?.key;
-    pending.current = null;
-    setPhase({ kind: "idle" });
-    if (key) void discardDictation({ key });
-  }
-
-  return { phase, start, stop, cancel, retry: () => void send(), discard };
-}
 
 // ─── English Coach ───────────────────────────────────────────────────────────
 
