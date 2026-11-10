@@ -8,6 +8,7 @@ const OPTIONS = [
   { href: "/os/profile/context", label: "Context" },
   { href: "/os/profile/clips", label: "Clips" },
   { href: "/os/profile/vaults", label: "Vaults" },
+  { href: "/os/profile/discoveries", label: "Discoveries" },
 ];
 
 const optionClass = (active: boolean) =>

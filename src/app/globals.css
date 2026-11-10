@@ -92,3 +92,55 @@ html:has(dialog[open]) {
 @media (prefers-reduced-motion: reduce) {
   .like-burst { animation-duration: 1ms; }
 }
+
+/* The Stakeholder side of a Discovery (/d/...): its own light look, nothing of Ivan OS (Q44).
+   It redefines the tokens, so every utility follows. */
+.discovery {
+  --background: #f6f5f1;
+  --foreground: #1b1b19;
+  --surface: #ffffff;
+  --muted: #6b6a64;
+  --line: #e6e3db;
+  --accent: #0f766e;
+  color-scheme: light;
+  background: var(--background);
+  color: var(--foreground);
+}
+html:has(.discovery),
+html:has(.discovery) body {
+  background: #f6f5f1;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+.card-in {
+  animation: card-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes thinking-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+.thinking-dot {
+  animation: thinking-dot 1.2s ease-in-out infinite;
+}
+/* Ivan's drawing rises in, then his bubble pops: once, when the screen opens. */
+@keyframes ivan-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.ivan-in {
+  animation: ivan-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes bubble-in {
+  0% { opacity: 0; transform: scale(0.85); }
+  70% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+.bubble-in {
+  transform-origin: left top;
+  animation: bubble-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) 280ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-in, .thinking-dot, .ivan-in, .bubble-in { animation: none; }
+}
