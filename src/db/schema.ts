@@ -5,6 +5,7 @@ import {
   check,
   date,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   real,
@@ -671,3 +672,197 @@ export const explorations = pgTable(
     check("explorations_ended", sql`(${t.verdict} is null) = (${t.endedOn} is null)`),
   ],
 );
+
+// ─── Discoveries ─────────────────────────────────────────────────────────────
+// The only part of Ivan OS that someone else enters (ADR 0005). Stakeholders
+// sign in with a code by email and only ever reach their own Interviews.
+
+/** A project whose people Ivan interviews, through an AI, before building it. */
+export const discoveries = pgTable(
+  "discoveries",
+  {
+    id: id(),
+    title: text("title").notNull(),
+    /** The address of its shared link: /d/<slug>. */
+    slug: text("slug").notNull().unique(),
+    /** What the AI, the Opening and every Stakeholder screen speak: "es" or "en". */
+    language: text("language").notNull().default("es"),
+    /** "draft" (the link is off), "open" or "closed". */
+    status: text("status").notNull().default("draft"),
+    /** Markdown only the AI reads. */
+    brief: text("brief").notNull().default(""),
+    /** Markdown every Stakeholder reads first. */
+    opening: text("opening").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("discoveries_language", sql`${t.language} in ('es', 'en')`),
+    check("discoveries_status", sql`${t.status} in ('draft', 'open', 'closed')`),
+  ],
+);
+
+/** A diagram of the Opening, stored in R2; its description is the caption and the AI's explanation. */
+export const discoveryImages = pgTable("discovery_images", {
+  id: id(),
+  discoveryId: uuid("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  key: text("key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  description: text("description").notNull().default(""),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
+
+export const discoveryThemes = pgTable("discovery_themes", {
+  id: id(),
+  discoveryId: uuid("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  /** One line the Stakeholder sees. */
+  description: text("description").notNull().default(""),
+  /** "What I want to learn": only the AI reads it. */
+  learn: text("learn").notNull().default(""),
+  position: integer("position").notNull(),
+  createdAt: createdAt(),
+});
+
+export const stakeholders = pgTable(
+  "stakeholders",
+  {
+    id: id(),
+    discoveryId: uuid("discovery_id")
+      .notNull()
+      .references(() => discoveries.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Lowercase; null for the test Stakeholder Ivan plays in a Draft. */
+    email: text("email"),
+    roleNote: text("role_note").notNull().default(""),
+    wantsNeeds: boolean("wants_needs").notNull().default(true),
+    wantsVision: boolean("wants_vision").notNull().default(false),
+    /** Ivan himself, trying the Discovery; wiped when it opens. */
+    isTest: boolean("is_test").notNull().default(false),
+    /** Access cut; what they said stays. */
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique().on(t.discoveryId, t.email), check("stakeholders_stage", sql`${t.wantsNeeds} or ${t.wantsVision}`)],
+);
+
+/** The Themes a Stakeholder sees and may answer. */
+export const stakeholderThemes = pgTable(
+  "stakeholder_themes",
+  {
+    stakeholderId: uuid("stakeholder_id")
+      .notNull()
+      .references(() => stakeholders.id, { onDelete: "cascade" }),
+    themeId: uuid("theme_id")
+      .notNull()
+      .references(() => discoveryThemes.id, { onDelete: "cascade" }),
+  },
+  (t) => [unique().on(t.stakeholderId, t.themeId)],
+);
+
+/** A one-time sign-in code sent by email; only its hash is kept. */
+export const stakeholderCodes = pgTable("stakeholder_codes", {
+  id: id(),
+  discoveryId: uuid("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  attempts: smallint("attempts").notNull().default(0),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+/** A signed-in device of a Stakeholder; the cookie holds the token, this table only its hash. */
+export const stakeholderSessions = pgTable("stakeholder_sessions", {
+  id: id(),
+  stakeholderId: uuid("stakeholder_id")
+    .notNull()
+    .references(() => stakeholders.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});
+
+/** One Stakeholder's conversation about one Theme. */
+export const interviews = pgTable(
+  "interviews",
+  {
+    id: id(),
+    stakeholderId: uuid("stakeholder_id")
+      .notNull()
+      .references(() => stakeholders.id, { onDelete: "cascade" }),
+    themeId: uuid("theme_id")
+      .notNull()
+      .references(() => discoveryThemes.id, { onDelete: "cascade" }),
+    /** "needs" or "vision". */
+    stage: text("stage").notNull(),
+    /** The round of the stage being answered, from 1. */
+    round: smallint("round").notNull().default(1),
+    /** "thinking" (the AI writes a round), "answering", "closing" (end of a stage), "done" or "failed". */
+    phase: text("phase").notNull().default("thinking"),
+    phaseAt: timestamp("phase_at", { withTimezone: true }).notNull().defaultNow(),
+    /** What the AI understood so far, in the Stakeholder's words. */
+    understood: text("understood").array().notNull().default(sql`'{}'::text[]`),
+    /** What this person said in their other Themes when this one started; frozen, so the prompt stays cached. */
+    earlier: text("earlier").notNull().default(""),
+    insights: jsonb("insights"),
+    insightsAt: timestamp("insights_at", { withTimezone: true }),
+    insightsError: text("insights_error"),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique().on(t.stakeholderId, t.themeId),
+    check("interviews_stage", sql`${t.stage} in ('needs', 'vision')`),
+    check("interviews_phase", sql`${t.phase} in ('thinking', 'answering', 'closing', 'done', 'failed')`),
+  ],
+);
+
+/**
+ * The conversation, append-only: a "round" the AI wrote, the "answers" to it,
+ * what was added at the "closing" of a stage, or "more" added afterwards.
+ */
+export const interviewTurns = pgTable(
+  "interview_turns",
+  {
+    id: id(),
+    interviewId: uuid("interview_id")
+      .notNull()
+      .references(() => interviews.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    kind: text("kind").notNull(),
+    stage: text("stage").notNull(),
+    round: smallint("round").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique().on(t.interviewId, t.seq),
+    check("interview_turns_kind", sql`${t.kind} in ('round', 'answers', 'closing', 'more')`),
+  ],
+);
+
+/** A PDF or photo a Stakeholder attached; the AI checked it has no client data before keeping it. */
+export const interviewFiles = pgTable("interview_files", {
+  id: id(),
+  interviewId: uuid("interview_id")
+    .notNull()
+    .references(() => interviews.id, { onDelete: "cascade" }),
+  /** The answers it was sent with; null while it waits for the next send. */
+  turnId: uuid("turn_id").references(() => interviewTurns.id, { onDelete: "set null" }),
+  key: text("key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  name: text("name").notNull(),
+  /** What the check saw in it, for the AI and for Ivan. */
+  summary: text("summary").notNull().default(""),
+  createdAt: createdAt(),
+});

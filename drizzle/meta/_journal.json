@@ -169,6 +169,13 @@
       "when": 1794185390389,
       "tag": "0023_trims",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794279240505,
+      "tag": "0024_discoveries",
+      "breakpoints": true
     }
   ]
 }
