@@ -819,6 +819,20 @@ Origen: Ivan quiere humanizar las Discoveries con su caricatura (con audífonos,
 | Q65 | Nube del menú | ✅ Cambia con el avance: "¡Hola, <nombre>! Elige un tema…", "¡Vas muy bien, <nombre>! Te faltan N de M temas." y "¡Lo lograste, <nombre>! Gracias por tu tiempo." con "Terminar y cerrar sesión" debajo. Reemplaza el saludo "<nombre> 👋" y el aviso de Q58. |
 | Q66 | Una sola imagen | ✅ Fija en la app, igual en todas las Discoveries; la nube en el idioma de la Discovery. Entra una vez con una animación suave, sin animación si el teléfono pide reducir movimiento. |
 
+## Ronda 57 — Sensación de avance entre Themes (2026-11-10)
+
+Origen: al terminar un Theme, la gente creía que había terminado toda la entrevista; se desconcentraba, se ponía a leer la conversación y le daba pereza seguir. Además, el contador de rondas volvía a empezar en Vision ("3 de 3" y luego "1 de 2") y daba miedo de un bucle infinito de preguntas.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q67 | Palabras | ✅ Las pantallas hablan de **temas** ("Tema 1 de 4"); un Theme terminado nunca se presenta como el fin de la entrevista. Sin término nuevo en el glosario. |
+| Q68 | Barra de avance | ✅ Una barra con un segmento por Theme: delgada mientras responde (con "Tema 1 de 4 · Ronda 4 de 5" y la etiqueta Needs/Vision), grande en la tarjeta de fin de Theme y en el menú, bajo la nube de Ivan. |
+| Q69 | Qué la mueve | ✅ Cada ronda respondida y el cierre de cada etapa son un paso (Needs + Vision = 7); el segmento solo se llena cuando el Theme termina. Las rondas son fijas, así que el total es honesto. |
+| Q70 | Rondas por Theme | ✅ Se cuentan en todo el Theme ("Ronda 4 de 5"), no por etapa. |
+| Q71 | Fin de un Theme | ✅ En vez de "¡Gracias!" y ✓: "¡Tema 1 de 4 listo! 💪", la barra llenándose, Ivan pequeño ("¡Vas muy bien, Mauricio! Faltan 3.") y "Te faltan 3 temas. Vamos con el siguiente.". El último sigue con "Terminaste todos los temas 🎉". Revisa Q55–Q57. |
+| Q72 | Sin trampas para leer | ✅ La conversación queda cerrada ("Ver la conversación") y, mientras falten Themes, "Agregar algo más a este tema" es un enlace. Revisa Q27. |
+| Q73 | El botón del cierre | ✅ En la última etapa dice "Terminar y pasar al siguiente tema" y lleva directo al siguiente Theme, con la celebración arriba de "Empezar" (o sobre sus preguntas si iba a medias). En el último Theme dice "Terminar". La tarjeta de fin de Theme solo se ve al volver a un Theme terminado. Sin saltos automáticos. |
+
 
 ## Discoveries — construido en local (2026-11-09)
 
