@@ -725,6 +725,112 @@ Origen: Ivan quiere reordenar las Tasks y los Steps como reordena la prioridad d
 - Sin migraciones: `tasks.position` y `steps.position` ya existían, y el orden actual se conserva.
 - Verificación: 142 tests, typecheck, lint, `next build` y prueba en el navegador con mouse, teclado y toques reales a ancho de teléfono. Se probaron arrastrar una Task por encima de otra con Steps, arrastrar un Step sin mover su Task, recargar, una Task nueva de última, marcar y desmarcar, las Tasks sueltas y el orden del Stack. La base local quedó sin filas de prueba.
 
+## Ronda 53 — Entrevistas a stakeholders (2026-11-09)
+
+Origen: Ivan va a avanzar el módulo gestor de cartera en El Alcaraván y quiere recoger las necesidades de varios stakeholders (su jefe, Mauricio el líder de cartera, los ejecutivos) con una IA que los entrevista al estilo grilling, sabiendo ya el contexto del proyecto que Ivan le da. Le sirve para muchos casos, no solo este.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q1 | Dónde vive | ✅ Dentro de Ivan OS, porque es parte de su flujo de trabajo. Es la primera vez que entra alguien que no es Ivan. |
+| Q2 | Permiso de la empresa | ✅ Ivan ya lo confirmó: en El Alcaraván todos usan Anthropic. Ningún dato de clientes (nombres, documentos, saldos) entra al contexto ni a las respuestas. |
+| Q3 | Quién pregunta | ✅ Solo Ivan. Los stakeholders entran con un código OTP que llega a su correo. |
+| Q4 | Qué sale | ✅ (Revisado por Q30: Insights por Interview, sin mapa curado.) Las necesidades importan más que las propuestas de qué haga la app. Nadie explica qué es la UIF ni qué es Microfinanzas El Alcaraván: eso ya está en el contexto. |
+| Q5 | El contexto oculto | ✅ Oculto solo en la UX: el stakeholder entra y empieza a hablar. La IA abre diciendo lo que entiende ("estamos haciendo X, Y, Z; Ivan quiere entender tus necesidades y propuestas"). Las opiniones sobre otras personas no entran. |
+| Q6 | Qué se le dice al stakeholder | ✅ Que habla con una IA cuyo trabajo es entender sus necesidades, ideas y propuestas para construir un producto pensado para todos; que Ivan lee sus respuestas con su nombre; que los demás no las ven. |
+| Q7 | Idioma y stack | ✅ El lado del stakeholder en español. Next.js y TypeScript dentro de Ivan OS, sin Python ni Cloud Run. |
+| Q8 | Cómo se siente | ✅ Un chat, primero en el teléfono, con voz y con botones para no escribir "Q1 estoy de acuerdo". Cada ronda se ve como un stepper, para saber dónde va la conversación. |
+| Q9 | Nombres | ✅ Discovery, Brief, Theme, Stakeholder (con su nota de rol), Interview, Need, Proposal y Needs Map. "Topic" sigue siendo solo de la Library. |
+| Q10 | Stakeholder y Person | ✅ Separados: un Stakeholder no es una Person ni toca el Radar. |
+| Q11 | Cómo entran | ✅ Un enlace por Discovery que Ivan comparte él mismo; el Stakeholder escribe su correo y, si está invitado, le llega un código de 6 dígitos. El código sale del dominio de Ivan (Namecheap) por un servicio de correo. |
+| Q12 | Aislamiento | ✅ El Stakeholder tiene su propia sesión, que solo abre sus Interviews y nunca llega a /os. |
+| Q13 | Qué Themes ve cada uno | ✅ Ivan elige qué Themes ve y responde cada Stakeholder. El Stakeholder puede responder solo algunos, y está bien. |
+| Q14 | Necesidades y visión | ✅ Dos etapas: primero sus necesidades; después, el producto que imaginan. Ivan elige a quién le pide cada una. No hay aprobación de por medio: Ivan solo quiere sus inputs (Q20). |
+| Q15 | Largo | ✅ Unas 3 rondas por Theme, con stepper. Al final la IA pregunta si quiere agregar algo más. Se puede parar y volver; lo que quede a medias cuenta. |
+| Q16 | Mensaje de apertura | ✅ La IA propone un borrador e Ivan lo edita; es el mismo para todos. Lleva texto e imágenes (los diagramas de Ivan). |
+| Q17 | Brief | ✅ Un Markdown pegado: el proyecto, cómo está construido, la visión de Ivan y la empresa (dónde está, sus metas). |
+| Q18 | Uso del Needs Map | ✅ Se copia como Markdown, con citas literales, para alimentar el grilling o un skill de diseño de producto en el repo del trabajo (Q30). |
+| Q19 | Dónde vive en la navegación | ✅ Una opción más del Profile: Discoveries. |
+| Q20 | Etapas en orden | ❌ No hay una etapa de visión después de que Ivan apruebe las necesidades. Ivan solo quiere inputs e insights de calidad, que luego usa con un skill de diseño de producto; si necesita aprobación, hace una reunión. |
+| Q21 | Sugerencias | ✅ En necesidades, opciones y preguntas sobre experiencias reales; en visión, la IA sugiere ideas del Brief, incluso lo que el Stakeholder no había considerado. Se ve de dónde salió cada cosa. |
+| Q22 | Una ronda en el teléfono | ✅ La IA manda 2 a 4 preguntas; se ven de a una tarjeta con stepper ("Ronda 2 · pregunta 1 de 3"), con opciones, "Otra cosa", texto y 🎤. La ronda se manda completa. Hay una barra de "hasta ahora entendí". |
+| Q23 | Voz | ✅ Dictation en español: el texto cae en el campo y se corrige antes de mandarlo. El audio no se guarda. Mientras habla ve barras que se mueven con su voz y un aviso si no se le oye; en computador, además, un borrador en vivo dentro del campo (reconocimiento del navegador: Chrome manda ese audio a Google). Al tocar Detener ese borrador **se queda tal cual** en el campo, con el cursor al final, para corregir la redacción; no se reemplaza ni se espera. Sin borrador (teléfono, Firefox) se transcribe la grabación. En el teléfono no hay borrador en vivo: el reconocimiento y la grabación se pelean el micrófono. Mientras graba el campo no se edita; "Enviar" no exige revisar. (2026-11-10) |
+| Q24 | Imágenes de la apertura | ✅ La IA también las ve, e Ivan le pone a cada una su descripción. El Brief sigue siendo solo texto. |
+| Q25 | Lo que ve Ivan | ✅ Una cuadrícula Stakeholder × Theme con el estado de cada Interview y su conversación. Sin notificaciones. |
+| Q26 | Atribución | ✅ Ivan quiere ver "esto dijo Diana, esto dijo Mauricio" y decidir él cómo usa cada cosa. |
+| Q27 | Después de responder | ✅ El Stakeholder ve su conversación, puede agregar más y subir archivos (PDFs y, desde Q53, fotos). No edita lo que ya mandó. |
+| Q28 | Modelo e idioma | ✅ Claude Opus 5.5 para las Interviews. Ivan elige el idioma al crear la Discovery. |
+| Q29 | Borrar | ✅ Borrar una Discovery borra todo y siempre pide confirmación. Quitar un Stakeholder le corta el acceso y conserva lo que dijo, salvo que Ivan borre sus Interviews. |
+| Q30 | Insights en vez de Needs Map | ✅ Después de cada Interview la IA escribe sus Insights: las Needs y Proposals que oyó, con citas literales y de dónde salió cada una (sus palabras, eligió una opción, reaccionó a una idea de la IA). Se ven por Theme y persona por persona. No hay síntesis entre personas ni curaduría: Ivan decide. Copy as Markdown exporta todo atribuido. Revisa Q4 y Q18. |
+| Q31 | Needs y Vision por Stakeholder | ✅ Al invitarlo, Ivan marca Needs, Vision o ambas. Dentro de cada Interview van primero las rondas de Needs y luego las de Vision. Una Proposal es del Theme y puede responder a una Need. "Todo input que me den vale." |
+| Q32 | PDFs y datos de clientes | ✅ Antes de subir: "No subas datos personales, solo información con el contexto relacionado." La IA revisa cada PDF y, si trae datos personales de clientes, lo rechaza, lo borra y explica por qué. Máximo 10 MB y 30 páginas. |
+| Q33 | Para qué sirve un PDF | ✅ Es parte de la Interview: la IA lo lee y pregunta por él, sale en los Insights como fuente e Ivan lo abre y lo descarga. |
+| Q34 | Idioma | ✅ Uno por Discovery, español por defecto; en inglés todo cambia (botones, preguntas, apertura), p. ej. para un cliente de EE. UU. El lado de Ivan sigue en inglés. |
+| Q35 | Remitente del código | ✅ `Ivan Díaz <codigo@ivanandresdiaz.com>`, asunto "Tu código para <Discovery>: 482913", 10 minutos, 5 intentos. |
+| Q36 | Ciclo de vida | ✅ Draft (enlace apagado) → Open → Closed ("Esta Discovery ya cerró. Gracias por tu tiempo."), y se puede reabrir. Cerrada, el Stakeholder tampoco ve su conversación, y por defecto se cierran las sesiones de todos (Q40). |
+| Q37 | Opening y leyendas | ✅ La primera pantalla se llama Opening. La descripción de cada diagrama es su leyenda para el Stakeholder y su explicación para la IA. |
+| Q38 | Qué escribe Ivan por Theme | ✅ Título y una línea de descripción, visibles; "What I want to learn", oculto, solo para la IA. |
+| Q39 | Inicio del Stakeholder | ✅ El Opening la primera vez (después, un enlace para volver a verlo) y sus Themes como tarjetas con estado, en el orden que quiera. |
+| Q40 | Sesión | ✅ 30 días por dispositivo, con cerrar sesión. Al cerrar la Discovery, Ivan cierra las sesiones de todos por defecto. |
+| Q41 | Colegas | ✅ Si un Stakeholder se queja de alguien, la IA lleva la conversación al proceso y los Insights no llevan nombres de terceros. La conversación literal queda como fue. |
+| Q42 | Cuándo se actualizan los Insights | ✅ Después de cada ronda, también en las Interviews de prueba. |
+| Q43 | Probar antes de abrir | ✅ En Draft, Ivan entra como Stakeholder de prueba (cualquier nota de rol y Themes) y vive la experiencia real. Las Interviews de prueba se borran al abrir la Discovery. |
+| Q44 | Cómo se ve | ✅ Una apariencia propia, limpia, clara y primero en el teléfono, con el nombre de Ivan ("Ivan Díaz te invita a…"), sin la marca ni la navegación de Ivan OS. |
+| Q45 | Copy as Markdown | ✅ Título de la Discovery; por Theme y por Stakeholder (nombre y rol), sus Insights con citas y de dónde salió cada una; la lista de PDFs. Sin el Brief. Casilla opcional "Include full conversations". |
+
+## Ronda 54 — El método de entrevista (2026-11-09)
+
+Origen: Ivan le pidió a Claude Fable (xhigh) una opinión sobre cómo debe entrevistar la IA. Su respuesta quedó en [docs/discovery-interview-method.md](docs/discovery-interview-method.md). Idea central: una opción también es una sugerencia; lo que importa es quién lo dijo primero.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q46 | Quién lee | ✅ El Opening dice: solo Ivan lee las respuestas con nombre; ni el jefe ni los compañeros las ven; si Ivan comparte algo, es en una presentación y sin nombres. Ivan no planea compartir nada más. |
+| Q47 | Método | ✅ El de Fable. Needs en 3 rondas: anclar (un dato fácil y "cuéntame la última vez"), profundizar en esa historia y dimensionar (sus propios puntos y al final un checklist con las hipótesis que no mencionó). Vision en 2 rondas: hablan primero; luego 2 o 3 ideas, cada una con su precio, y eligen una y dicen por qué. Nunca "Ivan está pensando en…". Lo implacable es profundizar en una historia real. Revisa Q15 y Q21. |
+| Q48 | Tipos de tarjeta | ✅ Abierta (sin botones), una opción o varias (solo el checklist). Las opciones se barajan, llevan "Otra cosa" y "Ninguna" cuando aplica, y su origen (escala neutra, sus palabras, la IA). Se mide cuántos segundos tomó cada tarjeta. Revisa Q22. |
+| Q49 | Insights | ✅ Los escribe una llamada aparte del entrevistador: sin cita no hay Insight, un toque no se vuelve frase, lo inferido se marca, y el código verifica que cada cita esté en la conversación. Campos de Fable y una fuerza: Strong, Medium o Weak. Copy as Markdown la lleva y dice que lo Weak son hipótesis, no votos. |
+| Q50 | Cierre | ✅ "Hasta ahora entendí" y "¿Algo está mal o falta? ¿Hay algo más que quieras agregar?" en la misma pantalla. |
+| Q51 | Plantillas | ✅ El Brief nace con los encabezados de Fable (con [known] / [assumed]) y "What I want to learn" con Decision / Learn / Hypotheses / Already known. |
+| Q52 | Números en las historias | ✅ Lo que parezca un documento o un teléfono se enmascara antes de guardar, y se le avisa al Stakeholder que escribió datos de un cliente (también nombres). |
+| Q53 | Archivos | ✅ PDFs y fotos (p. ej. una página del cuaderno), con advertencia de no subir datos personales y la misma revisión de la IA. Revisa Q27 y Q32. |
+| Q54 | Punto de partida | ✅ El prompt y el formato de ronda de Fable son la v1. Antes de Mauricio, Ivan juega tres Stakeholders de prueba: uno cooperativo, uno que toca todo en 3 segundos y uno que se queja de un colega. Después, Mauricio solo, y luego los ejecutivos. |
+
+## Ronda 55 — Qué sigue al terminar un Theme (2026-11-10)
+
+Origen: al terminar una Interview, el Stakeholder solo veía "Agregar algo más" y se quedaba en un limbo, sin saber si había terminado ni qué hacer.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q55 | Lo siguiente, primero | ✅ La tarjeta de "¡Gracias!" lleva los botones de qué sigue; "Agregar algo más" queda debajo como "¿Se te ocurrió algo más?". Revisa Q27. |
+| Q56 | Siguiente tema | ✅ "Siguiente tema: X →" lleva al siguiente Theme no terminado en el orden de Ivan, dando la vuelta (los que van a medias cuentan), con "Te faltan N de M temas". Debajo, discreto, "Terminar por ahora y cerrar sesión". |
+| Q57 | Último tema | ✅ "Terminaste todos los temas 🎉", con "Terminar y cerrar sesión" como botón principal y "Volver al menú". |
+| Q58 | En el menú | ✅ Con todos los Themes terminados, el menú muestra arriba "Terminaste todos los temas. Gracias, <nombre>." y el botón grande "Terminar y cerrar sesión". Mientras falten, solo el enlace pequeño "Cerrar sesión". |
+| Q59 | Despedida | ✅ Al cerrar sesión, una despedida con su nombre ("Gracias por tu tiempo… Ya puedes cerrar esta pestaña") en vez del formulario de correo, con "¿Quieres volver? Entra con tu correo". Sin confirmación. |
+| Q60 | Qué hace "Terminar" | ✅ Solo cierra la sesión: no avisa a Ivan ni guarda un estado nuevo (Q25). |
+| Q61 | Stakeholder de prueba | ✅ El botón dice "Terminar la prueba" y vuelve al editor de la Discovery en Ivan OS. |
+
+## Ronda 56 — La cara de Ivan e Ivan AI (2026-11-10)
+
+Origen: Ivan quiere humanizar las Discoveries con su caricatura (con audífonos, "entrevistando"): que lo reconozcan de una, le dé confianza y novedad al Stakeholder, y un toque de juego para su marca personal. No toca Q44: es la cara de Ivan, no la marca de Ivan OS.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q62 | Dónde | ✅ La caricatura con una nube de diálogo en el ingreso, en el menú de Themes y en la despedida. En el ingreso va grande, a todo el ancho, con la nube arriba, para que lo reconozcan de una; en el menú y la despedida, pequeña y con la nube al lado. Nunca dentro de la Interview: ahí no se quiere ruido. Revisa Q3 de la Ronda 55 (despedida). |
+| Q63 | Honestidad | ✅ La nube del ingreso dice quién pregunta: "¡Hola! Soy Ivan. Quiero conocer y entender tus necesidades, perspectivas e ideas. Ivan AI, mi entrevistador, te hace las preguntas y yo leo todo." |
+| Q64 | Ivan AI | ✅ El entrevistador se llama **Ivan AI**, "mi entrevistador" (no "agente": palabra trillada). En el lado del Stakeholder reemplaza a "la IA" en "Antes de empezar" y en el error; el lado de Ivan sigue diciendo "the AI". Dentro de la Interview no aparece su nombre. |
+| Q65 | Nube del menú | ✅ Cambia con el avance: "¡Hola, <nombre>! Elige un tema…", "¡Vas muy bien, <nombre>! Te faltan N de M temas." y "¡Lo lograste, <nombre>! Gracias por tu tiempo." con "Terminar y cerrar sesión" debajo. Reemplaza el saludo "<nombre> 👋" y el aviso de Q58. |
+| Q66 | Una sola imagen | ✅ Fija en la app, igual en todas las Discoveries; la nube en el idioma de la Discovery. Entra una vez con una animación suave, sin animación si el teléfono pide reducir movimiento. |
+
+
+## Discoveries — construido en local (2026-11-09)
+
+Rondas 53–54 construidas, sin commit. Migración 0024 aplicada en local; pendiente en Neon.
+
+- **Ivan**: Profile → Discoveries. Lista y crear (título e idioma). La página de una Discovery tiene, en este orden: estado y enlace (Draft → Open → Close → Reopen, con lista de "listo para abrir"), Brief, Opening (Draft with AI y diagramas con su descripción), Themes (con "What I want to learn"), Stakeholders (invitar, editar, quitar acceso, borrar), Try it (solo en Draft), Progress (persona × Theme), Insights (Copy as Markdown, con o sin conversaciones) y Settings (título, idioma, borrar). Cada Interview tiene su página: Insights, archivos y la conversación completa.
+- **Stakeholder**: `/d/<slug>`, con su propio aspecto claro (verde azulado). Correo, luego código; después el home (aviso de quién lee, Opening con diagramas, sus Themes) y el Interview en tarjetas.
+- **Ajustes al construir**: una escala (cuántos, cada cuánto) no se baraja y conserva el orden de la IA, incluso su "Ninguna"; lo demás sí se baraja. Los Insights solo se guardan si salen de las últimas respuestas: las rondas tardan unos 20 s y los Insights más, así que dos reescrituras podían cruzarse. El aviso de números ocultos se va solo a los 12 s.
+- **Probado en el navegador** (ancho de teléfono, contra el 3200): crear la Discovery, Brief, Opening con IA, diagrama a R2, invitar, Try it con 3 rondas reales de Needs (enmascaró un teléfono, aceptó una foto y la revisó con IA, "Ninguna" excluyente), cierre, terminado, "Agregar algo más", Insights (fuertes, con citas verificadas), Open (borra la prueba), código incorrecto y correcto, Close (cierra sesiones) y borrar (sin filas ni archivos en R2).
+- **Sin probar en el navegador**: el paso de Needs a Vision, el dictado por voz de un Stakeholder, los PDFs, el correo real (sin RESEND_API_KEY el código va a la consola del servidor) y Copy as Markdown pegado (se copió, pero el navegador de prueba no deja leer el portapapeles).
+- **Pendiente**: aplicar 0024 en Neon; RESEND_API_KEY en Vercel y los DNS de Resend en Namecheap (DKIM, MX/SPF de `send.`, DMARC). El "Esto fue lo que entendí" del cierre viene de antes de la última ronda, así que no incluye sus respuestas. El nombre de la app instalada sigue siendo "Ivan OS" (el manifest es de todo el sitio).
+
 ## Despliegue (2026-10-30)
 
 Ivan desplegó en **Vercel** con **Postgres en Neon** (migraciones aplicadas allí) y login de **Google** (OAuth client en el proyecto de Firebase/Google Cloud; redirect `/api/auth/callback/google`). El código vive en GitHub (`ivanandresdiaz/ivanandresdiaz_os`). Variables en Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ALLOWED_EMAIL`, `APP_TIMEZONE`.

@@ -170,7 +170,7 @@ _Evitar_: Distraction (Noise también es trabajo de bajo ROI o irrelevante).
 **Context** (Contexto): el Markdown sobre mí que copio a una IA para que me ayude a pensar con lo que soy: mi Season, mis Principles, mis Campaigns, mis últimos Journals y lo que yo elija. Cada vez escojo qué entra, por categoría o pieza por pieza (p. ej. solo una idea olvidada), y puedo dejar al final de qué quiero hablar. Se arma en el Profile, no se guarda en ningún lado y solo sale de Ivan OS cuando lo copio.
 _Evitar_: Prompt, Export, Resumen.
 
-**Profile** (Perfil): mi lugar en Ivan OS, con cuatro opciones: el Context, los Clips, los Vaults y cerrar sesión. Cerrar sesión siempre pide confirmación.
+**Profile** (Perfil): mi lugar en Ivan OS, con cinco opciones: el Context, los Clips, los Vaults, las Discoveries y cerrar sesión. Cerrar sesión siempre pide confirmación.
 
 **Vault** (Caja fuerte): donde guardo los Secrets que casi nunca abro, como códigos de recuperación o contraseñas que no uso a diario. Puedo tener varios para separar ámbitos (p. ej. uno para la infraestructura de Ivan OS y otro para finanzas), y todos usan la misma Passphrase. Se llega a ellos desde el Profile. Aunque ya haya iniciado sesión, solo se abren con la Passphrase. Abrirlos una vez los abre todos, y se cierran juntos: a mano, tras unos minutos sin usarlos o al salir de ellos. Cerrados, se ven los nombres de los Vaults y los títulos de sus Secrets, pero ningún texto. Ni Ivan OS ni nadie más puede leer lo que guarda. Nada de lo que hay adentro llega a una IA: no entra en el Context y no pasa por Dictation ni por el English Coach.
 _Evitar_: Password manager, Caja de contraseñas.
@@ -190,3 +190,28 @@ _Evitar_: Capture (capturar es del Learning Log y de las Secondary Tasks), Refer
 _Evitar_: Voice input, audio (un audio es una Reference).
 
 **English Coach**: revisa el inglés de un Long text cuando se lo pido. Muestra mis errores (spelling, grammar, word choice, lo que no suena natural), cada uno con su corrección y un porqué en inglés sencillo, y una versión pulida que conserva mi voz y mis ideas. Yo decido si uso la versión pulida; no guarda nada hasta que guardo el texto.
+
+## Discovery
+
+**Discovery**: un proyecto en el que quiero entender qué necesitan otras personas y qué imaginan antes de construirlo (p. ej. el gestor de cartera en El Alcaraván). Tiene su Brief, su Opening, sus Themes, sus Stakeholders y un idioma, que define todo lo que ven. Es Draft mientras la preparo (y la pruebo como un Stakeholder de prueba, cuyas Interviews se borran al abrirla), Open mientras se responde y Closed cuando termina, y se puede reabrir. Es la única parte de Ivan OS a la que entra alguien que no soy yo, y esa persona solo ve sus propias Interviews.
+
+**Brief**: lo que la IA sabe de una Discovery y el Stakeholder no ve: el proyecto, cómo está construido, mi visión y la empresa (dónde está, sus metas). Es confidencial, no secreto: no escribo en él nada que no aceptaría que un Stakeholder leyera, ni opiniones sobre personas. Nunca lleva datos de clientes.
+
+**Opening** (Apertura): lo primero que ve todo Stakeholder de una Discovery: lo que la IA entiende que estamos haciendo, para qué está ahí y quién lee sus respuestas (solo yo, con su nombre), con mis diagramas, cada uno con una descripción que el Stakeholder ve como leyenda y la IA lee como explicación. La IA propone un borrador y yo lo edito; es el mismo para todos.
+
+**Theme** (Tema): un asunto de una Discovery sobre el que entrevisto (p. ej. "Seguimiento de mora"). El Stakeholder ve su título y una línea de descripción; solo la IA ve lo que quiero aprender de él. No es un Topic: los Topics son de la Library.
+
+**Stakeholder**: alguien a quien invito a una Discovery, con su correo y una nota de rol (p. ej. "Mauricio, líder de cartera"). Elijo qué Themes ve y si le pido sus Needs, su Vision o ambas. No es una Person: vive solo en su Discovery y no toca el Radar.
+
+**Interview** (Entrevista): la conversación de un Stakeholder con la IA sobre un Theme, en rondas: primero sus Needs, a partir de una historia real de su trabajo, y después su Vision, según lo que le pedí. Se puede dejar a medias, retomar y ampliar después, y lo que dijo cuenta aunque no la termine.
+
+**Vision** (Visión): lo que un Stakeholder imagina que debería hacer el producto. Primero cuenta sus ideas; después la IA le trae otras, incluso las que no había considerado, cada una con lo que le pediría a cambio, para que elija.
+
+**Need** (Necesidad): algo que le duele o le hace falta a un Stakeholder en su trabajo.
+
+**Proposal** (Propuesta): lo que un Stakeholder quisiera que hiciera el producto en un Theme. Puede responder a una Need.
+
+**Ivan AI**: mi entrevistador de inteligencia artificial. En una Discovery entrevista a los Stakeholders y escribe sus Insights; no soy yo, y ante el Stakeholder siempre se presenta como una IA.
+_Evitar_: agente, asistente, bot.
+
+**Insights**: lo que la IA sacó de una Interview: sus Needs y Proposals, cada una con las palabras literales del Stakeholder y de dónde salió (sus propias palabras, una opción elegida o una reacción a una idea de la IA). Cada Need y cada Proposal tiene una fuerza (Strong, Medium o Weak) según cuánto la respalda lo que el Stakeholder contó; lo Weak es una hipótesis, no un voto. Siempre dicen quién lo dijo; no mezclan a varias personas, y no nombran a terceros: una queja sobre un colega se vuelve una Need del proceso. Salen de Ivan OS solo cuando los copio.
