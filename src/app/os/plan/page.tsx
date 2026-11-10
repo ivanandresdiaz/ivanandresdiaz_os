@@ -8,7 +8,20 @@ import { QuarterReader, SeasonReader } from "@/components/plan-drawers";
 import { MovePanel } from "@/components/plan-move";
 import { TaskList } from "@/components/plan-task";
 import { GamesPicker, GameTags, Hidden } from "@/components/ui";
-import { addDays, quarterLabel, quarterOf, quarterRange, startOfWeek, type QuarterRef } from "@/domain/dates";
+import {
+  addDays,
+  monthOf,
+  type QuarterClock,
+  quarterClock,
+  quarterClockText,
+  quarterLabel,
+  quarterOf,
+  quarterRange,
+  quarterSpan,
+  quarterWeekMarks,
+  startOfWeek,
+  type QuarterRef,
+} from "@/domain/dates";
 import {
   byPriority,
   firstOpen,
@@ -224,10 +237,8 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-medium">{quarterLabel(selected)}</span>
                         {sameQuarter(selected, current) && <span className="text-xs text-accent">now</span>}
-                        <span className="text-xs text-muted">
-                          {quarterRange(selected).start} → {quarterRange(selected).end}
-                        </span>
                       </div>
+                      <QuarterTime quarter={selected} today={now} />
                       <div className={`text-sm ${selectedRow?.title ? "" : "text-muted"}`}>
                         {selectedRow?.title || "No title yet"}
                       </div>
@@ -529,6 +540,41 @@ export default async function PlanPage({ searchParams }: PageProps<"/os/plan">) 
         </ColumnFrame>
       </div>
     </>
+  );
+}
+
+/**
+ * The Quarter's dates and how much of it is left, so Ivan sets a realistic
+ * expectation of what fits. The bar fills with the time used; each gap is a Monday.
+ * The dates open the Month: this month while the Quarter runs, else its first month.
+ */
+function QuarterTime({ quarter, today }: { quarter: QuarterRef; today: string }) {
+  const clock: QuarterClock = quarterClock(quarter, today);
+  return (
+    <div className="mt-0.5 mb-1.5 flex flex-col gap-1 text-xs text-muted">
+      <Link
+        href={`/os/month/${clock.phase === "running" ? monthOf(today) : monthOf(quarterRange(quarter).start)}`}
+        className="self-start hover:text-foreground hover:underline"
+        title="Open the Month"
+      >
+        {quarterSpan(quarter)}
+      </Link>
+      <span className={clock.phase === "running" ? "text-foreground" : ""}>{quarterClockText(clock)}</span>
+      {clock.phase !== "ended" && (
+        <span
+          className="relative block h-1.5 overflow-hidden rounded-full bg-line"
+          role="img"
+          aria-label={clock.phase === "running" ? `${Math.round(clock.used * 100)}% of the Quarter used` : "Not started"}
+        >
+          {clock.phase === "running" && (
+            <span className="block h-full bg-accent" style={{ width: `${clock.used * 100}%` }} />
+          )}
+          {quarterWeekMarks(quarter).map((mark) => (
+            <span key={mark} className="absolute inset-y-0 w-px bg-surface" style={{ left: `${mark * 100}%` }} />
+          ))}
+        </span>
+      )}
+    </div>
   );
 }
 
