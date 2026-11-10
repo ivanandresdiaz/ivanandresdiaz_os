@@ -36,15 +36,24 @@ let openai: OpenAI | null = null;
  * What Ivan said, word for word: his mistakes stay, because correcting them is
  * the English Coach's job and he learns from them.
  */
-export async function transcribe(audio: ArrayBuffer, fileName: string, contentType: string) {
+export async function transcribe(
+  audio: ArrayBuffer,
+  fileName: string,
+  contentType: string,
+  /** A Stakeholder of a Discovery speaks its language, with the Brief's terms as keywords. */
+  speaker?: { language: "es" | "en"; keywords: string[] },
+) {
   openai ??= new OpenAI();
   const result = await openai.audio.transcriptions.create({
     model: TRANSCRIBE_MODEL,
     file: await toFile(Buffer.from(audio), fileName, { type: contentType }),
-    language: "en",
-    keywords: DOMAIN_WORDS,
-    prompt:
-      "Verbatim transcription of a non-native English speaker thinking out loud. Keep every grammar mistake and wrong word exactly as spoken; do not correct or improve anything. Add punctuation and paragraphs. Write any Spanish word as spoken.",
+    language: speaker?.language ?? "en",
+    keywords: speaker ? speaker.keywords : DOMAIN_WORDS,
+    prompt: speaker
+      ? speaker.language === "es"
+        ? "Transcripción literal de una persona que cuenta cómo es su trabajo en una empresa de microfinanzas en Colombia. Escribe exactamente lo que dice, con puntuación y párrafos."
+        : "Verbatim transcription of a person describing their work. Write exactly what they say, with punctuation and paragraphs."
+      : "Verbatim transcription of a non-native English speaker thinking out loud. Keep every grammar mistake and wrong word exactly as spoken; do not correct or improve anything. Add punctuation and paragraphs. Write any Spanish word as spoken.",
   });
   return result.text.trim();
 }
