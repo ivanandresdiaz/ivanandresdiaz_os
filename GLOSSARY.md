@@ -203,9 +203,12 @@ _Evitar_: Voice input, audio (un audio es una Reference).
 
 **Stakeholder**: alguien a quien invito a una Discovery, con su correo y una nota de rol (p. ej. "Mauricio, líder de cartera"). Elijo qué Themes ve y si le pido sus Needs, su Vision o ambas. No es una Person: vive solo en su Discovery y no toca el Radar.
 
+**Handoff code** (Código de entrega): un código que creo para un Stakeholder y le doy yo mismo (p. ej. por WhatsApp); con él entra escribiendo solo el código, sin su correo. Sirve una vez, durante 7 días y solo con la Discovery Open; crear otro anula el anterior. La otra forma de entrar es el código que le llega por correo.
+_Evitar_: OTP, PIN, contraseña.
+
 **Interview** (Entrevista): la conversación de un Stakeholder con la IA sobre un Theme, en rondas: primero sus Needs, a partir de una historia real de su trabajo, y después su Vision, según lo que le pedí. Se puede dejar a medias, retomar y ampliar después, y lo que dijo cuenta aunque no la termine.
 
-**Vision** (Visión): lo que un Stakeholder imagina que debería hacer el producto. Primero cuenta sus ideas; después la IA le trae otras, incluso las que no había considerado, cada una con lo que le pediría a cambio, para que elija.
+**Vision** (Visión): lo que un Stakeholder imagina que debería hacer el producto. Primero cuenta sus ideas, empezando por imaginar una experiencia 10 (la experiencia ideal); después la IA le trae otras, incluso las que no había considerado, cada una con lo que le pediría a cambio, para que elija.
 
 **Need** (Necesidad): algo que le duele o le hace falta a un Stakeholder en su trabajo.
 

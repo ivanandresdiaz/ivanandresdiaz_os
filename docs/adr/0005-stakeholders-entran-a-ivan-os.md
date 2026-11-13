@@ -11,3 +11,4 @@ Ivan OS es de un solo usuario, pero las Discoveries viven dentro de él porque s
 
 - Los Stakeholders comparten la base de Neon con la vida de Ivan. El Brief no lleva datos de clientes, y la IA rechaza los PDFs que los traen.
 - Al cerrar una Discovery se cierran por defecto las sesiones de sus Stakeholders.
+- Desde la Ronda 58 hay una segunda forma de entrar a esa misma sesión: un Handoff code que Ivan crea y entrega él mismo, sin correo. Las dos cerraduras siguen igual.

@@ -834,6 +834,23 @@ Origen: al terminar un Theme, la gente creía que había terminado toda la entre
 | Q73 | El botón del cierre | ✅ En la última etapa dice "Terminar y pasar al siguiente tema" y lleva directo al siguiente Theme, con la celebración arriba de "Empezar" (o sobre sus preguntas si iba a medias). En el último Theme dice "Terminar". La tarjeta de fin de Theme solo se ve al volver a un Theme terminado. Sin saltos automáticos. |
 
 
+## Ronda 58 — La experiencia 10 y el Handoff code (2026-11-13)
+
+Origen: en Vision, Ivan AI improvisaba "imagina un 10" y la gente no entendía qué era el 10. Además, entrar con el código por correo es lento cuando Ivan ya está hablando con la persona por WhatsApp o en persona.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q74 | La experiencia 10 | ✅ Es un paso deliberado de Vision, no improvisación: después de "¿cómo sería tu día?", Ivan AI pide imaginar "una experiencia 10 (la experiencia ideal)" ("a 10 experience (the ideal experience)" en inglés), siempre escrito así, y luego vuelve a una versión realista. |
+| Q75 | Handoff code | ✅ Una segunda forma de entrar; el código por correo sigue igual. |
+| Q76 | Solo el código | ✅ Con un Handoff code la persona escribe solo el código, sin su correo. Máximo unos 10 intentos fallidos por hora por Discovery. |
+| Q77 | Duración | ✅ 7 días, un solo uso (después la sesión la mantiene dentro); crear uno nuevo anula el anterior. |
+| Q78 | Dónde se crea | ✅ Botón "Code" en la fila de cada Stakeholder del editor: muestra el número grande y copia un mensaje listo con el enlace de la Discovery y el código. Solo se ve en ese momento; se guarda su hash. |
+| Q79 | Cuándo sirve | ✅ Solo con la Discovery Open; en Draft y Closed el botón está desactivado, y cerrarla anula los códigos. |
+| Q80 | Nombre | ✅ **Handoff code** (Código de entrega) en el glosario; el otro es el código por correo. |
+
+**Construido en local (2026-11-13)**, sin commit. Migración 0025 (`handoff_codes`, `handoff_misses`) aplicada en local; pendiente en Neon. Probado en el navegador del lado del Stakeholder: "Tengo un código de Ivan", código incorrecto, código correcto (entra sin correo), el mismo código por segunda vez (no sirve) y el tope de intentos. Sin probar en el navegador: el botón "Code" del editor (pide el login de Google) y la experiencia 10 en una Interview real.
+
+
 ## Discoveries — construido en local (2026-11-09)
 
 Rondas 53–54 construidas, sin commit. Migración 0024 aplicada en local; pendiente en Neon.
