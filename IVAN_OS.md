@@ -848,7 +848,7 @@ Origen: en Vision, Ivan AI improvisaba "imagina un 10" y la gente no entendía q
 | Q79 | Cuándo sirve | ✅ Solo con la Discovery Open; en Draft y Closed el botón está desactivado, y cerrarla anula los códigos. |
 | Q80 | Nombre | ✅ **Handoff code** (Código de entrega) en el glosario; el otro es el código por correo. |
 
-**Construido en local (2026-11-13)**, sin commit. Migración 0025 (`handoff_codes`, `handoff_misses`) aplicada en local; pendiente en Neon. Probado en el navegador del lado del Stakeholder: "Tengo un código de Ivan", código incorrecto, código correcto (entra sin correo), el mismo código por segunda vez (no sirve) y el tope de intentos. Sin probar en el navegador: el botón "Code" del editor (pide el login de Google) y la experiencia 10 en una Interview real.
+**Construido y subido (2026-11-13)**, commit 99986c2. Migración 0025 (`handoff_codes`, `handoff_misses`) aplicada en local y en Neon. Probado en el navegador del lado del Stakeholder: "Tengo un código de Ivan", código incorrecto, código correcto (entra sin correo), el mismo código por segunda vez (no sirve) y el tope de intentos. Sin probar en el navegador: el botón "Code" del editor (pide el login de Google) y la experiencia 10 en una Interview real.
 
 
 ## Discoveries — construido en local (2026-11-09)
