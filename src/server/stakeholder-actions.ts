@@ -42,7 +42,9 @@ import {
   CODE_MINUTES,
   CODES_PER_HOUR,
   endSession,
+  HANDOFF_MISSES_PER_HOUR,
   hashCode,
+  hashHandoffCode,
   newCode,
   requireStakeholder,
   sameHash,
@@ -158,6 +160,54 @@ export async function verifyCode(input: { slug: string; email: string; code: str
   if (!stakeholder) return { ok: false, error: "expired" };
   await db.update(s.stakeholderCodes).set({ usedAt: new Date() }).where(eq(s.stakeholderCodes.id, code.id));
   await startSession(stakeholder.id, v.slug);
+  redirect(`/d/${v.slug}`);
+}
+
+/**
+ * Signs in with a Handoff code from Ivan (Ronda 58): only the code, no email.
+ * With nothing to narrow a guess, wrong codes are capped per Discovery per hour.
+ */
+export async function verifyHandoffCode(input: { slug: string; code: string }): Promise<Outcome> {
+  const v = z.object({ slug, code: z.string().trim().max(12) }).parse(input);
+  const found = await access(v.slug);
+  if (found.kind === "missing" || found.kind === "closed" || found.kind === "draft") return { ok: false, error: "closed" };
+  const { discovery } = found;
+  const [{ misses }] = await db
+    .select({ misses: count() })
+    .from(s.handoffMisses)
+    .where(
+      and(
+        eq(s.handoffMisses.discoveryId, discovery.id),
+        gt(s.handoffMisses.createdAt, new Date(Date.now() - 60 * 60 * 1000)),
+      ),
+    );
+  if (misses >= HANDOFF_MISSES_PER_HOUR) return { ok: false, error: "too-many-tries" };
+  const [match] = await db
+    .select({ code: s.handoffCodes, stakeholder: s.stakeholders })
+    .from(s.handoffCodes)
+    .innerJoin(s.stakeholders, eq(s.stakeholders.id, s.handoffCodes.stakeholderId))
+    .where(
+      and(
+        eq(s.handoffCodes.discoveryId, discovery.id),
+        eq(s.handoffCodes.codeHash, hashHandoffCode(discovery.id, v.code.replace(/\D/g, ""))),
+        isNull(s.handoffCodes.usedAt),
+        gt(s.handoffCodes.expiresAt, new Date()),
+        eq(s.stakeholders.isTest, false),
+        isNull(s.stakeholders.removedAt),
+      ),
+    );
+  if (!match) {
+    await db.insert(s.handoffMisses).values({ discoveryId: discovery.id });
+    return { ok: false, error: "handoff-wrong" };
+  }
+  // Single use: whoever marks it first gets in; a second device with the same code doesn't.
+  const [used] = await db
+    .update(s.handoffCodes)
+    .set({ usedAt: new Date() })
+    .where(and(eq(s.handoffCodes.id, match.code.id), isNull(s.handoffCodes.usedAt)))
+    .returning({ id: s.handoffCodes.id });
+  if (!used) return { ok: false, error: "handoff-wrong" };
+  await startSession(match.stakeholder.id, v.slug);
   redirect(`/d/${v.slug}`);
 }
 

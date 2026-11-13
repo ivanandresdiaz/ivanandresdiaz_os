@@ -5,6 +5,8 @@ import {
   discoveryMarkdown,
   displayOptions,
   glossaryKeywords,
+  handoffMessage,
+  HANDOFF_BUTTON,
   interviewStatusLabel,
   maskSensitive,
   nextStage,
@@ -339,5 +341,25 @@ describe("Theme progress", () => {
     expect(themeRound(both, "needs", 3)).toEqual({ n: 3, of: 5 });
     expect(themeRound(both, "vision", 1)).toEqual({ n: 4, of: 5 });
     expect(themeRound(["vision"], "vision", 2)).toEqual({ n: 2, of: 2 });
+  });
+});
+
+describe("handoffMessage", () => {
+  const base = { name: "Mauricio Pérez", url: "https://ivan.example/d/cartera", code: "042917", days: 7 };
+
+  it("greets by first name and names the button the sign-in shows", () => {
+    const text = handoffMessage({ ...base, language: "es" });
+    expect(text).toContain("¡Hola Mauricio!");
+    expect(text).toContain(base.url);
+    expect(text).toContain(`"${HANDOFF_BUTTON.es}"`);
+    expect(text).toContain("042917");
+    expect(text).toContain("7 días");
+  });
+
+  it("speaks the Discovery's language", () => {
+    const text = handoffMessage({ ...base, language: "en" });
+    expect(text).toContain("Hi Mauricio!");
+    expect(text).toContain(`"${HANDOFF_BUTTON.en}"`);
+    expect(text).not.toContain("Hola");
   });
 });

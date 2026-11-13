@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray, like, max } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, max } from "drizzle-orm";
 import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -31,7 +31,14 @@ import { DiscoveryAiError, discoveryAiAvailable, draftOpening } from "@/lib/disc
 import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { conversationText, loadInterview, refreshInsights } from "./interview-engine";
-import { endSessionsOf, endSessionsOfStakeholder, startSession } from "./stakeholder-session";
+import {
+  endSessionsOf,
+  endSessionsOfStakeholder,
+  HANDOFF_DAYS,
+  hashHandoffCode,
+  newCode,
+  startSession,
+} from "./stakeholder-session";
 import { titleTag } from "./stakeholder-views";
 
 /**
@@ -137,6 +144,8 @@ export async function setDiscoveryStatus(input: { id: string; status: "open" | "
     .parse(input);
   if (v.status === "open") await deleteTestStakeholders(v.id);
   if (v.status === "closed" && v.signOut) await endSessionsOf(v.id);
+  // A Handoff code never outlives a close, even when sessions stay (Q79).
+  if (v.status === "closed") await db.delete(s.handoffCodes).where(eq(s.handoffCodes.discoveryId, v.id));
   await db.update(s.discoveries).set({ status: v.status }).where(eq(s.discoveries.id, v.id));
   await done();
 }
@@ -400,8 +409,47 @@ export async function setStakeholderAccess(input: { id: string; removed: boolean
   await requireIvan();
   const v = z.object({ id: z.uuid(), removed: z.boolean() }).parse(input);
   await db.update(s.stakeholders).set({ removedAt: v.removed ? new Date() : null }).where(eq(s.stakeholders.id, v.id));
-  if (v.removed) await endSessionsOfStakeholder(v.id);
+  if (v.removed) {
+    await endSessionsOfStakeholder(v.id);
+    await db.delete(s.handoffCodes).where(eq(s.handoffCodes.stakeholderId, v.id));
+  }
   await done();
+}
+
+/**
+ * Creates a Handoff code for one Stakeholder (Ronda 58), replacing the last
+ * one. Only while the Discovery is Open. The code is shown once; only its
+ * hash is kept, keyed by the Discovery because the person types only the code.
+ */
+export async function createHandoffCode(input: { stakeholderId: string }): Promise<Outcome<{ code: string; days: number }>> {
+  await requireIvan();
+  const v = z.object({ stakeholderId: z.uuid() }).parse(input);
+  const [person] = await db.select().from(s.stakeholders).where(eq(s.stakeholders.id, v.stakeholderId));
+  if (!person || person.isTest) return { ok: false, error: "Stakeholder not found." };
+  if (person.removedAt) return { ok: false, error: "Give them access back first." };
+  const discovery = await requireDiscovery(person.discoveryId);
+  if (discovery.status !== "open") return { ok: false, error: "Codes work only while the Discovery is open." };
+  const active = new Set(
+    (
+      await db
+        .select({ hash: s.handoffCodes.codeHash })
+        .from(s.handoffCodes)
+        .where(and(eq(s.handoffCodes.discoveryId, discovery.id), isNull(s.handoffCodes.usedAt)))
+    ).map((r) => r.hash),
+  );
+  // Two live codes in one Discovery must differ, or one would sign in the wrong person.
+  let code = newCode();
+  while (active.has(hashHandoffCode(discovery.id, code))) code = newCode();
+  const values = {
+    discoveryId: discovery.id,
+    stakeholderId: person.id,
+    codeHash: hashHandoffCode(discovery.id, code),
+    expiresAt: new Date(Date.now() + HANDOFF_DAYS * 24 * 60 * 60 * 1000),
+    usedAt: null,
+    createdAt: new Date(),
+  };
+  await db.insert(s.handoffCodes).values(values).onConflictDoUpdate({ target: s.handoffCodes.stakeholderId, set: values });
+  return { ok: true, code, days: HANDOFF_DAYS };
 }
 
 /** Deletes a Stakeholder with everything they said and attached. */

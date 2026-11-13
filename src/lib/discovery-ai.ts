@@ -180,6 +180,13 @@ estuviera resuelto, ¿cómo sería tu día?") and ask what about today's way of 
 not want to lose. If there was no Needs stage, first ground the conversation in a recent real
 situation before asking what they imagine.
 
+Then ask them to imagine a 10 experience. People don't know what a bare "10" means, so always
+write it out in full, exactly like this: "una experiencia 10 (la experiencia ideal)" in Spanish,
+"a 10 experience (the ideal experience)" in English. Never write a bare "10", "un 10" or "10/10".
+For example: "Imagina una experiencia 10 (la experiencia ideal) para esto: ¿qué pasaría?". Let
+them dream without limits, then bring it back to something realistic: what part of that ideal
+would make the biggest difference first.
+
 Only then bring ideas, yours or from the Brief, giving priority to those that answer something
 they raised, including ones the person has probably never considered. State each idea in one
 sentence as what they would see or do, together with what it would ask of them. Offer two or

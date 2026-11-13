@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { requestCode, verifyCode } from "@/server/stakeholder-actions";
+import { requestCode, verifyCode, verifyHandoffCode } from "@/server/stakeholder-actions";
 import type { Language } from "@/domain/discovery";
 import { copyFor } from "./copy";
 
-/** Email, then the 6-digit code from the email (Q11). */
+/** Email, then the 6-digit code from the email (Q11); or only the Handoff code Ivan gave them (Ronda 58). */
 export function SignIn({ slug, language }: { slug: string; language: Language }) {
   const copy = copyFor(language);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [step, setStep] = useState<"email" | "code" | "handoff">("email");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -27,16 +27,17 @@ export function SignIn({ slug, language }: { slug: string; language: Language })
     start(async () => {
       setError(null);
       // On success the action sends the person to the Discovery's home.
-      const result = await verifyCode({ slug, email, code: value });
+      const result =
+        step === "handoff" ? await verifyHandoffCode({ slug, code: value }) : await verifyCode({ slug, email, code: value });
       if (result && !result.ok) setError(copy.signInErrors[result.error] ?? result.error);
     });
 
   return (
     <section className="card-in flex flex-col gap-4 rounded-3xl border border-line bg-surface p-6 shadow-sm">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{copy.signInTitle}</h2>
+        <h2 className="text-lg font-semibold">{step === "handoff" ? copy.handoffTitle : copy.signInTitle}</h2>
         <p id="code-hint" className="text-sm text-muted">
-          {step === "email" ? copy.signInHint : copy.codeSent(email)}
+          {step === "email" ? copy.signInHint : step === "handoff" ? copy.handoffHint : copy.codeSent(email)}
         </p>
       </div>
 
@@ -68,6 +69,17 @@ export function SignIn({ slug, language }: { slug: string; language: Language })
             className="min-h-12 rounded-full bg-accent px-6 text-base font-medium text-white shadow-sm disabled:opacity-50"
           >
             {pending ? copy.sending : copy.sendCode}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCode("");
+              setError(null);
+              setStep("handoff");
+            }}
+            className="min-h-11 self-center text-sm text-accent underline underline-offset-4"
+          >
+            {copy.handoffLink}
           </button>
         </form>
       ) : (
@@ -104,21 +116,34 @@ export function SignIn({ slug, language }: { slug: string; language: Language })
           >
             {pending ? copy.entering : copy.enter}
           </button>
-          <div className="flex flex-wrap justify-between gap-2 text-sm">
+          {step === "handoff" ? (
             <button
               type="button"
               onClick={() => {
                 setStep("email");
                 setError(null);
               }}
-              className="min-h-11 text-muted underline underline-offset-4"
+              className="min-h-11 self-center text-sm text-muted underline underline-offset-4"
             >
-              {copy.otherEmail}
+              {copy.useEmail}
             </button>
-            <button type="button" disabled={pending} onClick={send} className="min-h-11 text-accent underline underline-offset-4">
-              {copy.resend}
-            </button>
-          </div>
+          ) : (
+            <div className="flex flex-wrap justify-between gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setError(null);
+                }}
+                className="min-h-11 text-muted underline underline-offset-4"
+              >
+                {copy.otherEmail}
+              </button>
+              <button type="button" disabled={pending} onClick={send} className="min-h-11 text-accent underline underline-offset-4">
+                {copy.resend}
+              </button>
+            </div>
+          )}
         </form>
       )}
 

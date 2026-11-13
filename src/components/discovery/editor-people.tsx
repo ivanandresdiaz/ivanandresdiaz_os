@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MAX_ROLE_NOTE } from "@/domain/discovery";
+import { handoffMessage, type Language, MAX_ROLE_NOTE } from "@/domain/discovery";
 import {
+  createHandoffCode,
   createStakeholder,
   deleteStakeholder,
   setStakeholderAccess,
@@ -115,6 +116,7 @@ function PersonRow({ person, view }: { person: Person; view: DiscoveryView }) {
         >
           {removed ? "Give access back" : "Remove access"}
         </button>
+        <HandoffButton person={person} view={view} />
         <ConfirmDelete
           action={deleteStakeholder}
           id={person.id}
@@ -127,6 +129,76 @@ function PersonRow({ person, view }: { person: Person; view: DiscoveryView }) {
         </ConfirmDelete>
       </div>
     </div>
+  );
+}
+
+/**
+ * A Handoff code for this person (Ronda 58): shown once, large, with a message
+ * ready to paste (link + code). Only while the Discovery is open (Q79).
+ */
+function HandoffButton({ person, view }: { person: Person; view: DiscoveryView }) {
+  const [shown, setShown] = useState<{ code: string; days: number; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, start] = useTransition();
+  const open = view.discovery.status === "open";
+  const usable = open && !person.removedAt;
+
+  const create = () =>
+    start(async () => {
+      setError(null);
+      setCopied(false);
+      const result = await createHandoffCode({ stakeholderId: person.id });
+      if (!result.ok) return setError(result.error);
+      const message = handoffMessage({
+        language: view.discovery.language as Language,
+        name: person.name,
+        url: `${window.location.origin}/d/${view.discovery.slug}`,
+        code: result.code,
+        days: result.days,
+      });
+      setShown({ code: result.code, days: result.days, message });
+    });
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn"
+        disabled={!usable || pending}
+        onClick={create}
+        title={usable ? "A code you give them yourself; they sign in without their email" : "Only while the Discovery is open"}
+      >
+        {pending ? "…" : "Code"}
+      </button>
+      {error && <span className="w-full text-xs text-red-600">{error}</span>}
+      {shown && (
+        <div className="flex w-full flex-col items-start gap-2 rounded-lg border border-accent/40 p-3">
+          <span className="label">Handoff code for {person.name}</span>
+          <span className="font-mono text-3xl tracking-[0.3em]">
+            {shown.code.slice(0, 3)} {shown.code.slice(3)}
+          </span>
+          <span className="text-xs text-muted">
+            Works once, for {shown.days} days. Shown only now; a new one replaces it.
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                void navigator.clipboard.writeText(shown.message);
+                setCopied(true);
+              }}
+            >
+              {copied ? "Copied ✓" : "Copy message"}
+            </button>
+            <button type="button" className="btn" onClick={() => setShown(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

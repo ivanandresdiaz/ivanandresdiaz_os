@@ -107,6 +107,32 @@ export function firstName(name: string) {
   return name.trim().split(/\s+/)[0] ?? "";
 }
 
+/** The sign-in button for a Handoff code; the message Ivan copies names it, so both say the same. */
+export const HANDOFF_BUTTON: Record<Language, string> = {
+  es: "Tengo un código de Ivan",
+  en: "I have a code from Ivan",
+};
+
+/**
+ * What Ivan pastes to a Stakeholder (Q78): the link, which button to tap and
+ * the Handoff code, in the Discovery's language.
+ */
+export function handoffMessage(input: { language: Language; name: string; url: string; code: string; days: number }) {
+  const who = firstName(input.name);
+  if (input.language === "en") {
+    return [
+      `Hi ${who}! Here's the link: ${input.url}`,
+      `Tap "${HANDOFF_BUTTON.en}" and type ${input.code}`,
+      `It works once, for the next ${input.days} days.`,
+    ].join("\n");
+  }
+  return [
+    `¡Hola ${who}! Este es el enlace: ${input.url}`,
+    `Toca "${HANDOFF_BUTTON.es}" y escribe ${input.code}`,
+    `Sirve una vez, durante los próximos ${input.days} días.`,
+  ].join("\n");
+}
+
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }

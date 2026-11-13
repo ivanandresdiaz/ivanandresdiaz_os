@@ -780,6 +780,35 @@ export const stakeholderCodes = pgTable("stakeholder_codes", {
   createdAt: createdAt(),
 });
 
+/**
+ * A Handoff code (Ronda 58): Ivan creates it for one Stakeholder and gives it
+ * to them himself; it signs them in without their email. One per Stakeholder,
+ * so a new one replaces the old. Only its hash is kept.
+ */
+export const handoffCodes = pgTable("handoff_codes", {
+  id: id(),
+  discoveryId: uuid("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  stakeholderId: uuid("stakeholder_id")
+    .notNull()
+    .unique()
+    .references(() => stakeholders.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+/** A wrong Handoff code typed at a Discovery's link; counted to cap guessing per hour. */
+export const handoffMisses = pgTable("handoff_misses", {
+  id: id(),
+  discoveryId: uuid("discovery_id")
+    .notNull()
+    .references(() => discoveries.id, { onDelete: "cascade" }),
+  createdAt: createdAt(),
+});
+
 /** A signed-in device of a Stakeholder; the cookie holds the token, this table only its hash. */
 export const stakeholderSessions = pgTable("stakeholder_sessions", {
   id: id(),

@@ -1,4 +1,4 @@
-import type { Language, Masked } from "@/domain/discovery";
+import { HANDOFF_BUTTON, type Language, type Masked } from "@/domain/discovery";
 
 /** Every word a Stakeholder reads, in the Discovery's language (Q34). */
 const es = {
@@ -40,6 +40,10 @@ const es = {
   entering: "Entrando…",
   otherEmail: "Usar otro correo",
   resend: "Enviar otro código",
+  handoffLink: HANDOFF_BUTTON.es,
+  handoffTitle: "Entra con tu código",
+  handoffHint: "Escribe el código de 6 dígitos que te dio Ivan.",
+  useEmail: "Mejor entrar con mi correo",
   signInErrors: {
     email: "Ese correo no parece válido.",
     closed: "Esta Discovery no está abierta.",
@@ -48,6 +52,8 @@ const es = {
     send: "No pudimos enviar el correo. Intenta de nuevo en un minuto.",
     expired: "El código venció o ya no sirve. Pide otro.",
     wrong: "Ese código no es. Revísalo e intenta de nuevo.",
+    "handoff-wrong": "Ese código no sirve: revísalo, o puede que ya se haya usado o vencido. Pídele otro a Ivan.",
+    "too-many-tries": "Hubo muchos intentos. Espera un rato o entra con tu correo.",
   } as Record<string, string>,
   closedTitle: "Esta Discovery ya cerró",
   closedBody: "Gracias por tu tiempo.",
@@ -207,6 +213,10 @@ const en: Copy = {
   entering: "Signing in…",
   otherEmail: "Use another email",
   resend: "Send another code",
+  handoffLink: HANDOFF_BUTTON.en,
+  handoffTitle: "Sign in with your code",
+  handoffHint: "Type the 6-digit code Ivan gave you.",
+  useEmail: "Use my email instead",
   signInErrors: {
     email: "That email doesn't look valid.",
     closed: "This Discovery isn't open.",
@@ -215,6 +225,8 @@ const en: Copy = {
     send: "We couldn't send the email. Try again in a minute.",
     expired: "The code expired or no longer works. Ask for another.",
     wrong: "That's not the code. Check it and try again.",
+    "handoff-wrong": "That code doesn't work: check it, or it may be used or expired. Ask Ivan for another.",
+    "too-many-tries": "Too many tries. Wait a while or sign in with your email.",
   },
   closedTitle: "This Discovery has closed",
   closedBody: "Thank you for your time.",

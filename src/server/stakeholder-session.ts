@@ -6,8 +6,9 @@ import { db } from "@/db";
 import * as s from "@/db/schema";
 
 /**
- * A Stakeholder's own lock (ADR 0005): a code by email opens a session whose
- * cookie only travels under /d/<slug> and only opens that person's Interviews.
+ * A Stakeholder's own lock (ADR 0005): a code by email, or a Handoff code from
+ * Ivan, opens a session whose cookie only travels under /d/<slug> and only
+ * opens that person's Interviews.
  * Nothing here ever reads or grants Ivan's session, and nothing in /os accepts this one.
  */
 
@@ -16,6 +17,10 @@ export const SESSION_DAYS = 30;
 export const CODE_MINUTES = 10;
 export const CODE_ATTEMPTS = 5;
 export const CODES_PER_HOUR = 5;
+/** A Handoff code waits in a chat for hours, so it lasts days, not minutes (Q77). */
+export const HANDOFF_DAYS = 7;
+/** Wrong Handoff codes allowed per Discovery per hour; there is no email to narrow a guess (Q76). */
+export const HANDOFF_MISSES_PER_HOUR = 10;
 
 function secret() {
   const value = process.env.AUTH_SECRET;
@@ -31,6 +36,11 @@ export function newCode() {
 
 export function hashCode(discoveryId: string, email: string, code: string) {
   return hmac(`code:${discoveryId}:${email}:${code}`);
+}
+
+/** Keyed by the Discovery alone: the person types only the code. */
+export function hashHandoffCode(discoveryId: string, code: string) {
+  return hmac(`handoff:${discoveryId}:${code}`);
 }
 
 export function sameHash(a: string, b: string) {
