@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { IsoDate } from "@/domain/dates";
 import {
   amountInput,
+  amountTyping,
   CURRENCIES,
   formatAmount,
   MAX_MONEY_NAME,
@@ -514,7 +515,7 @@ function AccountForm({ account, onDone }: { account?: AccountView; onDone?: () =
         <span className="label">Opening balance</span>
         <input
           value={opening}
-          onChange={(event) => setOpening(event.target.value)}
+          onChange={(event) => setOpening(amountTyping(event.target.value, { balance: true }))}
           inputMode={currency === "COP" ? "numeric" : "decimal"}
           placeholder="What it holds when you start"
           className="input tabular-nums"
@@ -582,7 +583,7 @@ function AdjustForm({ account, onDone }: { account: AccountView; onDone: () => v
       <div className="flex gap-2">
         <input
           value={real}
-          onChange={(event) => setReal(event.target.value)}
+          onChange={(event) => setReal(amountTyping(event.target.value, { balance: true }))}
           inputMode={account.currency === "COP" ? "numeric" : "decimal"}
           placeholder="What it really holds"
           className="input tabular-nums"

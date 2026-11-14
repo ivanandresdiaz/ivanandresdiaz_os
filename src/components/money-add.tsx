@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   amountInput,
+  amountTyping,
   formatAmount,
   MAX_MONEY_NAME,
   MAX_MOVEMENT_NOTE,
@@ -338,7 +339,7 @@ function MovementDialog({
             <input
               ref={amountField}
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              onChange={(event) => setAmount(amountTyping(event.target.value))}
               inputMode={currency === "COP" ? "numeric" : "decimal"}
               autoComplete="off"
               placeholder="0"
@@ -436,7 +437,7 @@ function MovementDialog({
               <span className="label">Arrived, in {to.currency}</span>
               <input
                 value={toAmount}
-                onChange={(event) => setToAmount(event.target.value)}
+                onChange={(event) => setToAmount(amountTyping(event.target.value))}
                 inputMode={to.currency === "COP" ? "numeric" : "decimal"}
                 autoComplete="off"
                 className="input tabular-nums"

@@ -67,6 +67,16 @@ export function formatAmount(units: number, currency: Currency): string {
   return `${sign}${prefix}${grouped},${fraction}`;
 }
 
+/**
+ * What an amount field keeps of what Ivan typed or pasted: digits, dots and
+ * commas, and for a balance, which can be below 0, a minus in front.
+ */
+export function amountTyping(text: string, { balance = false } = {}): string {
+  const negative = balance && /^\s*[-−]/.test(text);
+  const kept = text.replace(/[^\d.,]/g, "");
+  return negative ? `-${kept}` : kept;
+}
+
 /** The amount as Ivan would type it back into the field: no symbol, no grouping. */
 export function amountInput(units: number, currency: Currency): string {
   const scale = SCALE[currency];

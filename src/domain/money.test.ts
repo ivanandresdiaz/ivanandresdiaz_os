@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   amountInput,
+  amountTyping,
   balances,
   categoryTotals,
   formatAmount,
@@ -52,6 +53,20 @@ describe("Amounts", () => {
     expect(formatAmount(-600_000, "COP")).toBe("−$600.000");
     expect(formatAmount(123456, "USD")).toBe("US$1.234,56");
     expect(formatAmount(5, "USD")).toBe("US$0,05");
+  });
+
+  it("keeps only digits, dots and commas as Ivan types", () => {
+    expect(amountTyping("45abc000")).toBe("45000");
+    expect(amountTyping("$ 1.450.000")).toBe("1.450.000");
+    expect(amountTyping("12,50 usd")).toBe("12,50");
+    expect(amountTyping("-5000")).toBe("5000");
+  });
+
+  it("lets a balance start with a minus", () => {
+    expect(amountTyping("-20.000", { balance: true })).toBe("-20.000");
+    expect(amountTyping("−20x", { balance: true })).toBe("-20");
+    expect(amountTyping("-", { balance: true })).toBe("-");
+    expect(amountTyping("20-", { balance: true })).toBe("20");
   });
 
   it("gives the field back what it can read again", () => {
