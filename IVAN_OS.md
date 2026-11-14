@@ -883,7 +883,7 @@ Migración 0026 (`money_accounts`, `money_categories`, `money_movements`, enums 
 
 **Subida (2026-11-14)**, commit d197628. Migración 0026 aplicada en Neon.
 
-## Money, rebanada 2 — construida en local (2026-11-14)
+## Money, rebanada 2 — Subida (2026-11-14), commit 4d009b8, 0027 en Neon
 
 Recurring: una tarjeta en el mes, arriba de "Where it went". Muestra cada ocurrencia del mes y, mirando el mes actual, las de meses anteriores que siguen sin resolver (en rojo, "overdue"). Pendiente desde su día, próxima antes; ambas se confirman o se saltan. Confirm registra el movimiento tal cual, en el día que tocaba y con el nombre como nota; Change… abre el mismo diálogo del "+" para confirmar con otro monto, Account o día; Skip lo deja tachado con Undo. Borrar lo que una confirmación registró la deja pendiente otra vez. "+ Recurring" y la lista "All Recurrings" (horario, siguiente, monto) usan el mismo diálogo, con Name, First on y Every N months; Stop la borra y lo ya registrado queda. Si el día no existe en un mes (31 en febrero), toca el último día.
 
