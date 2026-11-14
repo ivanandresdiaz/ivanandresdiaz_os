@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import type { IsoDate } from "@/domain/dates";
 import {
   amountInput,
@@ -8,9 +10,12 @@ import {
   CURRENCIES,
   formatAmount,
   MAX_MONEY_NAME,
+  MONEY_TABS,
   parseBalance,
+  pieSlices,
   shareLabel,
   type Currency,
+  type MoneyTab,
 } from "@/domain/money";
 import {
   adjustAccount,
@@ -20,6 +25,7 @@ import {
   deleteAccount,
   deleteAdjustment,
   deleteCategory,
+  loadCampaignMoney,
   mergeCategory,
   renameCategory,
   skipOccurrence,
@@ -29,6 +35,8 @@ import {
 import type {
   AccountView,
   AdjustmentView,
+  CampaignMoneyView,
+  CategoryKind,
   CategoryMonthView,
   CategoryView,
   MoneyMonthView,
@@ -54,7 +62,9 @@ function Section({ title, aside, children }: { title: string; aside?: React.Reac
 }
 
 /** The month at a glance (Q12): what came in, what went out, what was saved, and where it went. */
-export function MoneyMonth({ view, today }: { view: MoneyMonthView; today: IsoDate }) {
+export function MoneyMonth({ view, today, tab: initialTab }: { view: MoneyMonthView; today: IsoDate; tab: MoneyTab }) {
+  const [tab, setTab] = useState<MoneyTab>(initialTab);
+
   if (view.accounts.length === 0) {
     return (
       <Section title="Start here">
@@ -65,6 +75,17 @@ export function MoneyMonth({ view, today }: { view: MoneyMonthView; today: IsoDa
         <AccountForm />
       </Section>
     );
+  }
+
+  const pending = view.occurrences.filter((o) => o.state === "pending");
+
+  function choose(next: MoneyTab) {
+    setTab(next);
+    // Kept in the address, so a reload or going back lands on the same tab (Q1).
+    const url = new URL(window.location.href);
+    if (next === "movements") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
   }
 
   return (
@@ -84,15 +105,85 @@ export function MoneyMonth({ view, today }: { view: MoneyMonthView; today: IsoDa
         ))}
       </div>
 
-      <Recurrings occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
-      <WhereItWent byCategory={view.byCategory} today={today} />
-      <Movements movements={view.movements} adjustments={view.adjustments} today={today} />
+      {pending.length > 0 && (
+        <Section title={`To confirm · ${pending.length}`}>
+          <ul className="flex flex-col gap-1">
+            {pending.map((o) => (
+              <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
+            ))}
+          </ul>
+        </Section>
+      )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Accounts accounts={view.accounts} />
-        <Categories categories={view.categories} />
+      <WhereItWent byCategory={view.byCategory} incomeByCategory={view.incomeByCategory} today={today} />
+
+      <div className="flex flex-col gap-3">
+        <MoneyTabs tab={tab} onChoose={choose} pending={pending.length} />
+        <div role="tabpanel" id={`money-panel-${tab}`} aria-labelledby={`money-tab-${tab}`} className="flex flex-col gap-4">
+          {tab === "movements" && <Movements movements={view.movements} adjustments={view.adjustments} today={today} />}
+          {tab === "recurrings" && (
+            <Recurrings occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
+          )}
+          {tab === "accounts" && <Accounts accounts={view.accounts} />}
+          {tab === "categories" && (
+            <>
+              <Categories kind="expense" categories={view.categories.filter((c) => c.kind === "expense")} />
+              <Categories kind="income" categories={view.categories.filter((c) => c.kind === "income")} />
+            </>
+          )}
+        </div>
       </div>
     </>
+  );
+}
+
+const TAB_LABEL: Record<MoneyTab, string> = {
+  movements: "Movements",
+  recurrings: "Recurrings",
+  accounts: "Accounts",
+  categories: "Categories",
+};
+
+/** The tabs under the summary (Ronda 61): a line under each, the chosen one in the accent color. */
+function MoneyTabs({ tab, onChoose, pending }: { tab: MoneyTab; onChoose: (tab: MoneyTab) => void; pending: number }) {
+  function onKeyDown(event: React.KeyboardEvent) {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = MONEY_TABS[(MONEY_TABS.indexOf(tab) + step + MONEY_TABS.length) % MONEY_TABS.length];
+    onChoose(next);
+    document.getElementById(`money-tab-${next}`)?.focus();
+  }
+  return (
+    <div role="tablist" aria-label="Money" onKeyDown={onKeyDown} className="flex overflow-x-auto border-b border-line [scrollbar-width:none]">
+      {MONEY_TABS.map((t) => {
+        const selected = t === tab;
+        return (
+          <button
+            key={t}
+            id={`money-tab-${t}`}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={`money-panel-${t}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChoose(t)}
+            className={`-mb-px flex min-h-10 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 px-1.5 text-sm whitespace-nowrap transition ${
+              selected
+                ? "border-accent font-medium text-foreground"
+                : "border-transparent text-muted hover:border-line hover:text-foreground"
+            }`}
+          >
+            {TAB_LABEL[t]}
+            {t === "recurrings" && pending > 0 && (
+              <span className="rounded-full bg-accent/15 px-1.5 text-xs font-medium text-accent tabular-nums">
+                {pending}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -108,58 +199,190 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-function WhereItWent({ byCategory, today }: { byCategory: CategoryMonthView[]; today: IsoDate }) {
+/**
+ * Eight colors, in their validated order; any Category past the eighth (and
+ * old Income without one, at -1) is gray. Written out so Tailwind sees them.
+ */
+const SLICE_FILL = [
+  "fill-(--series-1)",
+  "fill-(--series-2)",
+  "fill-(--series-3)",
+  "fill-(--series-4)",
+  "fill-(--series-5)",
+  "fill-(--series-6)",
+  "fill-(--series-7)",
+  "fill-(--series-8)",
+];
+const SLICE_BG = [
+  "bg-(--series-1)",
+  "bg-(--series-2)",
+  "bg-(--series-3)",
+  "bg-(--series-4)",
+  "bg-(--series-5)",
+  "bg-(--series-6)",
+  "bg-(--series-7)",
+  "bg-(--series-8)",
+];
+const sliceFill = (index: number) => SLICE_FILL[index] ?? "fill-(--series-rest)";
+const sliceBg = (index: number) => SLICE_BG[index] ?? "bg-(--series-rest)";
+
+const PIE = { size: 168, outer: 80, inner: 52 };
+
+function arc(start: number, end: number): string {
+  const c = PIE.size / 2;
+  const at = (turn: number, r: number) => {
+    const a = turn * 2 * Math.PI - Math.PI / 2;
+    return `${(c + r * Math.cos(a)).toFixed(2)} ${(c + r * Math.sin(a)).toFixed(2)}`;
+  };
+  const large = end - start > 0.5 ? 1 : 0;
+  return [
+    `M ${at(start, PIE.outer)}`,
+    `A ${PIE.outer} ${PIE.outer} 0 ${large} 1 ${at(end, PIE.outer)}`,
+    `L ${at(end, PIE.inner)}`,
+    `A ${PIE.inner} ${PIE.inner} 0 ${large} 0 ${at(start, PIE.inner)}`,
+    "Z",
+  ].join(" ");
+}
+
+const sliceKey = (c: CategoryMonthView) => c.categoryId ?? "none";
+
+/**
+ * Where the month's pesos went, or where they came from (Q3–Q5): a donut with
+ * one slice per Category, the most money first, and the list beside it.
+ * Tapping either opens its movements.
+ */
+function WhereItWent({
+  byCategory,
+  incomeByCategory,
+  today,
+}: {
+  byCategory: CategoryMonthView[];
+  incomeByCategory: CategoryMonthView[];
+  today: IsoDate;
+}) {
+  const [side, setSide] = useState<"expense" | "income">("expense");
   const [open, setOpen] = useState<string | null>(null);
-  const top = new Map<Currency, number>();
-  for (const c of byCategory) top.set(c.currency, Math.max(top.get(c.currency) ?? 0, c.total));
+  const pesos = (side === "expense" ? byCategory : incomeByCategory).filter((c) => c.currency === "COP");
+  const total = pesos.reduce((sum, c) => sum + c.total, 0);
+  const slices = pieSlices(pesos.map((c) => c.total));
+  const chosen = pesos.find((c) => sliceKey(c) === open);
+  const toggle = (c: CategoryMonthView) => setOpen(open === sliceKey(c) ? null : sliceKey(c));
 
   return (
-    <Section title="Where it went">
-      {byCategory.length === 0 && <p className="text-sm text-muted">No Expenses this month.</p>}
-      <ul className="flex flex-col gap-1">
-        {byCategory.map((c) => {
-          const key = `${c.currency}:${c.categoryId}`;
-          const expanded = open === key;
-          return (
-            <li key={key}>
-              <button
-                type="button"
-                onClick={() => setOpen(expanded ? null : key)}
-                aria-expanded={expanded}
-                className="flex w-full flex-col gap-1 rounded-md px-2 py-1.5 text-left hover:bg-background"
+    <Section
+      title={side === "expense" ? "Where it went" : "Where it came from"}
+      aside={
+        <div className="flex items-center gap-0.5 rounded-lg bg-background p-0.5" role="group" aria-label="Show">
+          {(["expense", "income"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              aria-pressed={side === s}
+              onClick={() => {
+                setSide(s);
+                setOpen(null);
+              }}
+              className={`min-h-8 rounded-md px-2.5 text-xs ${
+                side === s ? "bg-surface font-medium shadow-sm" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {s === "expense" ? "Expenses" : "Income"}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {pesos.length === 0 ? (
+        <p className="text-sm text-muted">{side === "expense" ? "No Expenses this month." : "No Income this month."}</p>
+      ) : (
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          <svg
+            viewBox={`0 0 ${PIE.size} ${PIE.size}`}
+            className="size-44 shrink-0"
+            role="img"
+            aria-label={`${side === "expense" ? "Expenses" : "Income"} by Category, ${formatAmount(total, "COP")} in all`}
+          >
+            {pesos.length === 1 ? (
+              <circle
+                cx={PIE.size / 2}
+                cy={PIE.size / 2}
+                r={(PIE.outer + PIE.inner) / 2}
+                fill="none"
+                strokeWidth={PIE.outer - PIE.inner}
+                className={`cursor-pointer ${pesos[0].categoryId ? "stroke-(--series-1)" : "stroke-(--series-rest)"}`}
+                onClick={() => toggle(pesos[0])}
               >
-                <span className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="truncate font-medium">{c.name}</span>
-                  <span className="shrink-0 tabular-nums">
-                    {formatAmount(c.total, c.currency)}
-                    <span className="ml-2 text-xs text-muted">×{c.expenses.length}</span>
-                  </span>
-                </span>
-                <span className="h-1.5 overflow-hidden rounded-full bg-line">
-                  <span
-                    className="block h-full rounded-full bg-accent"
-                    style={{ width: `${Math.max(2, (c.total / (top.get(c.currency) || 1)) * 100)}%` }}
-                  />
-                </span>
-              </button>
-              {expanded && (
-                <ul className="mt-1 mb-2 ml-2 flex flex-col border-l border-line pl-2">
-                  {c.expenses.map((m) => (
-                    <MovementRow key={m.id} movement={m} today={today} hideCategory />
-                  ))}
-                </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                <title>{`${pesos[0].name}: ${formatAmount(pesos[0].total, "COP")}`}</title>
+              </circle>
+            ) : (
+              pesos.map((c, i) => (
+                <path
+                  key={sliceKey(c)}
+                  d={arc(slices[i].start, slices[i].end)}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  opacity={chosen && sliceKey(chosen) !== sliceKey(c) ? 0.3 : 1}
+                  className={`cursor-pointer stroke-surface transition-opacity ${sliceFill(c.categoryId ? i : -1)}`}
+                  onClick={() => toggle(c)}
+                >
+                  <title>{`${c.name}: ${formatAmount(c.total, "COP")} · ${shareLabel(c.total / total)}`}</title>
+                </path>
+              ))
+            )}
+            <text
+              x="50%"
+              y="47%"
+              textAnchor="middle"
+              className="fill-muted text-[10px] font-medium tracking-wide uppercase"
+            >
+              {chosen ? chosen.name.slice(0, 14) : side === "expense" ? "Spent" : "Came in"}
+            </text>
+            <text x="50%" y="58%" textAnchor="middle" className="fill-foreground text-[13px] font-semibold">
+              {formatAmount(chosen ? chosen.total : total, "COP")}
+            </text>
+          </svg>
+
+          <ul className="flex w-full min-w-0 flex-1 flex-col gap-0.5">
+            {pesos.map((c, i) => {
+              const expanded = open === sliceKey(c);
+              return (
+                <li key={sliceKey(c)}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(c)}
+                    aria-expanded={expanded}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background ${
+                      expanded ? "bg-background" : ""
+                    }`}
+                  >
+                    <span className={`size-3 shrink-0 rounded-sm ${sliceBg(c.categoryId ? i : -1)}`} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
+                    <span className="shrink-0 text-xs text-muted tabular-nums">{shareLabel(c.total / total)}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {formatAmount(c.total, "COP")}
+                      <span className="ml-2 text-xs text-muted">×{c.expenses.length}</span>
+                    </span>
+                  </button>
+                  {expanded && (
+                    <ul className="mt-1 mb-2 ml-2 flex flex-col border-l border-line pl-2">
+                      {c.expenses.map((m) => (
+                        <MovementRow key={m.id} movement={m} today={today} hideCategory />
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </Section>
   );
 }
 
 function describe(m: MovementView, hideCategory = false): string {
   if (m.kind === "expense") return hideCategory ? m.accountName : `${m.categoryName ?? "?"} · ${m.accountName}`;
-  if (m.kind === "income") return `Income · ${m.accountName}`;
+  if (m.kind === "income") return hideCategory ? m.accountName : `${m.categoryName ?? "Income"} · ${m.accountName}`;
   return `${m.accountName} → ${m.toAccountName ?? "?"}`;
 }
 
@@ -175,7 +398,12 @@ function MovementRow({ movement: m, today, hideCategory }: { movement: MovementV
         <span className="w-20 shrink-0 text-xs text-muted">{shortDate(m.date, today)}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1">
-            <span className="truncate">{describe(m, hideCategory)}</span>
+            <span className="truncate">
+              {describe(m, hideCategory)}
+              {m.campaigns.length > 0 && (
+                <span className="text-xs text-muted"> · {m.campaigns.map((c) => c.title).join(", ")}</span>
+              )}
+            </span>
             {m.receipts.length > 0 && (
               <span
                 className="flex shrink-0 items-center gap-0.5 text-xs text-muted"
@@ -263,13 +491,13 @@ function flowSign(kind: MovementView["kind"]): string {
 
 function flowLine(f: Pick<RecurringView, "kind" | "accountName" | "toAccountName" | "categoryName">): string {
   if (f.kind === "expense") return `${f.categoryName ?? "?"} · ${f.accountName}`;
-  if (f.kind === "income") return `Income · ${f.accountName}`;
+  if (f.kind === "income") return `${f.categoryName ?? "Income"} · ${f.accountName}`;
   return `${f.accountName} → ${f.toAccountName ?? "?"}`;
 }
 
 /**
- * The Recurrings of the month (Q10, Q12): what is pending asks first, the
- * oldest first; then what is coming; then what was confirmed or skipped.
+ * The Recurrings tab (Q2): what is coming this month and what was confirmed or
+ * skipped, then every Recurring to change or stop. What is pending asks above the tabs.
  */
 function Recurrings({
   occurrences,
@@ -280,58 +508,53 @@ function Recurrings({
   recurrings: RecurringView[];
   today: IsoDate;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const pending = occurrences.filter((o) => o.state === "pending").length;
+  const settled = occurrences.filter((o) => o.state !== "pending");
   return (
-    <Section
-      title={pending > 0 ? `Recurring · ${pending} pending` : "Recurring"}
-      aside={<RecurringButton className="btn">+ Recurring</RecurringButton>}
-    >
-      {recurrings.length === 0 && (
-        <p className="text-sm text-muted">
-          Your pay, the transfer to savings, your Bills: add each once. On its day it asks; you confirm or skip.
-        </p>
-      )}
-      {recurrings.length > 0 && occurrences.length === 0 && (
-        <p className="text-sm text-muted">Nothing due this month.</p>
-      )}
-      <ul className="flex flex-col gap-1">
-        {occurrences.map((o) => (
-          <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
-        ))}
-      </ul>
+    <>
+      <Section title="This month" aside={<RecurringButton className="btn">+ Recurring</RecurringButton>}>
+        {recurrings.length === 0 && (
+          <p className="text-sm text-muted">
+            Your pay, the transfer to savings, your Bills: add each once. On its day it asks; you confirm or skip.
+          </p>
+        )}
+        {recurrings.length > 0 && occurrences.length === 0 && <p className="text-sm text-muted">Nothing due this month.</p>}
+        {occurrences.length > 0 && settled.length === 0 && (
+          <p className="text-sm text-muted">Only what is waiting above, to confirm.</p>
+        )}
+        <ul className="flex flex-col gap-1">
+          {settled.map((o) => (
+            <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
+          ))}
+        </ul>
+      </Section>
       {recurrings.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <button type="button" className="self-start text-xs text-muted hover:underline" onClick={() => setShowAll(!showAll)}>
-            {showAll ? "Hide" : "All"} Recurrings ({recurrings.length})
-          </button>
-          {showAll && (
-            <ul className="flex flex-col">
-              {recurrings.map((r) => (
-                <li key={r.id}>
-                  <RecurringButton
-                    recurring={r}
-                    className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{r.name}</span>
-                      <span className="block truncate text-xs text-muted">
-                        {r.schedule} · {flowLine(r)}
-                        {r.next && ` · next ${shortDate(r.next.due, today)}`}
-                      </span>
+        <Section title={`All Recurrings · ${recurrings.length}`}>
+          <ul className="flex flex-col">
+            {recurrings.map((r) => (
+              <li key={r.id}>
+                <RecurringButton
+                  recurring={r}
+                  className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{r.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {r.schedule} · {flowLine(r)}
+                      {r.campaigns.length > 0 && ` · ${r.campaigns.map((c) => c.title).join(", ")}`}
+                      {r.next && ` · next ${shortDate(r.next.due, today)}`}
                     </span>
-                    <span className="shrink-0 tabular-nums">
-                      {flowSign(r.kind)}
-                      {formatAmount(r.amount, r.currency)}
-                    </span>
-                  </RecurringButton>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {flowSign(r.kind)}
+                    {formatAmount(r.amount, r.currency)}
+                  </span>
+                </RecurringButton>
+              </li>
+            ))}
+          </ul>
+        </Section>
       )}
-    </Section>
+    </>
   );
 }
 
@@ -623,12 +846,19 @@ function AdjustForm({ account, onDone }: { account: AccountView; onDone: () => v
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-function Categories({ categories }: { categories: CategoryView[] }) {
+/** Expenses and Incomes each have their own Categories (Ronda 61); a merge stays within one kind. */
+function Categories({ kind, categories }: { kind: CategoryKind; categories: CategoryView[] }) {
   const [name, setName] = useState("");
   const [pending, startTransition] = useTransition();
   return (
-    <Section title="Categories">
-      {categories.length === 0 && <p className="text-sm text-muted">None yet. Create them here or from the +.</p>}
+    <Section title={kind === "expense" ? "Expense Categories" : "Income Categories"}>
+      {categories.length === 0 && (
+        <p className="text-sm text-muted">
+          {kind === "expense"
+            ? "None yet. Create them here or from the +."
+            : "None yet, e.g. Salary, Freelance, Sale. Create them here or from the +."}
+        </p>
+      )}
       <ul className="flex flex-col gap-1">
         {categories.map((c) => (
           <CategoryRow key={c.id} category={c} others={categories.filter((o) => o.id !== c.id)} />
@@ -640,7 +870,7 @@ function Categories({ categories }: { categories: CategoryView[] }) {
           event.preventDefault();
           if (!name.trim()) return;
           startTransition(async () => {
-            await createCategory({ name });
+            await createCategory({ name, kind });
             setName("");
           });
         }}
@@ -649,9 +879,9 @@ function Categories({ categories }: { categories: CategoryView[] }) {
           value={name}
           onChange={(event) => setName(event.target.value)}
           maxLength={MAX_MONEY_NAME}
-          placeholder="New Category"
+          placeholder={kind === "expense" ? "New Expense Category" : "New Income Category"}
           className="input"
-          aria-label="New Category"
+          aria-label={kind === "expense" ? "New Expense Category" : "New Income Category"}
         />
         <button className="btn" disabled={pending || !name.trim()}>
           Add
@@ -662,6 +892,14 @@ function Categories({ categories }: { categories: CategoryView[] }) {
 }
 
 /** Rename it any time; one with Expenses merges into another instead of being deleted (Q7). */
+/** "3 Expenses · 1 Bill", or "2 Incomes · 1 Recurring". */
+function uses(c: CategoryView, joiner = " · "): string {
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const moved = plural(c.expenses, c.kind === "expense" ? "Expense" : "Income");
+  const repeats = c.recurrings > 0 ? plural(c.recurrings, c.kind === "expense" ? "Bill" : "Recurring") : null;
+  return repeats ? `${moved}${joiner}${repeats}` : moved;
+}
+
 function CategoryRow({ category: c, others }: { category: CategoryView; others: CategoryView[] }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(c.name);
@@ -675,10 +913,7 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
         <button type="button" className="min-w-0 flex-1 truncate text-left hover:underline" onClick={() => setEditing(true)}>
           {c.name}
         </button>
-        <span className="text-xs text-muted tabular-nums">
-          {c.expenses} Expense{c.expenses === 1 ? "" : "s"}
-          {c.recurrings > 0 && ` · ${c.recurrings} Bill${c.recurrings === 1 ? "" : "s"}`}
-        </span>
+        <span className="text-xs text-muted tabular-nums">{uses(c)}</span>
       </li>
     );
   }
@@ -736,9 +971,7 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
       )}
       {target && (
         <p className="text-xs text-muted">
-          Its {c.expenses} Expense{c.expenses === 1 ? "" : "s"}
-          {c.recurrings > 0 && ` and ${c.recurrings} Bill${c.recurrings === 1 ? "" : "s"}`} move to {target.name} and “
-          {c.name}” disappears.
+          Its {uses(c, " and ")} move to {target.name} and “{c.name}” disappears.
         </p>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -763,5 +996,73 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
         </button>
       </div>
     </li>
+  );
+}
+
+/** A link to another month that keeps the tab Ivan is on. */
+export function MonthLink({ month, children, ...props }: { month: string; children: React.ReactNode } & Omit<React.ComponentProps<typeof Link>, "href">) {
+  const tab = useSearchParams().get("tab");
+  const href = `/os/money/${month}${tab && tab !== "movements" ? `?tab=${tab}` : ""}`;
+  return (
+    <Link href={href} {...props}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * A Campaign's money (Q11): every Expense and Income that served it, from all
+ * months, and what it cost and brought in, in pesos. A record, not a budget;
+ * nothing shows until something serves it.
+ */
+export function CampaignMoney({ campaignId }: { campaignId: string }) {
+  const [found, setFound] = useState<(CampaignMoneyView & { today: string }) | null>(null);
+  const [all, setAll] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    loadCampaignMoney({ campaignId })
+      .then((v) => live && setFound(v))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [campaignId]);
+
+  if (!found || found.movements.length === 0) return null;
+  const shown = all ? found.movements : found.movements.slice(0, 10);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="label">Money</div>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Spent" value={formatAmount(found.spent, "COP")} />
+        <Stat label="Came in" value={formatAmount(found.cameIn, "COP")} />
+      </div>
+      <ul className="flex flex-col">
+        {shown.map((m) => (
+          <li key={m.id}>
+            <Link
+              href={`/os/money/${m.date.slice(0, 7)}`}
+              className="flex items-baseline gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-background"
+            >
+              <span className="w-24 shrink-0 text-xs text-muted">{shortDate(m.date, found.today)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{describe(m)}</span>
+                {m.note && <span className="block truncate text-xs text-muted">{m.note}</span>}
+              </span>
+              <span className={`shrink-0 tabular-nums ${m.kind === "income" ? "text-green-700 dark:text-green-500" : ""}`}>
+                {flowSign(m.kind)}
+                {formatAmount(m.amount, m.currency)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {found.movements.length > shown.length && (
+        <button type="button" className="btn self-start" onClick={() => setAll(true)}>
+          Show all {found.movements.length}
+        </button>
+      )}
+    </div>
   );
 }

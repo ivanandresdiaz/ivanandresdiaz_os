@@ -5,6 +5,7 @@ import * as s from "@/db/schema";
 import { addMonths, type IsoDate, type IsoMonth } from "@/domain/dates";
 import {
   balances,
+  campaignMoney,
   categoryTotals,
   monthSummary,
   type AccountRef,
@@ -30,7 +31,9 @@ export type AccountView = AccountRef & {
   /** Movements, Adjustments or Recurrings point at it, so it can't be deleted. */
   inUse: boolean;
 };
-export type CategoryView = { id: string; name: string; expenses: number; recurrings: number };
+export type CategoryKind = "expense" | "income";
+/** `expenses` counts every movement in it: Expenses, or Incomes for an Income Category. */
+export type CategoryView = { id: string; kind: CategoryKind; name: string; expenses: number; recurrings: number };
 
 /** What a movement and a Recurring share: what moves, from where, to where. */
 type Flow = {
@@ -47,10 +50,19 @@ type Flow = {
   categoryName: string | null;
 };
 export type ReceiptView = { id: string; name: string; contentType: string; url: string };
-export type MovementView = Flow & { id: string; date: IsoDate; note: string | null; receipts: ReceiptView[] };
+/** A Campaign an Expense or an Income serves. */
+export type CampaignRef = { id: string; title: string };
+export type MovementView = Flow & {
+  id: string;
+  date: IsoDate;
+  note: string | null;
+  receipts: ReceiptView[];
+  campaigns: CampaignRef[];
+};
 export type RecurringView = Flow & {
   id: string;
   name: string;
+  campaigns: CampaignRef[];
   firstDate: IsoDate;
   everyMonths: number;
   schedule: string;
@@ -75,7 +87,8 @@ export type AdjustmentView = {
   note: string | null;
 };
 export type CategoryMonthView = {
-  categoryId: string;
+  /** Null gathers Income recorded before Income had Categories. */
+  categoryId: string | null;
   name: string;
   currency: Currency;
   total: number;
@@ -87,6 +100,8 @@ export type MoneyMonthView = {
   summary: CurrencySummary[];
   /** Where the month's Expenses went, the most money first. */
   byCategory: CategoryMonthView[];
+  /** Where the month's Income came from, the most money first. */
+  incomeByCategory: CategoryMonthView[];
   /** Every movement of the month, the newest first. */
   movements: MovementView[];
   adjustments: AdjustmentView[];
@@ -95,10 +110,11 @@ export type MoneyMonthView = {
   occurrences: OccurrenceView[];
 };
 
-/** What the "+" offers: every Account, and the Categories Ivan uses most first. */
+/** What the "+" offers: every Account, the Categories Ivan uses most first, and the active Campaigns by priority. */
 export type MoneyChoices = {
   accounts: { id: string; name: string; currency: Currency }[];
-  categories: { id: string; name: string }[];
+  categories: { id: string; kind: CategoryKind; name: string }[];
+  campaigns: CampaignRef[];
 };
 
 type AccountRow = typeof s.moneyAccounts.$inferSelect;
@@ -137,7 +153,12 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     await Promise.all([
       db.select().from(s.moneyAccounts).orderBy(asc(s.moneyAccounts.createdAt)),
       db
-        .select({ id: s.moneyCategories.id, name: s.moneyCategories.name, expenses: count(s.moneyMovements.id) })
+        .select({
+          id: s.moneyCategories.id,
+          kind: s.moneyCategories.kind,
+          name: s.moneyCategories.name,
+          expenses: count(s.moneyMovements.id),
+        })
         .from(s.moneyCategories)
         .leftJoin(s.moneyMovements, eq(s.moneyMovements.categoryId, s.moneyCategories.id))
         .groupBy(s.moneyCategories.id)
@@ -207,18 +228,22 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     date: m.date,
     note: m.note,
     receipts: [],
+    campaigns: [],
   });
   const movements = monthRows.map(movementView);
 
-  const byCategory = categoryTotals(accountRows, monthRows).map((t) => ({
-    categoryId: t.categoryId,
-    name: categoryMap.get(t.categoryId)?.name ?? "",
-    currency: t.currency,
-    total: t.total,
-    expenses: movements.filter(
-      (m) => m.kind === "expense" && m.categoryId === t.categoryId && m.currency === t.currency,
-    ),
-  }));
+  const totalsOf = (kind: CategoryKind): CategoryMonthView[] =>
+    categoryTotals(accountRows, monthRows, kind).map((t) => ({
+      categoryId: t.categoryId,
+      name: t.categoryId ? (categoryMap.get(t.categoryId)?.name ?? "") : "No Category",
+      currency: t.currency,
+      total: t.total,
+      expenses: movements.filter(
+        (m) => m.kind === kind && m.categoryId === t.categoryId && m.currency === t.currency,
+      ),
+    }));
+  const byCategory = totalsOf("expense");
+  const incomeByCategory = totalsOf("income");
 
   const resolutions: Resolutions = new Map(
     resolutionRows.map((r) => [resolutionKey(r.recurringId, r.month), r.movementId]),
@@ -231,6 +256,7 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     everyMonths: r.everyMonths,
     schedule: scheduleLabel(r.firstDate, r.everyMonths),
     next: nextOccurrence(r, resolutions),
+    campaigns: [],
   }));
   const recurringMap = new Map(recurrings.map((r) => [r.id, r]));
 
@@ -243,7 +269,11 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     const rows = await db.select().from(s.moneyMovements).where(inArray(s.moneyMovements.id, missing));
     for (const row of rows) confirmed.set(row.id, movementView(row));
   }
-  await addReceipts([...confirmed.values()]);
+  await Promise.all([
+    addReceipts([...confirmed.values()]),
+    addCampaigns([...confirmed.values()]),
+    addRecurringCampaigns(recurrings),
+  ]);
 
   const occurrences: OccurrenceView[] = occurrenceList.map((o) => ({
     recurring: recurringMap.get(o.recurringId)!,
@@ -268,6 +298,7 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     categories,
     summary: monthSummary(accountRows, monthRows),
     byCategory,
+    incomeByCategory,
     movements,
     adjustments,
     recurrings,
@@ -288,6 +319,66 @@ async function addReceipts(movements: MovementView[]) {
   rows.forEach((r, i) => {
     byId.get(r.movementId)!.receipts.push({ id: r.id, name: r.name, contentType: r.contentType, url: links[i] });
   });
+}
+
+/** Fills in the Campaigns each movement serves. */
+async function addCampaigns(movements: MovementView[]) {
+  if (movements.length === 0) return;
+  const byId = new Map(movements.map((m) => [m.id, m]));
+  const rows = await db
+    .select({ movementId: s.moneyMovementCampaigns.movementId, id: s.campaigns.id, title: s.campaigns.title })
+    .from(s.moneyMovementCampaigns)
+    .innerJoin(s.campaigns, eq(s.campaigns.id, s.moneyMovementCampaigns.campaignId))
+    .where(inArray(s.moneyMovementCampaigns.movementId, [...byId.keys()]))
+    .orderBy(asc(s.campaigns.position), asc(s.campaigns.title));
+  for (const r of rows) byId.get(r.movementId)!.campaigns.push({ id: r.id, title: r.title });
+}
+
+/** Fills in the Campaigns each Recurring carries. */
+async function addRecurringCampaigns(recurrings: RecurringView[]) {
+  if (recurrings.length === 0) return;
+  const byId = new Map(recurrings.map((r) => [r.id, r]));
+  const rows = await db
+    .select({ recurringId: s.moneyRecurringCampaigns.recurringId, id: s.campaigns.id, title: s.campaigns.title })
+    .from(s.moneyRecurringCampaigns)
+    .innerJoin(s.campaigns, eq(s.campaigns.id, s.moneyRecurringCampaigns.campaignId))
+    .where(inArray(s.moneyRecurringCampaigns.recurringId, [...byId.keys()]))
+    .orderBy(asc(s.campaigns.position), asc(s.campaigns.title));
+  for (const r of rows) byId.get(r.recurringId)!.campaigns.push({ id: r.id, title: r.title });
+}
+
+export type CampaignMoneyView = {
+  spent: number;
+  cameIn: number;
+  /** Every Expense and Income that served it, the newest first, from all months. */
+  movements: MovementView[];
+};
+
+/** What a Campaign's page shows of money (Q11): a record, not a budget. */
+export async function getCampaignMoney(campaignId: string): Promise<CampaignMoneyView> {
+  const rows = await db
+    .select({ movement: s.moneyMovements })
+    .from(s.moneyMovementCampaigns)
+    .innerJoin(s.moneyMovements, eq(s.moneyMovements.id, s.moneyMovementCampaigns.movementId))
+    .where(eq(s.moneyMovementCampaigns.campaignId, campaignId))
+    .orderBy(desc(s.moneyMovements.date), desc(s.moneyMovements.createdAt));
+  if (rows.length === 0) return { spent: 0, cameIn: 0, movements: [] };
+  const [accountRows, categoryRows] = await Promise.all([
+    db.select().from(s.moneyAccounts),
+    db.select({ id: s.moneyCategories.id, name: s.moneyCategories.name }).from(s.moneyCategories),
+  ]);
+  const accounts = new Map(accountRows.map((a) => [a.id, a]));
+  const categories = new Map(categoryRows.map((c) => [c.id, c]));
+  const movements: MovementView[] = rows.map(({ movement: m }) => ({
+    ...flowView(m, accounts, categories),
+    id: m.id,
+    date: m.date,
+    note: m.note,
+    receipts: [],
+    campaigns: [],
+  }));
+  await Promise.all([addReceipts(movements), addCampaigns(movements)]);
+  return { ...campaignMoney(movements), movements };
 }
 
 /** One Account's balance right now, for an Adjustment. */
@@ -312,17 +403,29 @@ export async function getAccountBalance(accountId: string): Promise<{ account: A
 }
 
 export async function getMoneyChoices(): Promise<MoneyChoices> {
-  const [accounts, categories] = await Promise.all([
+  const [accounts, categories, campaigns] = await Promise.all([
     db
       .select({ id: s.moneyAccounts.id, name: s.moneyAccounts.name, currency: s.moneyAccounts.currency })
       .from(s.moneyAccounts)
       .orderBy(asc(s.moneyAccounts.createdAt)),
     db
-      .select({ id: s.moneyCategories.id, name: s.moneyCategories.name, uses: count(s.moneyMovements.id) })
+      .select({
+        id: s.moneyCategories.id,
+        kind: s.moneyCategories.kind,
+        name: s.moneyCategories.name,
+        uses: count(s.moneyMovements.id),
+      })
       .from(s.moneyCategories)
       .leftJoin(s.moneyMovements, eq(s.moneyMovements.categoryId, s.moneyCategories.id))
       .groupBy(s.moneyCategories.id)
       .orderBy(desc(count(s.moneyMovements.id)), asc(s.moneyCategories.name)),
+    // The newest Quarter first, then each Quarter's priority.
+    db
+      .select({ id: s.campaigns.id, title: s.campaigns.title })
+      .from(s.campaigns)
+      .leftJoin(s.quarters, eq(s.quarters.id, s.campaigns.quarterId))
+      .where(eq(s.campaigns.status, "active"))
+      .orderBy(desc(s.quarters.year), desc(s.quarters.quarter), asc(s.campaigns.position), asc(s.campaigns.title)),
   ]);
-  return { accounts, categories: categories.map(({ id, name }) => ({ id, name })) };
+  return { accounts, categories: categories.map(({ id, kind, name }) => ({ id, kind, name })), campaigns };
 }

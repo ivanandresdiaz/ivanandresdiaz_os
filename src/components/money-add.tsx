@@ -9,6 +9,7 @@ import {
   MAX_MONEY_NAME,
   MAX_MOVEMENT_NOTE,
   parseAmount,
+  servesCampaigns,
   type Currency,
   type MovementKind,
 } from "@/domain/money";
@@ -21,7 +22,7 @@ import {
   saveMovement,
   saveRecurring,
 } from "@/server/money-actions";
-import type { MoneyChoices, MovementView, OccurrenceView, ReceiptView, RecurringView } from "@/server/money";
+import type { CampaignRef, MoneyChoices, MovementView, OccurrenceView, ReceiptView, RecurringView } from "@/server/money";
 import { ConfirmDelete, keepEvents } from "./confirm-delete";
 import { ReceiptsField, useReceipts } from "./money-receipts";
 import { useRemembered } from "./use-remembered";
@@ -145,6 +146,7 @@ type Draft = {
   date: string;
   everyMonths?: number;
   receipts?: ReceiptView[];
+  campaigns?: CampaignRef[];
 };
 
 type Choices = MoneyChoices & { today: string };
@@ -200,6 +202,7 @@ function MovementDialog({
   const [note, setNote] = useState(initial?.note ?? "");
   const [date, setDate] = useState(initial?.date ?? "");
   const [every, setEvery] = useState(String(initial?.everyMonths ?? 1));
+  const [campaignIds, setCampaignIds] = useState<string[]>(initial?.campaigns?.map((c) => c.id) ?? []);
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -220,7 +223,6 @@ function MovementDialog({
         const has = (id: string | null) => !!id && found.accounts.some((a) => a.id === id);
         setAccountId((id) => (has(id) ? id : has(lastAccount) ? lastAccount : (found.accounts[0]?.id ?? null)));
         setToAccountId((id) => (has(id) ? id : has(lastToAccount) ? lastToAccount : null));
-        if (found.categories.length === 0) setNewCategory("");
       })
       .catch(() => live && setFailed(true));
     return () => {
@@ -242,11 +244,24 @@ function MovementDialog({
   const units = parseAmount(amount, currency);
   const crossCurrency = !!to && to.currency !== currency;
   const toUnits = crossCurrency ? parseAmount(toAmount, to.currency) : null;
+  // Expenses and Incomes each have their own Categories (Ronda 61).
+  const categories = kind === "transfer" ? [] : (choices?.categories ?? []).filter((c) => c.kind === kind);
+  const category = categories.find((c) => c.id === categoryId);
+  // The active Campaigns, plus any it already serves that are done or dropped by now (Q8).
+  const campaignChoices = [
+    ...(choices?.campaigns ?? []),
+    ...(initial?.campaigns ?? []).filter((c) => !choices?.campaigns.some((x) => x.id === c.id)),
+  ];
+
+  function toggleCampaign(id: string) {
+    setCampaignIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
 
   async function addCategory() {
     const name = newCategory?.trim();
     if (!name) return;
-    const created = await createCategory({ name });
+    if (kind === "transfer") return;
+    const created = await createCategory({ name, kind });
     setChoices((c) =>
       c && !c.categories.some((x) => x.id === created.id) ? { ...c, categories: [...c.categories, created] } : c,
     );
@@ -258,7 +273,7 @@ function MovementDialog({
     setError(null);
     if (!from) return setError("Pick an Account.");
     if (units === null) return setError("Type an amount above 0.");
-    if (kind === "expense" && !categoryId) return setError("Pick a Category.");
+    if (kind !== "transfer" && !category) return setError("Pick a Category.");
     if (kind === "transfer" && !to) return setError("Pick where the money goes.");
     if (crossCurrency && toUnits === null) return setError(`Say how much arrived, in ${to!.currency}.`);
     if (isRule && !note.trim()) return setError("Give it a name, e.g. Internet.");
@@ -270,7 +285,8 @@ function MovementDialog({
       accountId: from.id,
       toAccountId: kind === "transfer" ? (to?.id ?? null) : null,
       toAmount: crossCurrency ? toUnits : null,
-      categoryId: kind === "expense" ? categoryId : null,
+      categoryId: kind === "transfer" ? null : (category?.id ?? null),
+      campaignIds: servesCampaigns(kind) ? campaignIds : [],
     };
     startTransition(async () => {
       const result =
@@ -373,25 +389,25 @@ function MovementDialog({
             </p>
           )}
 
-          {choices && kind === "expense" && (
+          {choices && kind !== "transfer" && (
             <fieldset className="flex flex-col gap-1">
               <legend className="label mb-1">Category</legend>
               <div className="flex flex-wrap gap-1.5">
-                {choices.categories.map((c) => (
+                {categories.map((c) => (
                   <Chip key={c.id} selected={categoryId === c.id} onClick={() => setCategoryId(c.id)}>
                     {c.name}
                   </Chip>
                 ))}
-                {newCategory === null && (
+                {newCategory === null && categories.length > 0 && (
                   <Chip selected={false} onClick={() => setNewCategory("")}>
                     + New
                   </Chip>
                 )}
               </div>
-              {newCategory !== null && (
+              {(newCategory !== null || categories.length === 0) && (
                 <div className="mt-1 flex gap-2">
                   <input
-                    value={newCategory}
+                    value={newCategory ?? ""}
                     onChange={(event) => setNewCategory(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
@@ -400,15 +416,36 @@ function MovementDialog({
                       }
                     }}
                     maxLength={MAX_MONEY_NAME}
-                    placeholder={choices.categories.length === 0 ? "Your first Category, e.g. Food" : "New Category"}
+                    placeholder={
+                      categories.length > 0
+                        ? "New Category"
+                        : kind === "income"
+                          ? "Your first Income Category, e.g. Salary"
+                          : "Your first Category, e.g. Food"
+                    }
                     className="input"
                     aria-label="New Category"
                   />
-                  <button type="button" className="btn" onClick={() => void addCategory()} disabled={!newCategory.trim()}>
+                  <button type="button" className="btn" onClick={() => void addCategory()} disabled={!newCategory?.trim()}>
                     Add
                   </button>
                 </div>
               )}
+            </fieldset>
+          )}
+
+          {choices && servesCampaigns(kind) && campaignChoices.length > 0 && (
+            <fieldset className="flex flex-col gap-1">
+              <legend className="label mb-1">
+                Campaigns <span className="font-normal normal-case text-muted">· optional</span>
+              </legend>
+              <div className="flex flex-wrap gap-1.5">
+                {campaignChoices.map((c) => (
+                  <Chip key={c.id} selected={campaignIds.includes(c.id)} onClick={() => toggleCampaign(c.id)}>
+                    {c.title}
+                  </Chip>
+                ))}
+              </div>
             </fieldset>
           )}
 

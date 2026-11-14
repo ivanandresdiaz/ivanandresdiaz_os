@@ -3,13 +3,17 @@ import {
   amountInput,
   amountTyping,
   balances,
+  campaignMoney,
   categoryTotals,
   formatAmount,
+  moneyTab,
   monthSummary,
   movementProblem,
   parseAmount,
   parseBalance,
+  pieSlices,
   sameName,
+  servesCampaigns,
   shareLabel,
   type AccountRef,
   type MovementRef,
@@ -201,11 +205,32 @@ describe("The month", () => {
   });
 });
 
+describe("Where the Income came from", () => {
+  it("adds Income per its Category, keeping old Income without one together", () => {
+    const paid = (amount: number, categoryId: string | null, accountId = "bank") => ({
+      ...income(amount, accountId),
+      categoryId,
+    });
+    expect(
+      categoryTotals(
+        accounts,
+        [paid(1_450_000, "salary"), paid(1_450_000, "salary"), paid(300_000, "freelance"), paid(50_000, null), expense(45_000)],
+        "income",
+      ),
+    ).toEqual([
+      { categoryId: "salary", currency: "COP", total: 2_900_000, count: 2 },
+      { categoryId: "freelance", currency: "COP", total: 300_000, count: 1 },
+      { categoryId: null, currency: "COP", total: 50_000, count: 1 },
+    ]);
+  });
+});
+
 describe("What a movement needs", () => {
-  it("an Expense needs its Category", () => {
+  it("an Expense and an Income need their Category", () => {
     expect(movementProblem({ kind: "expense", categoryId: null })).toBe("Pick a Category.");
     expect(movementProblem({ kind: "expense", categoryId: "food" })).toBeNull();
-    expect(movementProblem({ kind: "income" })).toBeNull();
+    expect(movementProblem({ kind: "income", categoryId: null })).toBe("Pick a Category.");
+    expect(movementProblem({ kind: "income", categoryId: "salary" })).toBeNull();
   });
 
   it("a Transfer needs two Accounts, and what arrived when the currency changes", () => {
@@ -220,5 +245,43 @@ describe("What a movement needs", () => {
   it("names are the same regardless of case and spaces", () => {
     expect(sameName("Food", " food ")).toBe(true);
     expect(sameName("Food", "Home")).toBe(false);
+  });
+});
+
+describe("The page", () => {
+  it("opens on Movements unless the address names another tab", () => {
+    expect(moneyTab(undefined)).toBe("movements");
+    expect(moneyTab("accounts")).toBe("accounts");
+    expect(moneyTab("nope")).toBe("movements");
+    expect(moneyTab(["accounts"])).toBe("movements");
+  });
+
+  it("cuts the pie by each share of the total", () => {
+    expect(pieSlices([600_000, 300_000, 100_000])).toEqual([
+      { start: 0, end: 0.6 },
+      { start: 0.6, end: 0.9 },
+      { start: 0.9, end: 1 },
+    ]);
+    expect(pieSlices([5])).toEqual([{ start: 0, end: 1 }]);
+    expect(pieSlices([])).toEqual([]);
+  });
+});
+
+describe("Campaigns", () => {
+  it("are served by Expenses and Incomes, not Transfers", () => {
+    expect(servesCampaigns("expense")).toBe(true);
+    expect(servesCampaigns("income")).toBe(true);
+    expect(servesCampaigns("transfer")).toBe(false);
+  });
+
+  it("add up what was spent and what came in, in pesos only", () => {
+    expect(
+      campaignMoney([
+        { kind: "expense", amount: 200_000, currency: "COP" },
+        { kind: "expense", amount: 50_000, currency: "COP" },
+        { kind: "income", amount: 1_000_000, currency: "COP" },
+        { kind: "expense", amount: 500, currency: "USD" },
+      ]),
+    ).toEqual({ spent: 250_000, cameIn: 1_000_000 });
   });
 });

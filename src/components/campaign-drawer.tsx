@@ -5,6 +5,7 @@ import { deleteCampaign, setCampaignStatus, updateCampaign } from "@/server/acti
 import { LongText } from "./long-text";
 import { ConfirmDelete } from "./confirm-delete";
 import { Markdown } from "./markdown";
+import { CampaignMoney } from "./money";
 import { DrawerFrame, ReadButton, SaveForm, useEditMode } from "./plan-drawers";
 import { GamesPicker, GameTags, Hidden } from "./ui";
 
@@ -104,6 +105,7 @@ function CampaignDrawer({
               {text[key].trim() ? <Markdown>{text[key]}</Markdown> : <p className="text-sm text-muted">{empty}</p>}
             </div>
           ))}
+          <CampaignMoney campaignId={campaign.id} />
         </>
       ) : (
         <SaveForm

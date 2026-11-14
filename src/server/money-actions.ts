@@ -9,10 +9,12 @@ import { isIsoDate, isIsoMonth } from "@/domain/dates";
 import {
   CURRENCIES,
   MAX_AMOUNT,
+  MAX_MOVEMENT_CAMPAIGNS,
   MAX_MONEY_NAME,
   MAX_MOVEMENT_NOTE,
   MOVEMENT_KINDS,
   movementProblem,
+  servesCampaigns,
   type MovementKind,
 } from "@/domain/money";
 import {
@@ -26,7 +28,7 @@ import { dueDateIn, MAX_EVERY_MONTHS } from "@/domain/recurring";
 import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
-import { getAccountBalance, getMoneyChoices, type MoneyChoices } from "./money";
+import { getAccountBalance, getCampaignMoney, getMoneyChoices, type CampaignMoneyView, type MoneyChoices } from "./money";
 
 /** What a form needs back: nothing when it worked, or what to tell Ivan. */
 export type MoneyResult = { error: string } | null;
@@ -93,11 +95,9 @@ async function checkFlow(v: FlowInput): Promise<{ error: string } | { flow: Flow
 
   const to = v.kind === "transfer" ? accounts.find((a) => a.id === v.toAccountId) : undefined;
   const problem = movementProblem(
-    v.kind === "expense"
-      ? { kind: "expense", categoryId: v.categoryId }
-      : v.kind === "income"
-        ? { kind: "income" }
-        : {
+    v.kind !== "transfer"
+      ? { kind: v.kind, categoryId: v.categoryId }
+      : {
             kind: "transfer",
             from: from.currency,
             to: to?.currency ?? null,
@@ -107,12 +107,13 @@ async function checkFlow(v: FlowInput): Promise<{ error: string } | { flow: Flow
   );
   if (problem) return { error: problem };
 
-  if (v.kind === "expense") {
+  if (v.kind !== "transfer") {
     const [category] = await db
-      .select({ id: s.moneyCategories.id })
+      .select({ id: s.moneyCategories.id, kind: s.moneyCategories.kind })
       .from(s.moneyCategories)
       .where(eq(s.moneyCategories.id, v.categoryId!));
     if (!category) return { error: "That Category no longer exists." };
+    if (category.kind !== v.kind) return { error: "Pick a Category." };
   }
 
   return {
@@ -122,9 +123,54 @@ async function checkFlow(v: FlowInput): Promise<{ error: string } | { flow: Flow
       accountId: v.accountId,
       toAccountId: v.kind === "transfer" ? v.toAccountId : null,
       toAmount: v.kind === "transfer" ? (to!.currency === from.currency ? v.amount : v.toAmount) : null,
-      categoryId: v.kind === "expense" ? v.categoryId : null,
+      categoryId: v.kind === "transfer" ? null : v.categoryId,
     },
   };
+}
+
+// ─── Campaigns ───────────────────────────────────────────────────────────────
+
+/** The Campaigns picked in the form; absent means "leave them as they are". */
+const campaignIdsInput = z.array(z.uuid()).max(MAX_MOVEMENT_CAMPAIGNS).optional();
+
+/**
+ * The Campaigns a movement or a Recurring of `kind` will serve: none for a
+ * Transfer (Q7), and only ones that still exist. `undefined` keeps what it had.
+ */
+async function checkCampaigns(
+  kind: MovementKind,
+  ids: string[] | undefined,
+): Promise<{ error: string } | { campaignIds: string[] | undefined }> {
+  if (!servesCampaigns(kind)) return { campaignIds: [] };
+  if (ids === undefined) return { campaignIds: undefined };
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { campaignIds: [] };
+  const found = await db.select({ id: s.campaigns.id }).from(s.campaigns).where(inArray(s.campaigns.id, unique));
+  if (found.length !== unique.length) return { error: "One of those Campaigns no longer exists." };
+  return { campaignIds: unique };
+}
+
+async function linkMovement(tx: Tx, movementId: string, campaignIds: string[] | undefined) {
+  if (campaignIds === undefined) return;
+  await tx.delete(s.moneyMovementCampaigns).where(eq(s.moneyMovementCampaigns.movementId, movementId));
+  if (campaignIds.length > 0) {
+    await tx.insert(s.moneyMovementCampaigns).values(campaignIds.map((campaignId) => ({ movementId, campaignId })));
+  }
+}
+
+async function linkRecurring(tx: Tx, recurringId: string, campaignIds: string[] | undefined) {
+  if (campaignIds === undefined) return;
+  await tx.delete(s.moneyRecurringCampaigns).where(eq(s.moneyRecurringCampaigns.recurringId, recurringId));
+  if (campaignIds.length > 0) {
+    await tx.insert(s.moneyRecurringCampaigns).values(campaignIds.map((campaignId) => ({ recurringId, campaignId })));
+  }
+}
+
+/** For a Campaign's page: the Expenses and Incomes that served it. */
+export async function loadCampaignMoney(input: { campaignId: string }): Promise<CampaignMoneyView & { today: string }> {
+  await requireIvan();
+  const { campaignId } = z.object({ campaignId: z.uuid() }).parse(input);
+  return { ...(await getCampaignMoney(campaignId)), today: today() };
 }
 
 // ─── Accounts ────────────────────────────────────────────────────────────────
@@ -219,25 +265,29 @@ export async function deleteAdjustment(fd: FormData) {
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-/** Creating one that already exists (any case) gives back that one, so the "+" never makes twins. */
-export async function createCategory(input: { name: string }): Promise<{ id: string; name: string }> {
+const categoryKind = z.enum(["expense", "income"]);
+type CategoryRow = { id: string; kind: "expense" | "income"; name: string };
+
+/** Creating one that already exists (any case, same kind) gives back that one, so the "+" never makes twins. */
+export async function createCategory(input: { name: string; kind?: "expense" | "income" }): Promise<CategoryRow> {
   await requireIvan();
-  const v = z.object({ name }).parse(input);
-  const byName = eq(sql`lower(${s.moneyCategories.name})`, v.name.toLowerCase());
+  const v = z.object({ name, kind: categoryKind.default("expense") }).parse(input);
+  const byName = and(eq(s.moneyCategories.kind, v.kind), eq(sql`lower(${s.moneyCategories.name})`, v.name.toLowerCase()));
+  const picked = { id: s.moneyCategories.id, kind: s.moneyCategories.kind, name: s.moneyCategories.name };
   const [existing] = await db
-    .select({ id: s.moneyCategories.id, name: s.moneyCategories.name })
+    .select(picked)
     .from(s.moneyCategories)
     .where(byName)
     .limit(1);
   if (existing) return existing;
   const [created] = await db
     .insert(s.moneyCategories)
-    .values({ name: v.name })
+    .values({ name: v.name, kind: v.kind })
     .onConflictDoNothing()
-    .returning({ id: s.moneyCategories.id, name: s.moneyCategories.name });
+    .returning(picked);
   if (!created) {
     const [raced] = await db
-      .select({ id: s.moneyCategories.id, name: s.moneyCategories.name })
+      .select(picked)
       .from(s.moneyCategories)
       .where(byName);
     return raced;
@@ -259,17 +309,18 @@ export async function renameCategory(input: { id: string; name: string }): Promi
   return null;
 }
 
-/** Its Expenses and Bills move to `intoId` and it disappears (Q7). */
+/** Its movements and Recurrings move to `intoId` (same kind) and it disappears (Q7). */
 export async function mergeCategory(input: { id: string; intoId: string }) {
   await requireIvan();
   const v = z.object({ id: z.uuid(), intoId: z.uuid() }).parse(input);
   if (v.id === v.intoId) return;
   await db.transaction(async (tx) => {
     const found = await tx
-      .select({ id: s.moneyCategories.id })
+      .select({ id: s.moneyCategories.id, kind: s.moneyCategories.kind })
       .from(s.moneyCategories)
       .where(inArray(s.moneyCategories.id, [v.id, v.intoId]));
     if (found.length !== 2) throw new Error("That Category no longer exists.");
+    if (found[0].kind !== found[1].kind) throw new Error("A Category only merges into one of the same kind (Expense or Income).");
     await tx.update(s.moneyMovements).set({ categoryId: v.intoId }).where(eq(s.moneyMovements.categoryId, v.id));
     await tx.update(s.moneyRecurrings).set({ categoryId: v.intoId }).where(eq(s.moneyRecurrings.categoryId, v.id));
     await tx.delete(s.moneyCategories).where(eq(s.moneyCategories.id, v.id));
@@ -301,6 +352,7 @@ const movementInput = z.object({
   note,
   /** Confirming a Recurring with what really happened: it settles that month's occurrence. */
   occurrence: z.object({ recurringId: z.uuid(), month: isoMonth }).optional(),
+  campaignIds: campaignIdsInput,
   /** Receipts already uploaded to attach, and attached ones to take off. */
   receipts: z
     .object({
@@ -369,6 +421,9 @@ export async function saveMovement(input: z.input<typeof movementInput>): Promis
   const v = movementInput.parse(input);
   const checked = await checkFlow(v);
   if ("error" in checked) return checked;
+  const linked = await checkCampaigns(checked.flow.kind, v.campaignIds);
+  if ("error" in linked) return linked;
+  const { campaignIds } = linked;
   const row = { ...checked.flow, date: v.date, note: v.note };
   const add = v.receipts?.add ?? [];
   const remove = v.receipts?.remove ?? [];
@@ -387,6 +442,7 @@ export async function saveMovement(input: z.input<typeof movementInput>): Promis
     const id = v.id;
     await db.transaction(async (tx) => {
       await tx.update(s.moneyMovements).set(row).where(eq(s.moneyMovements.id, id));
+      await linkMovement(tx, id, campaignIds);
       await attach(tx, id, uploads.rows);
       if (remove.length > 0) {
         removed = await tx
@@ -396,11 +452,12 @@ export async function saveMovement(input: z.input<typeof movementInput>): Promis
       }
     });
   } else if (v.occurrence) {
-    const settled = await settle(v.occurrence.recurringId, v.occurrence.month, row, uploads.rows);
+    const settled = await settle(v.occurrence.recurringId, v.occurrence.month, row, uploads.rows, campaignIds ?? []);
     if (settled) return settled;
   } else {
     await db.transaction(async (tx) => {
       const [movement] = await tx.insert(s.moneyMovements).values(row).returning({ id: s.moneyMovements.id });
+      await linkMovement(tx, movement.id, campaignIds ?? []);
       await attach(tx, movement.id, uploads.rows);
     });
   }
@@ -415,11 +472,13 @@ async function settle(
   month: string,
   row: typeof s.moneyMovements.$inferInsert,
   receipts: ReceiptRow[] = [],
+  campaignIds: string[] = [],
 ): Promise<MoneyResult> {
   try {
     await db.transaction(async (tx) => {
       const [movement] = await tx.insert(s.moneyMovements).values(row).returning({ id: s.moneyMovements.id });
       await tx.insert(s.moneyRecurringOccurrences).values({ recurringId, month, movementId: movement.id });
+      await linkMovement(tx, movement.id, campaignIds);
       await attach(tx, movement.id, receipts);
     });
   } catch (error) {
@@ -450,6 +509,7 @@ const recurringInput = z.object({
   ...flowInput,
   firstDate: isoDate,
   everyMonths: z.number().int().min(1).max(MAX_EVERY_MONTHS),
+  campaignIds: campaignIdsInput,
 });
 
 /** Creates a Recurring or changes it; a change applies to the occurrences still to settle. */
@@ -458,9 +518,18 @@ export async function saveRecurring(input: z.input<typeof recurringInput>): Prom
   const v = recurringInput.parse(input);
   const checked = await checkFlow(v);
   if ("error" in checked) return checked;
+  const linked = await checkCampaigns(checked.flow.kind, v.campaignIds);
+  if ("error" in linked) return linked;
   const row = { ...checked.flow, name: v.name, firstDate: v.firstDate, everyMonths: v.everyMonths };
-  if (v.id) await db.update(s.moneyRecurrings).set(row).where(eq(s.moneyRecurrings.id, v.id));
-  else await db.insert(s.moneyRecurrings).values(row);
+  await db.transaction(async (tx) => {
+    if (v.id) {
+      await tx.update(s.moneyRecurrings).set(row).where(eq(s.moneyRecurrings.id, v.id));
+      await linkRecurring(tx, v.id, linked.campaignIds);
+    } else {
+      const [created] = await tx.insert(s.moneyRecurrings).values(row).returning({ id: s.moneyRecurrings.id });
+      await linkRecurring(tx, created.id, linked.campaignIds ?? []);
+    }
+  });
   await done();
   return null;
 }
@@ -483,6 +552,11 @@ export async function confirmOccurrence(input: { recurringId: string; month: str
   if (!rule) return { error: "That Recurring no longer exists." };
   const due = dueDateIn(rule.firstDate, rule.everyMonths, v.month);
   if (!due) return { error: "It isn't due that month." };
+  // The occurrence takes the Campaigns its Recurring carries (Q7).
+  const carried = await db
+    .select({ campaignId: s.moneyRecurringCampaigns.campaignId })
+    .from(s.moneyRecurringCampaigns)
+    .where(eq(s.moneyRecurringCampaigns.recurringId, rule.id));
   const settled = await settle(rule.id, v.month, {
     kind: rule.kind,
     amount: rule.amount,
@@ -492,7 +566,7 @@ export async function confirmOccurrence(input: { recurringId: string; month: str
     categoryId: rule.categoryId,
     date: due,
     note: rule.name,
-  });
+  }, [], servesCampaigns(rule.kind) ? carried.map((c) => c.campaignId) : []);
   if (settled) return settled;
   await done();
   return null;

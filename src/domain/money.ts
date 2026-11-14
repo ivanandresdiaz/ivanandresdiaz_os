@@ -183,19 +183,25 @@ export function shareLabel(share: number): string {
   return `${shown}%`;
 }
 
-export type CategoryTotal = { categoryId: string; currency: Currency; total: number; count: number };
+/** `categoryId` is null for Income recorded before Income had Categories. */
+export type CategoryTotal = { categoryId: string | null; currency: Currency; total: number; count: number };
 
-/** Where the month's Expenses went: per Category and currency, pesos first, the most money first. */
+/**
+ * Where the month's Expenses went, or where its Income came from: per Category
+ * and currency, pesos first, the most money first.
+ */
 export function categoryTotals(
   accounts: AccountRef[],
-  expenses: (MovementRef & { categoryId: string | null })[],
+  movements: (MovementRef & { categoryId: string | null })[],
+  kind: "expense" | "income" = "expense",
 ): CategoryTotal[] {
   const currencyOf = new Map(accounts.map((a) => [a.id, a.currency]));
   const totals = new Map<string, CategoryTotal>();
-  for (const e of expenses) {
+  for (const e of movements) {
     const currency = currencyOf.get(e.accountId);
-    if (e.kind !== "expense" || !e.categoryId || !currency) continue;
-    const key = `${currency}:${e.categoryId}`;
+    if (e.kind !== kind || !currency) continue;
+    if (kind === "expense" && !e.categoryId) continue;
+    const key = `${currency}:${e.categoryId ?? ""}`;
     const found = totals.get(key) ?? { categoryId: e.categoryId, currency, total: 0, count: 0 };
     found.total += e.amount;
     found.count += 1;
@@ -207,13 +213,12 @@ export function categoryTotals(
 }
 
 export type MovementCheck =
-  | { kind: "expense"; categoryId: string | null }
-  | { kind: "income" }
+  | { kind: "expense" | "income"; categoryId: string | null }
   | { kind: "transfer"; from: Currency; to: Currency | null; sameAccount: boolean; toAmount: number | null };
 
 /** Why a movement can't be saved as it is, or null when it can. */
 export function movementProblem(m: MovementCheck): string | null {
-  if (m.kind === "expense" && !m.categoryId) return "Pick a Category.";
+  if (m.kind !== "transfer" && !m.categoryId) return "Pick a Category.";
   if (m.kind === "transfer") {
     if (!m.to) return "Pick where the money goes.";
     if (m.sameAccount) return "A Transfer goes between two different Accounts.";
@@ -225,4 +230,49 @@ export function movementProblem(m: MovementCheck): string | null {
 /** "Food" and "food " are the same Category. */
 export function sameName(a: string, b: string): boolean {
   return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+}
+
+// ─── The page ────────────────────────────────────────────────────────────────
+
+/** The tabs under the month summary (Ronda 61); it opens on Movements. */
+export const MONEY_TABS = ["movements", "recurrings", "accounts", "categories"] as const;
+export type MoneyTab = (typeof MONEY_TABS)[number];
+
+export function moneyTab(value: string | string[] | null | undefined): MoneyTab {
+  return (MONEY_TABS as readonly string[]).includes(value as string) ? (value as MoneyTab) : "movements";
+}
+
+/** Where each slice of a pie starts and ends, as parts of the whole turn (0 to 1). */
+export function pieSlices(values: number[]): { start: number; end: number }[] {
+  const total = values.reduce((sum, v) => sum + Math.max(0, v), 0);
+  let sum = 0;
+  return values.map((v) => {
+    const start = total > 0 ? sum / total : 0;
+    sum += Math.max(0, v);
+    return { start, end: total > 0 ? sum / total : 0 };
+  });
+}
+
+// ─── Campaigns ───────────────────────────────────────────────────────────────
+
+export const MAX_MOVEMENT_CAMPAIGNS = 10;
+
+/** Only Expenses and Incomes serve Campaigns; a Transfer stays mine (Q7). */
+export function servesCampaigns(kind: MovementKind): boolean {
+  return kind !== "transfer";
+}
+
+/** What a Campaign has cost and brought in, in pesos: a record, not a budget (Q9, Q11). */
+export function campaignMoney(movements: { kind: MovementKind; amount: number; currency: Currency }[]): {
+  spent: number;
+  cameIn: number;
+} {
+  let spent = 0;
+  let cameIn = 0;
+  for (const m of movements) {
+    if (m.currency !== "COP") continue;
+    if (m.kind === "expense") spent += m.amount;
+    else if (m.kind === "income") cameIn += m.amount;
+  }
+  return { spent, cameIn };
 }

@@ -7,6 +7,16 @@
   --muted: #78716c;
   --line: #e7e5e4;
   --accent: #b45309;
+  /* Categorical chart colors, in this order (validated for colorblind separation of neighbors). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --series-rest: #a8a29e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +27,15 @@
     --muted: #a8a29e;
     --line: #292524;
     --accent: #f59e0b;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #0ca30c;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-rest: #57534e;
   }
 }
 

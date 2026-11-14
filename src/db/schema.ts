@@ -922,15 +922,21 @@ export const moneyAccounts = pgTable(
   (t) => [uniqueIndex("money_accounts_name").on(sql`lower(${t.name})`)],
 );
 
-/** The class of an Expense, named by Ivan. There is no "Other". */
+export const moneyCategoryKind = pgEnum("money_category_kind", ["expense", "income"]);
+
+/**
+ * The class of an Expense or of an Income, named by Ivan; each kind has its
+ * own (Ronda 61). There is no "Other".
+ */
 export const moneyCategories = pgTable(
   "money_categories",
   {
     id: id(),
+    kind: moneyCategoryKind("kind").notNull().default("expense"),
     name: text("name").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("money_categories_name").on(sql`lower(${t.name})`)],
+  (t) => [uniqueIndex("money_categories_kind_name").on(t.kind, sql`lower(${t.name})`)],
 );
 
 /**
@@ -961,7 +967,7 @@ export const moneyMovements = pgTable(
     check(
       "money_movement_shape",
       sql`(${t.kind} = 'expense' and ${t.categoryId} is not null and ${t.toAccountId} is null and ${t.toAmount} is null)
-        or (${t.kind} = 'income' and ${t.categoryId} is null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'income' and ${t.toAccountId} is null and ${t.toAmount} is null)
         or (${t.kind} = 'transfer' and ${t.categoryId} is null and ${t.toAccountId} is not null
             and ${t.toAccountId} <> ${t.accountId} and ${t.toAmount} > 0)`,
     ),
@@ -996,7 +1002,7 @@ export const moneyRecurrings = pgTable(
     check(
       "money_recurring_shape",
       sql`(${t.kind} = 'expense' and ${t.categoryId} is not null and ${t.toAccountId} is null and ${t.toAmount} is null)
-        or (${t.kind} = 'income' and ${t.categoryId} is null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'income' and ${t.toAccountId} is null and ${t.toAmount} is null)
         or (${t.kind} = 'transfer' and ${t.categoryId} is null and ${t.toAccountId} is not null
             and ${t.toAccountId} <> ${t.accountId} and ${t.toAmount} > 0)`,
     ),
@@ -1054,4 +1060,32 @@ export const moneyReceipts = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("money_receipts_movement").on(t.movementId)],
+);
+
+/** The Campaigns an Expense or an Income serves: any number, or none (Ronda 61). */
+export const moneyMovementCampaigns = pgTable(
+  "money_movement_campaigns",
+  {
+    movementId: uuid("movement_id")
+      .notNull()
+      .references(() => moneyMovements.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+  },
+  (t) => [unique().on(t.movementId, t.campaignId), index("money_movement_campaigns_campaign").on(t.campaignId)],
+);
+
+/** The Campaigns a Recurring carries; each occurrence confirmed takes them. */
+export const moneyRecurringCampaigns = pgTable(
+  "money_recurring_campaigns",
+  {
+    recurringId: uuid("recurring_id")
+      .notNull()
+      .references(() => moneyRecurrings.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+  },
+  (t) => [unique().on(t.recurringId, t.campaignId)],
 );
