@@ -940,9 +940,9 @@ Migración 0027 (`money_recurrings`, `money_recurring_occurrences`, `money_adjus
 | Q11 | Al pagar | ✅ Pay / Collect con lo que falta ya puesto. Casilla "From an Account" ("Into an Account"), marcada por defecto: mueve el saldo ese día y queda como Expense (o Income) en la Category de la Debt. Sin marcar, solo baja la Debt. El pago se ve en Movements; borrarlo devuelve el monto a la Debt. |
 | Q12 | Lo prestado | ✅ El dinero que me prestan cuenta como Income del mes, y el que presto como Expense. "No es gran cosa." Por simetría, devolverlo es un Expense (o un Income al cobrarlo). |
 
-## Money, Debts — construido en local (2026-11-14)
+## Money, Debts — Subida (2026-11-14), commit f0bee6a, 0031 en Neon
 
-Ronda 62 construida, sin commit. Migración 0031 (`money_debts`, `money_debt_payments`, solo tablas nuevas) aplicada en local; pendiente en Neon.
+Ronda 62 subida (commit f0bee6a). Migración 0031 (`money_debts`, `money_debt_payments`, solo tablas nuevas) aplicada en local y en Neon (32 migraciones).
 
 - **Pestaña Debts** (después de Recurrings): totales "I owe" / "Owed to me" de las abiertas, el control I owe / Owed to me con cuántas abiertas hay, y "+ Debt". Cada Debt muestra a quién, su Category y nota, lo que falta de cuánto con una barra, la fecha límite (roja si venció), su recordatorio y sus pagos (se pueden deshacer). Las pagadas o cerradas van plegadas abajo; una cerrada a mano se puede reabrir.
 - **Nueva / editar**: a quién, monto, Category (de Expense para I owe, de Income para Owed to me, con "+ New"), nota, fecha límite; "Record the money now" (marcada) con Account de pesos, Category del dinero de ahora y fecha; "Remind me on" crea la Secondary Task. Editar mueve o quita el recordatorio; el monto no puede quedar por debajo de lo pagado. Close la cierra a mano; Delete la borra con su recordatorio abierto y deja sus movimientos.
