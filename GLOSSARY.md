@@ -248,5 +248,8 @@ _Evitar_: Stock, Reserve.
 **Adjustment** (Ajuste): poner el saldo real de una Account cuando no coincide (p. ej. ZuluTrade bajó por el mercado, o conté el efectivo y falta). Queda la diferencia; no es Expense ni Income y no cuenta en ninguna Category.
 _Evitar_: Correction, Gain, Loss.
 
+**Debt** (Deuda): dinero que debo (I owe) o que me deben (Owed to me), por una sola vez (p. ej. el derecho a grado de la universidad, lo que le presté a Carlos). Lleva a quién, escrito tal cual (una persona o una entidad, sin ser una Person), el monto en pesos, una fecha límite opcional y su Category. Se paga o se cobra por partes y se cierra sola al llegar a 0, o a mano (perdonada, no me va a pagar). Lo que se mueve por ella es un movimiento normal con su Category: lo que pago es un Expense y lo que cobro un Income; si al nacer entra dinero (me prestan) es un Income, y si sale (presto) es un Expense. Un pago puede no tocar ninguna Account; entonces solo baja la Debt. Puede tener una Secondary Task que me recuerde pagarla o cobrarla.
+_Evitar_: Loan, IOU, Receivable, Payable.
+
 **Receipt** (Soporte): una foto o un PDF que respalda un movimiento (p. ej. la factura de la luz, el comprobante de una Transfer). Un movimiento puede tener varios, y se van con él.
 _Evitar_: Attachment, Voucher, File.

@@ -923,6 +923,33 @@ Migración 0027 (`money_recurrings`, `money_recurring_occurrences`, `money_adjus
 | Q17 | Recurrings por clase | ✅ La pestaña Recurrings tiene un control segmentado Expenses / Income / Transfers (con cuántos hay de cada uno) que filtra "This month" y "All Recurrings". Transfers va también, para que el 1M al ahorro no se pierda. "+ Recurring" abre en la clase elegida. |
 | Q18 | Total del mes en Recurrings | ✅ "This month" muestra "Confirmed $X / $Y" con una barra, para la clase elegida y por moneda. $Y es todo lo que vence en el mes menos lo saltado; lo confirmado cuenta con el monto que se registró de verdad. Lo vencido de meses anteriores cuenta en su mes, no en este. |
 
+## Ronda 62 — Money: Debts (2026-11-14)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q1 | Recordatorio | ✅ Es una Secondary Task ("Pay Universidad $X" / "Collect from Carlos $X") en el día que elijo; no es un "goal". |
+| Q2 | Nombre | ✅ Debt, con dos lados: I owe y Owed to me. Una sola lista con selector. |
+| Q3 | A quién | ✅ Texto libre (una persona o una entidad, p. ej. la universidad). Nunca se liga a una Person. Es algo de una sola vez. |
+| Q4 | Saldos | ✅ El día que el dinero se mueve, cambia el saldo de su Account. |
+| Q5 | Por partes | ✅ Varios pagos; lo que falta es el monto menos lo pagado; se cierra sola en 0 o a mano (perdonada, no me va a pagar). |
+| Q6 | Secondary Task | ✅ Opcional "Remind me on [date]" al crear o editar; marcarla hecha no mueve dinero; al cerrarse la Debt, su Secondary Task abierta queda hecha. |
+| Q7 | Moneda | ✅ Solo pesos. Fecha límite opcional; vencida en rojo. Sin intereses. |
+| Q8 | Dónde | ✅ Pestaña Debts en Money, después de Recurrings, con el control I owe / Owed to me y los totales arriba ("I owe $X · Owed to me $Y"). Las cerradas, plegadas abajo. |
+| Q9 | Category | ✅ Todo Expense tiene su Category: la Debt lleva la suya, y pagarla es un Expense en ella (cobrarla, un Income). |
+| Q10 | Al crearla | ✅ Casilla "Record the money now", marcada por defecto, con Account y fecha: si me prestan entra a la Account; si presto sale. Sin marcar, solo se anota la Debt y se cuenta después al pagarla (p. ej. el derecho a grado). |
+| Q11 | Al pagar | ✅ Pay / Collect con lo que falta ya puesto. Casilla "From an Account" ("Into an Account"), marcada por defecto: mueve el saldo ese día y queda como Expense (o Income) en la Category de la Debt. Sin marcar, solo baja la Debt. El pago se ve en Movements; borrarlo devuelve el monto a la Debt. |
+| Q12 | Lo prestado | ✅ El dinero que me prestan cuenta como Income del mes, y el que presto como Expense. "No es gran cosa." Por simetría, devolverlo es un Expense (o un Income al cobrarlo). |
+
+## Money, Debts — construido en local (2026-11-14)
+
+Ronda 62 construida, sin commit. Migración 0031 (`money_debts`, `money_debt_payments`, solo tablas nuevas) aplicada en local; pendiente en Neon.
+
+- **Pestaña Debts** (después de Recurrings): totales "I owe" / "Owed to me" de las abiertas, el control I owe / Owed to me con cuántas abiertas hay, y "+ Debt". Cada Debt muestra a quién, su Category y nota, lo que falta de cuánto con una barra, la fecha límite (roja si venció), su recordatorio y sus pagos (se pueden deshacer). Las pagadas o cerradas van plegadas abajo; una cerrada a mano se puede reabrir.
+- **Nueva / editar**: a quién, monto, Category (de Expense para I owe, de Income para Owed to me, con "+ New"), nota, fecha límite; "Record the money now" (marcada) con Account de pesos, Category del dinero de ahora y fecha; "Remind me on" crea la Secondary Task. Editar mueve o quita el recordatorio; el monto no puede quedar por debajo de lo pagado. Close la cierra a mano; Delete la borra con su recordatorio abierto y deja sus movimientos.
+- **Pay / Collect**: lo que falta ya puesto (no deja pasarse), fecha, y "From an Account" / "Into an Account" (marcada) con Account de pesos. Queda como Expense (o Income) en la Category de la Debt y en Movements con "· Debt". Cada pago cambia el texto del recordatorio a lo que falta; al llegar a 0 o cerrarla, el recordatorio queda hecho. Editar el movimiento de un pago cambia el pago; borrarlo devuelve el monto a la Debt.
+- Las pestañas se ajustan en el celular para que quepan las cinco. Una Category usada por una Debt no se borra, y al unirla sus Debts se van con ella.
+- **Probado en el navegador** (ancho de teléfono, contra el 3200): derecho a grado sin dinero ahora con fecha y recordatorio; préstamo de Carlos como Income; pago de 200.000 (Expense en la dona, recordatorio a 300.000), intento de pagar de más, pago del resto (pagada, recordatorio hecho); préstamo a Pedro como Expense, cobro de 40.000 sin Account y cierre a mano; borrar el movimiento de un pago la reabrió. Los datos de prueba se borraron.
+
 ## Money, pestañas, tortas y Campaigns — Subida (2026-11-14), commit a2931f7, 0029 y 0030 en Neon
 
 Ronda 61 subida (commit a2931f7). Migraciones 0029 (`money_movement_campaigns`, `money_recurring_campaigns`, solo tablas nuevas) y 0030 (`money_categories.kind`, nombre único por clase, y el Income puede llevar Category; solo afloja reglas) aplicadas en local y en Neon (31 migraciones). En Neon hay 1 Income y 2 Recurrings de Income sin Category: saldrán como "No Category" hasta que Ivan les ponga una.
