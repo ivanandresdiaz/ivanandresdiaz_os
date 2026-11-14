@@ -91,8 +91,15 @@ export type MovementRef = {
   toAmount: number | null;
 };
 
-/** Each Account's balance: its opening balance and everything that came in or went out since. */
-export function balances(accounts: AccountRef[], movements: MovementRef[]): Map<string, number> {
+/** An Adjustment: the difference between what an Account held for real and what Ivan OS said. */
+export type AdjustmentRef = { accountId: string; delta: number };
+
+/** Each Account's balance: its opening balance, everything that came in or went out since, and its Adjustments. */
+export function balances(
+  accounts: AccountRef[],
+  movements: MovementRef[],
+  adjustments: AdjustmentRef[] = [],
+): Map<string, number> {
   const result = new Map(accounts.map((a) => [a.id, a.openingBalance]));
   const add = (id: string | null, units: number) => {
     if (id !== null && result.has(id)) result.set(id, result.get(id)! + units);
@@ -102,6 +109,7 @@ export function balances(accounts: AccountRef[], movements: MovementRef[]): Map<
     else add(m.accountId, -m.amount);
     if (m.kind === "transfer") add(m.toAccountId, m.toAmount ?? 0);
   }
+  for (const a of adjustments) add(a.accountId, a.delta);
   return result;
 }
 

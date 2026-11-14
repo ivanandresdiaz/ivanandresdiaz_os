@@ -105,6 +105,15 @@ describe("Balances", () => {
     expect(result.get("savings")).toBe(3_000_000);
     expect(result.get("zulu")).toBe(10_000);
   });
+
+  it("take Adjustments, which can go either way", () => {
+    const result = balances(accounts, [transfer(400_000, "bank", "zulu", 10_000)], [
+      { accountId: "zulu", delta: -800 },
+      { accountId: "cash", delta: -20_000 },
+    ]);
+    expect(result.get("zulu")).toBe(9_200);
+    expect(result.get("cash")).toBe(-20_000);
+  });
 });
 
 describe("The month", () => {

@@ -11,8 +11,16 @@ import {
   type Currency,
   type MovementKind,
 } from "@/domain/money";
-import { createCategory, deleteMovement, loadMoneyChoices, saveMovement } from "@/server/money-actions";
-import type { MoneyChoices, MovementView } from "@/server/money";
+import { isValidEvery, MAX_EVERY_MONTHS } from "@/domain/recurring";
+import {
+  createCategory,
+  deleteMovement,
+  deleteRecurring,
+  loadMoneyChoices,
+  saveMovement,
+  saveRecurring,
+} from "@/server/money-actions";
+import type { MoneyChoices, MovementView, OccurrenceView, RecurringView } from "@/server/money";
 import { ConfirmDelete, keepEvents } from "./confirm-delete";
 import { useRemembered } from "./use-remembered";
 
@@ -50,18 +58,91 @@ export function AddMovementButton() {
   );
 }
 
-/** Opens a movement of the month to change or delete it. */
-export function EditMovement({ movement, children, className }: { movement: MovementView; children: React.ReactNode; className?: string }) {
+/** A button that opens the dialog for `target`, starting from `draft`. */
+function Opener({
+  target,
+  draft,
+  children,
+  className,
+  title,
+}: {
+  target: Target;
+  draft?: Draft;
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)} title="Edit">
+      <button type="button" className={className} onClick={() => setOpen(true)} title={title}>
         {children}
       </button>
-      {open && <MovementDialog initial={movement} onClose={() => setOpen(false)} />}
+      {open && <MovementDialog target={target} initial={draft} onClose={() => setOpen(false)} />}
     </>
   );
 }
+
+/** Opens a movement of the month to change or delete it. */
+export function EditMovement({ movement, children, className }: { movement: MovementView; children: React.ReactNode; className?: string }) {
+  return (
+    <Opener target={{ type: "movement", id: movement.id }} draft={movement} className={className} title="Edit">
+      {children}
+    </Opener>
+  );
+}
+
+/** Confirms an occurrence with what really happened: another amount, Account or day. */
+export function ConfirmWithChanges({ occurrence, children, className }: { occurrence: OccurrenceView; children: React.ReactNode; className?: string }) {
+  const r = occurrence.recurring;
+  return (
+    <Opener
+      target={{ type: "occurrence", recurringId: r.id, month: occurrence.month, name: r.name }}
+      draft={{ ...r, note: r.name, date: occurrence.due }}
+      className={className}
+      title="Confirm with changes"
+    >
+      {children}
+    </Opener>
+  );
+}
+
+/** Creates a Recurring, or opens one to change or stop it. */
+export function RecurringButton({ recurring, children, className }: { recurring?: RecurringView; children: React.ReactNode; className?: string }) {
+  return (
+    <Opener
+      target={{ type: "recurring", id: recurring?.id, name: recurring?.name }}
+      draft={recurring && { ...recurring, note: recurring.name, date: recurring.firstDate }}
+      className={className}
+    >
+      {children}
+    </Opener>
+  );
+}
+
+/**
+ * What the dialog saves: a movement (new, or changed when it has an id), an
+ * occurrence of a Recurring confirmed with changes, or a Recurring itself.
+ */
+type Target =
+  | { type: "movement"; id?: string }
+  | { type: "occurrence"; recurringId: string; month: string; name: string }
+  | { type: "recurring"; id?: string; name?: string };
+
+/** What the fields start with. For a Recurring, the note is its name and the date its first one. */
+type Draft = {
+  kind: MovementKind;
+  amount: number;
+  currency: Currency;
+  accountId: string;
+  toAccountId: string | null;
+  toAmount: number | null;
+  toCurrency: Currency | null;
+  categoryId: string | null;
+  note: string | null;
+  date: string;
+  everyMonths?: number;
+};
 
 type Choices = MoneyChoices & { today: string };
 
@@ -82,9 +163,19 @@ function Chip({ selected, onClick, children }: { selected: boolean; onClick: () 
 
 /**
  * Adding (or changing) an Expense, an Income or a Transfer. Amount first, then
- * the Category, both one tap away; the Account is the last one used (Q3).
+ * the Category, both one tap away; the Account is the last one used (Q3). The
+ * same form confirms a Recurring with changes, and creates or edits one.
  */
-function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose: () => void }) {
+function MovementDialog({
+  target = { type: "movement" },
+  initial,
+  onClose,
+}: {
+  target?: Target;
+  initial?: Draft;
+  onClose: () => void;
+}) {
+  const isRule = target.type === "recurring";
   const dialog = useRef<HTMLDialogElement>(null);
   const amountField = useRef<HTMLInputElement>(null);
   const [choices, setChoices] = useState<Choices | null>(null);
@@ -105,6 +196,7 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [note, setNote] = useState(initial?.note ?? "");
   const [date, setDate] = useState(initial?.date ?? "");
+  const [every, setEvery] = useState(String(initial?.everyMonths ?? 1));
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -165,26 +257,47 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
     if (kind === "expense" && !categoryId) return setError("Pick a Category.");
     if (kind === "transfer" && !to) return setError("Pick where the money goes.");
     if (crossCurrency && toUnits === null) return setError(`Say how much arrived, in ${to!.currency}.`);
+    if (isRule && !note.trim()) return setError("Give it a name, e.g. Internet.");
+    if (isRule && !isValidEvery(Number(every))) return setError(`Repeat every 1 to ${MAX_EVERY_MONTHS} months.`);
+    const flow = {
+      kind,
+      amount: units,
+      accountId: from.id,
+      toAccountId: kind === "transfer" ? (to?.id ?? null) : null,
+      toAmount: crossCurrency ? toUnits : null,
+      categoryId: kind === "expense" ? categoryId : null,
+    };
     startTransition(async () => {
-      const result = await saveMovement({
-        id: initial?.id,
-        kind,
-        date,
-        amount: units,
-        accountId: from.id,
-        toAccountId: kind === "transfer" ? (to?.id ?? null) : null,
-        toAmount: crossCurrency ? toUnits : null,
-        categoryId: kind === "expense" ? categoryId : null,
-        note,
-      });
+      const result =
+        target.type === "recurring"
+          ? await saveRecurring({ ...flow, id: target.id, name: note, firstDate: date, everyMonths: Number(every) })
+          : await saveMovement({
+              ...flow,
+              id: target.type === "movement" ? target.id : undefined,
+              date,
+              note,
+              occurrence:
+                target.type === "occurrence" ? { recurringId: target.recurringId, month: target.month } : undefined,
+            });
       if (result) return setError(result.error);
-      setLastAccount(from.id);
-      if (kind === "transfer" && to) setLastToAccount(to.id);
+      if (target.type === "movement" && !target.id) {
+        setLastAccount(from.id);
+        if (kind === "transfer" && to) setLastToAccount(to.id);
+      }
       dialog.current?.close();
     });
   }
 
-  const title = initial ? `Edit ${KIND_LABEL[kind]}` : `Add ${KIND_LABEL[kind]}`;
+  const title =
+    target.type === "recurring"
+      ? target.id
+        ? `Edit ${target.name}`
+        : "New Recurring"
+      : target.type === "occurrence"
+        ? `Confirm ${target.name}`
+        : target.id
+          ? `Edit ${KIND_LABEL[kind]}`
+          : `Add ${KIND_LABEL[kind]}`;
 
   return (
     <div className="contents" {...keepEvents}>
@@ -202,6 +315,7 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
             save();
           }}
         >
+          {target.type !== "movement" && <h2 className="font-semibold">{title}</h2>}
           <div className="flex items-center gap-1 rounded-lg bg-background p-1" role="tablist" aria-label="Kind">
             {(["expense", "income", "transfer"] as const).map((k) => (
               <button
@@ -335,17 +449,18 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
 
           <div className="flex gap-2">
             <label className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="label">Note</span>
+              <span className="label">{isRule ? "Name" : "Note"}</span>
               <input
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                maxLength={MAX_MOVEMENT_NOTE}
-                placeholder="Optional"
+                maxLength={isRule ? MAX_MONEY_NAME : MAX_MOVEMENT_NOTE}
+                required={isRule}
+                placeholder={isRule ? "e.g. Internet, Pay" : "Optional"}
                 className="input"
               />
             </label>
             <label className="flex w-36 flex-col gap-1">
-              <span className="label">Date</span>
+              <span className="label">{isRule ? "First on" : "Date"}</span>
               <input
                 type="date"
                 value={date}
@@ -356,16 +471,33 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
             </label>
           </div>
 
+          {isRule && (
+            <label className="flex flex-wrap items-center gap-2 text-sm">
+              Every
+              <input
+                type="number"
+                min={1}
+                max={MAX_EVERY_MONTHS}
+                value={every}
+                onChange={(event) => setEvery(event.target.value)}
+                className="input w-16 tabular-nums"
+                aria-label="Every how many months"
+              />
+              {Number(every) === 1 ? "month" : "months"}, on the day of the first date. It asks on its day; nothing is
+              recorded until you confirm.
+            </label>
+          )}
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex items-center gap-2">
-            {initial && (
+            {target.type === "movement" && target.id && initial && (
               <ConfirmDelete
                 action={async (fd) => {
                   await deleteMovement(fd);
                   dialog.current?.close();
                 }}
-                id={initial.id}
+                id={target.id}
                 what={KIND_LABEL[initial.kind]}
                 title={formatAmount(initial.amount, initial.currency)}
                 className="btn text-red-600"
@@ -373,12 +505,27 @@ function MovementDialog({ initial, onClose }: { initial?: MovementView; onClose:
                 Delete
               </ConfirmDelete>
             )}
+            {target.type === "recurring" && target.id && (
+              <ConfirmDelete
+                action={async (fd) => {
+                  await deleteRecurring(fd);
+                  dialog.current?.close();
+                }}
+                id={target.id}
+                what="Recurring"
+                title={target.name ?? ""}
+                buttonTitle="Stop it; what it recorded stays"
+                className="btn text-red-600"
+              >
+                Stop
+              </ConfirmDelete>
+            )}
             <div className="flex-1" />
             <button type="button" className="btn" onClick={() => dialog.current?.close()}>
               Cancel
             </button>
             <button className="btn-primary min-h-9 px-4" disabled={pending || !choices || accounts.length === 0 || !date}>
-              {pending ? "Saving…" : "Save"}
+              {pending ? "Saving…" : target.type === "occurrence" ? "Confirm" : "Save"}
             </button>
           </div>
         </form>

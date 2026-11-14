@@ -967,3 +967,74 @@ export const moneyMovements = pgTable(
     ),
   ],
 );
+
+/**
+ * An Expense (a Bill), an Income or a Transfer that repeats: due on the day of
+ * `firstDate`, every `everyMonths` months from it. `name` becomes the note of
+ * what it records. Deleting it stops it; what it already recorded stays.
+ */
+export const moneyRecurrings = pgTable(
+  "money_recurrings",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    kind: movementKind("kind").notNull(),
+    amount: money("amount").notNull(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => moneyAccounts.id, { onDelete: "restrict" }),
+    toAccountId: uuid("to_account_id").references(() => moneyAccounts.id, { onDelete: "restrict" }),
+    toAmount: money("to_amount"),
+    categoryId: uuid("category_id").references(() => moneyCategories.id, { onDelete: "restrict" }),
+    firstDate: isoDate("first_date").notNull(),
+    everyMonths: smallint("every_months").notNull().default(1),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("money_recurring_amount", sql`${t.amount} > 0`),
+    check("money_recurring_every", sql`${t.everyMonths} between 1 and 12`),
+    check(
+      "money_recurring_shape",
+      sql`(${t.kind} = 'expense' and ${t.categoryId} is not null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'income' and ${t.categoryId} is null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'transfer' and ${t.categoryId} is null and ${t.toAccountId} is not null
+            and ${t.toAccountId} <> ${t.accountId} and ${t.toAmount} > 0)`,
+    ),
+  ],
+);
+
+/**
+ * How one month's occurrence of a Recurring was settled: the movement it
+ * recorded, or none when Ivan skipped it. Deleting that movement unsettles it,
+ * so it is pending again.
+ */
+export const moneyRecurringOccurrences = pgTable(
+  "money_recurring_occurrences",
+  {
+    id: id(),
+    recurringId: uuid("recurring_id")
+      .notNull()
+      .references(() => moneyRecurrings.id, { onDelete: "cascade" }),
+    /** "2026-11": the month it was due in. */
+    month: text("month").notNull(),
+    movementId: uuid("movement_id").references(() => moneyMovements.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [unique().on(t.recurringId, t.month), unique().on(t.movementId)],
+);
+
+/** Setting an Account to its real balance: the difference stays, never an Expense or an Income. */
+export const moneyAdjustments = pgTable(
+  "money_adjustments",
+  {
+    id: id(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => moneyAccounts.id, { onDelete: "restrict" }),
+    date: isoDate("date").notNull(),
+    delta: money("delta").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("money_adjustments_date").on(t.date), check("money_adjustment_delta", sql`${t.delta} <> 0`)],
+);

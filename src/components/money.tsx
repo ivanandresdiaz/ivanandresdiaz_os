@@ -12,17 +12,31 @@ import {
   type Currency,
 } from "@/domain/money";
 import {
+  adjustAccount,
+  confirmOccurrence,
   createAccount,
   createCategory,
   deleteAccount,
+  deleteAdjustment,
   deleteCategory,
   mergeCategory,
   renameCategory,
+  skipOccurrence,
+  unskipOccurrence,
   updateAccount,
 } from "@/server/money-actions";
-import type { AccountView, CategoryMonthView, CategoryView, MoneyMonthView, MovementView } from "@/server/money";
+import type {
+  AccountView,
+  AdjustmentView,
+  CategoryMonthView,
+  CategoryView,
+  MoneyMonthView,
+  MovementView,
+  OccurrenceView,
+  RecurringView,
+} from "@/server/money";
 import { ConfirmDelete } from "./confirm-delete";
-import { EditMovement } from "./money-add";
+import { ConfirmWithChanges, EditMovement, RecurringButton } from "./money-add";
 import { shortDate } from "./upkeeps";
 
 function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
@@ -68,8 +82,9 @@ export function MoneyMonth({ view, today }: { view: MoneyMonthView; today: IsoDa
         ))}
       </div>
 
+      <Recurrings occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
       <WhereItWent byCategory={view.byCategory} today={today} />
-      <Movements movements={view.movements} today={today} />
+      <Movements movements={view.movements} adjustments={view.adjustments} today={today} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Accounts accounts={view.accounts} />
@@ -170,23 +185,218 @@ function MovementRow({ movement: m, today, hideCategory }: { movement: MovementV
   );
 }
 
-function Movements({ movements, today }: { movements: MovementView[]; today: IsoDate }) {
+type Line = { type: "movement"; item: MovementView } | { type: "adjustment"; item: AdjustmentView };
+
+function Movements({
+  movements,
+  adjustments,
+  today,
+}: {
+  movements: MovementView[];
+  adjustments: AdjustmentView[];
+  today: IsoDate;
+}) {
   const [all, setAll] = useState(false);
-  const shown = all ? movements : movements.slice(0, 15);
+  // Both lists come newest first; a stable sort by date keeps that within a day.
+  const lines: Line[] = [
+    ...movements.map((item) => ({ type: "movement" as const, item })),
+    ...adjustments.map((item) => ({ type: "adjustment" as const, item })),
+  ].sort((a, b) => b.item.date.localeCompare(a.item.date));
+  const shown = all ? lines : lines.slice(0, 15);
   return (
     <Section title="Movements">
-      {movements.length === 0 && <p className="text-sm text-muted">Nothing moved this month.</p>}
+      {lines.length === 0 && <p className="text-sm text-muted">Nothing moved this month.</p>}
       <ul className="flex flex-col">
-        {shown.map((m) => (
-          <MovementRow key={m.id} movement={m} today={today} />
-        ))}
+        {shown.map((line) =>
+          line.type === "movement" ? (
+            <MovementRow key={line.item.id} movement={line.item} today={today} />
+          ) : (
+            <AdjustmentRow key={line.item.id} adjustment={line.item} today={today} />
+          ),
+        )}
       </ul>
-      {movements.length > shown.length && (
+      {lines.length > shown.length && (
         <button type="button" className="btn self-start" onClick={() => setAll(true)}>
-          Show all {movements.length}
+          Show all {lines.length}
         </button>
       )}
     </Section>
+  );
+}
+
+/** An Adjustment isn't edited: a wrong one is deleted and the Account adjusted again. */
+function AdjustmentRow({ adjustment: a, today }: { adjustment: AdjustmentView; today: IsoDate }) {
+  return (
+    <li className="flex items-baseline gap-2 px-2 py-1.5 text-sm">
+      <span className="w-20 shrink-0 text-xs text-muted">{shortDate(a.date, today)}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">Adjustment · {a.accountName}</span>
+        {a.note && <span className="block truncate text-xs text-muted">{a.note}</span>}
+      </span>
+      <span className="shrink-0 text-muted tabular-nums">
+        {a.delta > 0 ? "+" : ""}
+        {formatAmount(a.delta, a.currency)}
+      </span>
+      <ConfirmDelete action={deleteAdjustment} id={a.id} what="Adjustment" title={formatAmount(a.delta, a.currency)} />
+    </li>
+  );
+}
+
+// ─── Recurrings ──────────────────────────────────────────────────────────────
+
+function flowSign(kind: MovementView["kind"]): string {
+  return kind === "income" ? "+" : kind === "expense" ? "−" : "";
+}
+
+function flowLine(f: Pick<RecurringView, "kind" | "accountName" | "toAccountName" | "categoryName">): string {
+  if (f.kind === "expense") return `${f.categoryName ?? "?"} · ${f.accountName}`;
+  if (f.kind === "income") return `Income · ${f.accountName}`;
+  return `${f.accountName} → ${f.toAccountName ?? "?"}`;
+}
+
+/**
+ * The Recurrings of the month (Q10, Q12): what is pending asks first, the
+ * oldest first; then what is coming; then what was confirmed or skipped.
+ */
+function Recurrings({
+  occurrences,
+  recurrings,
+  today,
+}: {
+  occurrences: OccurrenceView[];
+  recurrings: RecurringView[];
+  today: IsoDate;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const pending = occurrences.filter((o) => o.state === "pending").length;
+  return (
+    <Section
+      title={pending > 0 ? `Recurring · ${pending} pending` : "Recurring"}
+      aside={<RecurringButton className="btn">+ Recurring</RecurringButton>}
+    >
+      {recurrings.length === 0 && (
+        <p className="text-sm text-muted">
+          Your pay, the transfer to savings, your Bills: add each once. On its day it asks; you confirm or skip.
+        </p>
+      )}
+      {recurrings.length > 0 && occurrences.length === 0 && (
+        <p className="text-sm text-muted">Nothing due this month.</p>
+      )}
+      <ul className="flex flex-col gap-1">
+        {occurrences.map((o) => (
+          <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
+        ))}
+      </ul>
+      {recurrings.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <button type="button" className="self-start text-xs text-muted hover:underline" onClick={() => setShowAll(!showAll)}>
+            {showAll ? "Hide" : "All"} Recurrings ({recurrings.length})
+          </button>
+          {showAll && (
+            <ul className="flex flex-col">
+              {recurrings.map((r) => (
+                <li key={r.id}>
+                  <RecurringButton
+                    recurring={r}
+                    className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{r.name}</span>
+                      <span className="block truncate text-xs text-muted">
+                        {r.schedule} · {flowLine(r)}
+                        {r.next && ` · next ${shortDate(r.next.due, today)}`}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {flowSign(r.kind)}
+                      {formatAmount(r.amount, r.currency)}
+                    </span>
+                  </RecurringButton>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function OccurrenceRow({ occurrence: o, today }: { occurrence: OccurrenceView; today: IsoDate }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const r = o.recurring;
+  const open = o.state === "pending" || o.state === "upcoming";
+  const overdue = o.state === "pending" && o.due < today;
+  const amount = o.movement ?? r;
+
+  return (
+    <li className={`flex flex-col gap-1 rounded-md px-2 py-1.5 ${o.state === "pending" ? "bg-accent/5" : ""}`}>
+      <div className={`flex items-baseline gap-2 text-sm ${open ? "" : "text-muted"}`}>
+        <span className={`w-20 shrink-0 text-xs ${overdue ? "font-medium text-red-600" : "text-muted"}`}>
+          {shortDate(o.due, today)}
+          {overdue && <span className="block">overdue</span>}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate ${o.state === "skipped" ? "line-through" : ""}`}>{r.name}</span>
+          <span className="block truncate text-xs text-muted">{flowLine(r)}</span>
+        </span>
+        <span className="shrink-0 tabular-nums">
+          {flowSign(r.kind)}
+          {formatAmount(amount.amount, amount.currency)}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {open && (
+          <>
+            <button
+              type="button"
+              className={o.state === "pending" ? "btn-primary min-h-8" : "btn min-h-8"}
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await confirmOccurrence({ recurringId: r.id, month: o.month });
+                  setError(result?.error ?? null);
+                })
+              }
+            >
+              {pending ? "…" : "Confirm"}
+            </button>
+            <ConfirmWithChanges occurrence={o} className="btn min-h-8">
+              Change…
+            </ConfirmWithChanges>
+            <button
+              type="button"
+              className="btn min-h-8 text-muted"
+              disabled={pending}
+              onClick={() => startTransition(() => skipOccurrence({ recurringId: r.id, month: o.month }))}
+              title="Not this month"
+            >
+              Skip
+            </button>
+          </>
+        )}
+        {o.state === "confirmed" && o.movement && (
+          <EditMovement movement={o.movement} className="text-xs text-muted hover:underline">
+            ✓ Confirmed
+          </EditMovement>
+        )}
+        {o.state === "skipped" && (
+          <>
+            <span className="text-xs text-muted">Skipped</span>
+            <button
+              type="button"
+              className="text-xs text-muted underline hover:text-foreground"
+              disabled={pending}
+              onClick={() => startTransition(() => unskipOccurrence({ recurringId: r.id, month: o.month }))}
+            >
+              Undo
+            </button>
+          </>
+        )}
+      </div>
+      {error && <p className="text-right text-xs text-red-600">{error}</p>}
+    </li>
   );
 }
 
@@ -220,8 +430,9 @@ function AccountRow({ account: a }: { account: AccountView }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
     return (
-      <li>
+      <li className="flex flex-col gap-2">
         <AccountForm account={a} onDone={() => setEditing(false)} />
+        <AdjustForm account={a} onDone={() => setEditing(false)} />
       </li>
     );
   }
@@ -232,7 +443,15 @@ function AccountRow({ account: a }: { account: AccountView }) {
       </button>
       {a.savings && <span className="rounded-full border border-line px-1.5 text-[11px] text-muted">Savings</span>}
       {a.currency !== "COP" && <span className="text-[11px] text-muted">{a.currency}</span>}
-      <span className={`tabular-nums ${a.balance < 0 ? "text-red-600" : ""}`}>{formatAmount(a.balance, a.currency)}</span>
+      <span className="flex flex-col items-end">
+        <span className={`tabular-nums ${a.balance < 0 ? "text-red-600" : ""}`}>{formatAmount(a.balance, a.currency)}</span>
+        {a.monthAdjusted !== null && (
+          <span className="text-[11px] text-muted tabular-nums" title="What this month's Adjustments added up to">
+            adjusted {a.monthAdjusted > 0 ? "+" : ""}
+            {formatAmount(a.monthAdjusted, a.currency)}
+          </span>
+        )}
+      </span>
     </li>
   );
 }
@@ -310,14 +529,12 @@ function AccountForm({ account, onDone }: { account?: AccountView; onDone?: () =
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-2">
-        {account && account.movements === 0 && (
+        {account && !account.inUse && (
           <ConfirmDelete action={deleteAccount} id={account.id} what="Account" title={account.name} className="btn text-red-600">
             Delete
           </ConfirmDelete>
         )}
-        {account && account.movements > 0 && (
-          <span className="text-xs text-muted">It has movements, so it stays.</span>
-        )}
+        {account?.inUse && <span className="text-xs text-muted">It has history, so it stays.</span>}
         <div className="flex-1" />
         {onDone && (
           <button type="button" className="btn" onClick={onDone}>
@@ -328,6 +545,65 @@ function AccountForm({ account, onDone }: { account?: AccountView; onDone?: () =
           {pending ? "Saving…" : account ? "Save" : "Create"}
         </button>
       </div>
+    </form>
+  );
+}
+
+/**
+ * Setting an Account to what it really holds (Q11): ZuluTrade moved with the
+ * market, or the cash count came up short. The difference is an Adjustment.
+ */
+function AdjustForm({ account, onDone }: { account: AccountView; onDone: () => void }) {
+  const [real, setReal] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const realUnits = real.trim() === "" ? null : parseBalance(real, account.currency);
+  const delta = realUnits === null ? null : realUnits - account.balance;
+
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-md border border-line p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (realUnits === null) return setError("Type what it really holds.");
+        startTransition(async () => {
+          const result = await adjustAccount({ accountId: account.id, realBalance: realUnits, note });
+          if (result) return setError(result.error);
+          onDone();
+        });
+      }}
+    >
+      <span className="label">Adjust to the real balance</span>
+      <p className="text-xs text-muted">
+        Ivan OS says {formatAmount(account.balance, account.currency)}. The difference is kept as an Adjustment, never as
+        an Expense or an Income.
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={real}
+          onChange={(event) => setReal(event.target.value)}
+          inputMode={account.currency === "COP" ? "numeric" : "decimal"}
+          placeholder="What it really holds"
+          className="input tabular-nums"
+          aria-label="Real balance"
+        />
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Note (optional)"
+          className="input"
+          aria-label="Adjustment note"
+        />
+      </div>
+      <span className="h-4 text-xs text-muted tabular-nums">
+        {delta !== null && delta !== 0 && `Difference: ${delta > 0 ? "+" : ""}${formatAmount(delta, account.currency)}`}
+        {delta === 0 && "It already matches."}
+      </span>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button className="btn self-end" disabled={pending || delta === null || delta === 0}>
+        {pending ? "Adjusting…" : "Adjust"}
+      </button>
     </form>
   );
 }
@@ -388,6 +664,7 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
         </button>
         <span className="text-xs text-muted tabular-nums">
           {c.expenses} Expense{c.expenses === 1 ? "" : "s"}
+          {c.recurrings > 0 && ` · ${c.recurrings} Bill${c.recurrings === 1 ? "" : "s"}`}
         </span>
       </li>
     );
@@ -446,12 +723,14 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
       )}
       {target && (
         <p className="text-xs text-muted">
-          Its {c.expenses} Expense{c.expenses === 1 ? "" : "s"} move to {target.name} and “{c.name}” disappears.
+          Its {c.expenses} Expense{c.expenses === 1 ? "" : "s"}
+          {c.recurrings > 0 && ` and ${c.recurrings} Bill${c.recurrings === 1 ? "" : "s"}`} move to {target.name} and “
+          {c.name}” disappears.
         </p>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-2">
-        {c.expenses === 0 && (
+        {c.expenses === 0 && c.recurrings === 0 && (
           <ConfirmDelete action={deleteCategory} id={c.id} what="Category" title={c.name} className="btn text-red-600">
             Delete
           </ConfirmDelete>

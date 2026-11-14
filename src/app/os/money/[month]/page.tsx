@@ -15,7 +15,7 @@ export default async function MoneyPage({ params }: PageProps<"/os/money/[month]
   const { month } = await params;
   if (!isIsoMonth(month)) notFound();
   const now = today();
-  const view = await getMoneyMonth(month);
+  const view = await getMoneyMonth(month, now);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
