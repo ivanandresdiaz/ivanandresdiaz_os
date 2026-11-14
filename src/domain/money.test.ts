@@ -144,6 +144,14 @@ describe("The month", () => {
     expect(lines[1]).toMatchObject({ expenses: 500, income: 0, savedShare: null });
   });
 
+  it("shows dollars when a Transfer only brought them in", () => {
+    const lines = monthSummary(accounts, [transfer(400_000, "bank", "zulu", 10_000)]);
+    expect(lines).toEqual([
+      { currency: "COP", income: 0, expenses: 0, saved: 0, savedShare: null },
+      { currency: "USD", income: 0, expenses: 0, saved: 0, savedShare: null },
+    ]);
+  });
+
   it("shows pesos even in an empty month, and dollars only when they moved", () => {
     expect(monthSummary(accounts, [])).toEqual([
       { currency: "COP", income: 0, expenses: 0, saved: 0, savedShare: null },

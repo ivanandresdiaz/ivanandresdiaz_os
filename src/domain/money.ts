@@ -152,10 +152,10 @@ export function monthSummary(accounts: AccountRef[], movements: MovementRef[]): 
       if (from.savings) line(from.currency).saved -= m.amount;
     } else {
       const to = m.toAccountId ? byId.get(m.toAccountId) : undefined;
-      if (!to || from.savings === to.savings) {
-        line(from.currency);
-        continue;
-      }
+      // Both currencies moved, so both show, even when nothing counts as saved.
+      line(from.currency);
+      if (to) line(to.currency);
+      if (!to || from.savings === to.savings) continue;
       if (to.savings) line(to.currency).saved += m.toAmount ?? 0;
       else line(from.currency).saved -= m.amount;
     }
