@@ -47,7 +47,9 @@ import type {
 } from "@/server/money";
 import { ConfirmDelete } from "./confirm-delete";
 import { ConfirmWithChanges, EditMovement, RecurringButton } from "./money-add";
+import { Debts } from "./money-debts";
 import { ClipIcon } from "./money-receipts";
+import { Segmented } from "./segmented";
 import { shortDate } from "./upkeeps";
 
 function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
@@ -125,6 +127,7 @@ export function MoneyMonth({ view, today, tab: initialTab }: { view: MoneyMonthV
           {tab === "recurrings" && (
             <Recurrings month={view.month} occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
           )}
+          {tab === "debts" && <Debts debts={view.debts} today={today} />}
           {tab === "accounts" && <Accounts accounts={view.accounts} />}
           {tab === "categories" && (
             <>
@@ -141,6 +144,7 @@ export function MoneyMonth({ view, today, tab: initialTab }: { view: MoneyMonthV
 const TAB_LABEL: Record<MoneyTab, string> = {
   movements: "Movements",
   recurrings: "Recurrings",
+  debts: "Debts",
   accounts: "Accounts",
   categories: "Categories",
 };
@@ -169,7 +173,7 @@ function MoneyTabs({ tab, onChoose, pending }: { tab: MoneyTab; onChoose: (tab: 
             aria-controls={`money-panel-${t}`}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChoose(t)}
-            className={`-mb-px flex min-h-10 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 px-1.5 text-sm whitespace-nowrap transition ${
+            className={`-mb-px flex min-h-10 flex-1 shrink-0 items-center justify-center gap-1.5 border-b-2 px-1 text-[13px] whitespace-nowrap transition sm:px-3 sm:text-sm ${
               selected
                 ? "border-accent font-medium text-foreground"
                 : "border-transparent text-muted hover:border-line hover:text-foreground"
@@ -243,37 +247,6 @@ function arc(start: number, end: number): string {
     `A ${PIE.inner} ${PIE.inner} 0 ${large} 0 ${at(start, PIE.inner)}`,
     "Z",
   ].join(" ");
-}
-
-/** A small switch between a few options, like Expense / Income in the "+". */
-function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: T;
-  options: { value: T; label: React.ReactNode }[];
-  onChange: (value: T) => void;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-background p-0.5" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={`flex min-h-8 items-center gap-1 rounded-md px-2.5 text-xs whitespace-nowrap ${
-            value === o.value ? "bg-surface font-medium shadow-sm" : "text-muted hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 const sliceKey = (c: CategoryMonthView) => c.categoryId ?? "none";
@@ -426,6 +399,7 @@ function MovementRow({ movement: m, today, hideCategory }: { movement: MovementV
           <span className="flex items-center gap-1">
             <span className="truncate">
               {describe(m, hideCategory)}
+              {m.debt && <span className="text-xs text-muted"> · Debt</span>}
               {m.campaigns.length > 0 && (
                 <span className="text-xs text-muted"> · {m.campaigns.map((c) => c.title).join(", ")}</span>
               )}
@@ -1001,7 +975,8 @@ function uses(c: CategoryView, joiner = " · "): string {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const moved = plural(c.expenses, c.kind === "expense" ? "Expense" : "Income");
   const repeats = c.recurrings > 0 ? plural(c.recurrings, c.kind === "expense" ? "Bill" : "Recurring") : null;
-  return repeats ? `${moved}${joiner}${repeats}` : moved;
+  const owed = c.debts > 0 ? plural(c.debts, "Debt") : null;
+  return [moved, repeats, owed].filter(Boolean).join(joiner);
 }
 
 function CategoryRow({ category: c, others }: { category: CategoryView; others: CategoryView[] }) {
@@ -1080,7 +1055,7 @@ function CategoryRow({ category: c, others }: { category: CategoryView; others: 
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-2">
-        {c.expenses === 0 && c.recurrings === 0 && (
+        {c.expenses === 0 && c.recurrings === 0 && c.debts === 0 && (
           <ConfirmDelete action={deleteCategory} id={c.id} what="Category" title={c.name} className="btn text-red-600">
             Delete
           </ConfirmDelete>

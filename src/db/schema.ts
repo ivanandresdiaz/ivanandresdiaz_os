@@ -1089,3 +1089,55 @@ export const moneyRecurringCampaigns = pgTable(
   },
   (t) => [unique().on(t.recurringId, t.campaignId)],
 );
+
+export const moneyDebtSide = pgEnum("money_debt_side", ["owe", "owed"]);
+
+/**
+ * Money Ivan owes (I owe) or is owed (Owed to me), once (Ronda 62). `who` is
+ * plain text, never a Person. Paying or collecting it records an Expense or an
+ * Income in its Category; it is done when its payments reach the amount, or
+ * when Ivan closes it by hand (`closedAt`).
+ */
+export const moneyDebts = pgTable(
+  "money_debts",
+  {
+    id: id(),
+    side: moneyDebtSide("side").notNull(),
+    who: text("who").notNull(),
+    amount: money("amount").notNull(),
+    dueDate: isoDate("due_date"),
+    note: text("note"),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => moneyCategories.id, { onDelete: "restrict" }),
+    /** The money that started it (lent to me: an Income; lent by me: an Expense), when recorded. */
+    openingMovementId: uuid("opening_movement_id").references(() => moneyMovements.id, { onDelete: "set null" }),
+    /** The Secondary Task that reminds Ivan to pay or collect it. */
+    reminderId: uuid("reminder_id").references(() => secondaryTasks.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [check("money_debt_amount", sql`${t.amount} > 0`)],
+);
+
+/**
+ * A part paid or collected. With a movement it moved an Account (deleting that
+ * movement deletes the payment, so the amount is owed again); without one,
+ * only the Debt went down.
+ */
+export const moneyDebtPayments = pgTable(
+  "money_debt_payments",
+  {
+    id: id(),
+    debtId: uuid("debt_id")
+      .notNull()
+      .references(() => moneyDebts.id, { onDelete: "cascade" }),
+    amount: money("amount").notNull(),
+    date: isoDate("date").notNull(),
+    movementId: uuid("movement_id")
+      .unique()
+      .references(() => moneyMovements.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("money_debt_payments_debt").on(t.debtId), check("money_debt_payment_amount", sql`${t.amount} > 0`)],
+);

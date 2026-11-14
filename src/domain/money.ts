@@ -235,7 +235,7 @@ export function sameName(a: string, b: string): boolean {
 // ─── The page ────────────────────────────────────────────────────────────────
 
 /** The tabs under the month summary (Ronda 61); it opens on Movements. */
-export const MONEY_TABS = ["movements", "recurrings", "accounts", "categories"] as const;
+export const MONEY_TABS = ["movements", "recurrings", "debts", "accounts", "categories"] as const;
 export type MoneyTab = (typeof MONEY_TABS)[number];
 
 export function moneyTab(value: string | string[] | null | undefined): MoneyTab {

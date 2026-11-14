@@ -21,6 +21,7 @@ import {
   type OccurrenceState,
   type Resolutions,
 } from "@/domain/recurring";
+import { debtLeft, debtState, type DebtSide, type DebtState } from "@/domain/debts";
 import { presignView } from "@/lib/r2";
 
 export type AccountView = AccountRef & {
@@ -33,7 +34,15 @@ export type AccountView = AccountRef & {
 };
 export type CategoryKind = "expense" | "income";
 /** `expenses` counts every movement in it: Expenses, or Incomes for an Income Category. */
-export type CategoryView = { id: string; kind: CategoryKind; name: string; expenses: number; recurrings: number };
+export type CategoryView = {
+  id: string;
+  kind: CategoryKind;
+  name: string;
+  expenses: number;
+  recurrings: number;
+  /** Debts paid or collected in it. */
+  debts: number;
+};
 
 /** What a movement and a Recurring share: what moves, from where, to where. */
 type Flow = {
@@ -58,6 +67,8 @@ export type MovementView = Flow & {
   note: string | null;
   receipts: ReceiptView[];
   campaigns: CampaignRef[];
+  /** The Debt it paid, collected or started. */
+  debt: { id: string; who: string } | null;
 };
 export type RecurringView = Flow & {
   id: string;
@@ -109,6 +120,32 @@ export type MoneyMonthView = {
   recurrings: RecurringView[];
   /** The Recurrings due this month, and the unsettled ones of earlier months when it is this month. */
   occurrences: OccurrenceView[];
+  /** Every Debt, open or not: they don't belong to a month. */
+  debts: DebtView[];
+};
+
+export type DebtPaymentView = {
+  id: string;
+  date: IsoDate;
+  amount: number;
+  /** The movement it recorded, when it moved an Account. */
+  movementId: string | null;
+  accountName: string | null;
+};
+export type DebtView = {
+  id: string;
+  side: DebtSide;
+  who: string;
+  amount: number;
+  left: number;
+  state: DebtState;
+  dueDate: IsoDate | null;
+  note: string | null;
+  categoryId: string;
+  categoryName: string;
+  /** Its reminder, while it exists. */
+  reminder: { id: string; day: IsoDate; done: boolean } | null;
+  payments: DebtPaymentView[];
 };
 
 /** What the "+" offers: every Account, the Categories Ivan uses most first, and the active Campaigns by priority. */
@@ -221,7 +258,14 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
   for (const r of recurringRows) {
     if (r.categoryId) recurringUses.set(r.categoryId, (recurringUses.get(r.categoryId) ?? 0) + 1);
   }
-  const categories: CategoryView[] = categoryRows.map((c) => ({ ...c, recurrings: recurringUses.get(c.id) ?? 0 }));
+  const debts = await getDebts(accountMap, categoryMap);
+  const debtUses = new Map<string, number>();
+  for (const d of debts) debtUses.set(d.categoryId, (debtUses.get(d.categoryId) ?? 0) + 1);
+  const categories: CategoryView[] = categoryRows.map((c) => ({
+    ...c,
+    recurrings: recurringUses.get(c.id) ?? 0,
+    debts: debtUses.get(c.id) ?? 0,
+  }));
 
   const movementView = (m: typeof s.moneyMovements.$inferSelect): MovementView => ({
     ...flowView(m, accountMap, categoryMap),
@@ -230,6 +274,7 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     note: m.note,
     receipts: [],
     campaigns: [],
+    debt: null,
   });
   const movements = monthRows.map(movementView);
 
@@ -275,6 +320,17 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     addCampaigns([...confirmed.values()]),
     addRecurringCampaigns(recurrings),
   ]);
+  // Which movements paid, collected or started a Debt.
+  const debtOf = new Map<string, { id: string; who: string }>();
+  for (const d of debts) {
+    for (const p of d.payments) if (p.movementId) debtOf.set(p.movementId, { id: d.id, who: d.who });
+  }
+  for (const row of await db
+    .select({ id: s.moneyDebts.id, who: s.moneyDebts.who, movementId: s.moneyDebts.openingMovementId })
+    .from(s.moneyDebts)) {
+    if (row.movementId) debtOf.set(row.movementId, { id: row.id, who: row.who });
+  }
+  for (const m of confirmed.values()) m.debt = debtOf.get(m.id) ?? null;
 
   const occurrences: OccurrenceView[] = occurrenceList.map((o) => ({
     recurring: recurringMap.get(o.recurringId)!,
@@ -305,7 +361,58 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     adjustments,
     recurrings,
     occurrences,
+    debts,
   };
+}
+
+/** Every Debt with its payments and reminder; open ones first, the nearest due first. */
+async function getDebts(
+  accounts: Map<string, AccountRow>,
+  categories: Map<string, { name: string }>,
+): Promise<DebtView[]> {
+  const [debtRows, paymentRows] = await Promise.all([
+    db
+      .select({ debt: s.moneyDebts, reminder: s.secondaryTasks })
+      .from(s.moneyDebts)
+      .leftJoin(s.secondaryTasks, eq(s.secondaryTasks.id, s.moneyDebts.reminderId))
+      .orderBy(asc(s.moneyDebts.createdAt)),
+    db
+      .select({ payment: s.moneyDebtPayments, accountId: s.moneyMovements.accountId })
+      .from(s.moneyDebtPayments)
+      .leftJoin(s.moneyMovements, eq(s.moneyMovements.id, s.moneyDebtPayments.movementId))
+      .orderBy(desc(s.moneyDebtPayments.date), desc(s.moneyDebtPayments.createdAt)),
+  ]);
+  const paymentsOf = new Map<string, DebtPaymentView[]>();
+  for (const { payment: p, accountId } of paymentRows) {
+    const list = paymentsOf.get(p.debtId) ?? [];
+    list.push({
+      id: p.id,
+      date: p.date,
+      amount: p.amount,
+      movementId: p.movementId,
+      accountName: accountId ? (accounts.get(accountId)?.name ?? null) : null,
+    });
+    paymentsOf.set(p.debtId, list);
+  }
+  const views: DebtView[] = debtRows.map(({ debt: d, reminder: r }) => {
+    const payments = paymentsOf.get(d.id) ?? [];
+    return {
+      id: d.id,
+      side: d.side,
+      who: d.who,
+      amount: d.amount,
+      left: debtLeft(d.amount, payments),
+      state: debtState(d, payments),
+      dueDate: d.dueDate,
+      note: d.note,
+      categoryId: d.categoryId,
+      categoryName: categories.get(d.categoryId)?.name ?? "",
+      reminder: r ? { id: r.id, day: r.day, done: r.doneAt !== null } : null,
+      payments,
+    };
+  });
+  const rank = (d: DebtView) => (d.state === "open" ? 0 : 1);
+  return views.sort((a, b) => rank(a) - rank(b) || (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
 }
 
 /** Fills in each movement's Receipts, with a link to open each one. */
@@ -378,6 +485,7 @@ export async function getCampaignMoney(campaignId: string): Promise<CampaignMone
     note: m.note,
     receipts: [],
     campaigns: [],
+    debt: null,
   }));
   await Promise.all([addReceipts(movements), addCampaigns(movements)]);
   return { ...campaignMoney(movements), movements };

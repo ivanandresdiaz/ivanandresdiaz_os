@@ -218,6 +218,13 @@
       "when": 1794687621315,
       "tag": "0030_money_income_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794692940489,
+      "tag": "0031_money_debts",
+      "breakpoints": true
     }
   ]
 }

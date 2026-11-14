@@ -6,8 +6,10 @@ import { z } from "zod";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { isIsoDate, isIsoMonth } from "@/domain/dates";
+import { DEBT_SIDES, MAX_DEBT_WHO, openingKind, paymentKind, paymentProblem, reminderTitle } from "@/domain/debts";
 import {
   CURRENCIES,
+  formatAmount,
   MAX_AMOUNT,
   MAX_MOVEMENT_CAMPAIGNS,
   MAX_MONEY_NAME,
@@ -28,6 +30,7 @@ import { dueDateIn, MAX_EVERY_MONTHS } from "@/domain/recurring";
 import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
+import { syncDeletions, syncWork } from "./reminders";
 import { getAccountBalance, getCampaignMoney, getMoneyChoices, type CampaignMoneyView, type MoneyChoices } from "./money";
 
 /** What a form needs back: nothing when it worked, or what to tell Ivan. */
@@ -323,6 +326,7 @@ export async function mergeCategory(input: { id: string; intoId: string }) {
     if (found[0].kind !== found[1].kind) throw new Error("A Category only merges into one of the same kind (Expense or Income).");
     await tx.update(s.moneyMovements).set({ categoryId: v.intoId }).where(eq(s.moneyMovements.categoryId, v.id));
     await tx.update(s.moneyRecurrings).set({ categoryId: v.intoId }).where(eq(s.moneyRecurrings.categoryId, v.id));
+    await tx.update(s.moneyDebts).set({ categoryId: v.intoId }).where(eq(s.moneyDebts.categoryId, v.id));
     await tx.delete(s.moneyCategories).where(eq(s.moneyCategories.id, v.id));
   });
   await done();
@@ -332,11 +336,12 @@ export async function mergeCategory(input: { id: string; intoId: string }) {
 export async function deleteCategory(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse({ id: fd.get("id") });
-  const [spent, billed] = await Promise.all([
+  const [spent, billed, owed] = await Promise.all([
     db.select({ id: s.moneyMovements.id }).from(s.moneyMovements).where(eq(s.moneyMovements.categoryId, id)).limit(1),
     db.select({ id: s.moneyRecurrings.id }).from(s.moneyRecurrings).where(eq(s.moneyRecurrings.categoryId, id)).limit(1),
+    db.select({ id: s.moneyDebts.id }).from(s.moneyDebts).where(eq(s.moneyDebts.categoryId, id)).limit(1),
   ]);
-  if (spent.length || billed.length) throw new Error("This Category is in use; merge it into another instead.");
+  if (spent.length || billed.length || owed.length) throw new Error("This Category is in use; merge it into another instead.");
   await db.delete(s.moneyCategories).where(eq(s.moneyCategories.id, id));
   await done();
 }
@@ -442,6 +447,11 @@ export async function saveMovement(input: z.input<typeof movementInput>): Promis
     const id = v.id;
     await db.transaction(async (tx) => {
       await tx.update(s.moneyMovements).set(row).where(eq(s.moneyMovements.id, id));
+      // A Debt's payment follows its movement.
+      await tx
+        .update(s.moneyDebtPayments)
+        .set({ amount: row.amount, date: row.date })
+        .where(eq(s.moneyDebtPayments.movementId, id));
       await linkMovement(tx, id, campaignIds);
       await attach(tx, id, uploads.rows);
       if (remove.length > 0) {
@@ -595,5 +605,228 @@ export async function unskipOccurrence(input: { recurringId: string; month: stri
         isNull(s.moneyRecurringOccurrences.movementId),
       ),
     );
+  await done();
+}
+
+// ─── Debts ───────────────────────────────────────────────────────────────────
+
+const debtInput = z.object({
+  id: z.uuid().optional(),
+  side: z.enum(DEBT_SIDES),
+  who: z.string().trim().min(1).max(MAX_DEBT_WHO),
+  amount: units,
+  dueDate: isoDate.nullable(),
+  note,
+  categoryId: z.uuid(),
+  /** New only: the money that started it, into or out of an Account (Q10). */
+  record: z.object({ accountId: z.uuid(), date: isoDate, categoryId: z.uuid() }).nullable().optional(),
+  /** The day of its reminder, or null for none (Q6). */
+  remindOn: isoDate.nullable(),
+});
+
+async function categoryOfKind(id: string, kind: "expense" | "income"): Promise<boolean> {
+  const [found] = await db
+    .select({ kind: s.moneyCategories.kind })
+    .from(s.moneyCategories)
+    .where(eq(s.moneyCategories.id, id));
+  return found?.kind === kind;
+}
+
+/** A Debt's money only moves through peso Accounts (Q7). */
+async function pesoAccount(id: string): Promise<boolean> {
+  const [found] = await db
+    .select({ currency: s.moneyAccounts.currency })
+    .from(s.moneyAccounts)
+    .where(eq(s.moneyAccounts.id, id));
+  return found?.currency === "COP";
+}
+
+async function paidSoFar(conn: Tx | typeof db, debtId: string): Promise<number> {
+  const [row] = await conn
+    .select({ paid: sql<number>`coalesce(sum(${s.moneyDebtPayments.amount}), 0)`.mapWith(Number) })
+    .from(s.moneyDebtPayments)
+    .where(eq(s.moneyDebtPayments.debtId, debtId));
+  return row.paid;
+}
+
+/** Creates a Debt, or changes it when it has an `id`. Its side never changes. */
+export async function saveDebt(input: z.input<typeof debtInput>): Promise<MoneyResult> {
+  await requireIvan();
+  const v = debtInput.parse(input);
+  if (!(await categoryOfKind(v.categoryId, paymentKind(v.side)))) return { error: "Pick a Category." };
+  if (!v.id && v.record) {
+    if (!(await pesoAccount(v.record.accountId))) return { error: "Pick a peso Account." };
+    if (!(await categoryOfKind(v.record.categoryId, openingKind(v.side)))) {
+      return { error: `Pick the ${openingKind(v.side) === "income" ? "Income" : "Expense"} Category of the money now.` };
+    }
+  }
+
+  type Synced = { kind: "work"; id: string } | { kind: "deleted" } | null;
+  const { result, synced } = await db.transaction(async (tx): Promise<{ result: MoneyResult; synced: Synced }> => {
+    const fail = (error: string) => ({ result: { error }, synced: null });
+    const fields = { who: v.who, amount: v.amount, dueDate: v.dueDate, note: v.note, categoryId: v.categoryId };
+    let debt: typeof s.moneyDebts.$inferSelect;
+    if (v.id) {
+      const paid = await paidSoFar(tx, v.id);
+      if (v.amount < paid) return fail(`${formatAmount(paid, "COP")} is already paid; the amount can't be less.`);
+      const [updated] = await tx.update(s.moneyDebts).set(fields).where(eq(s.moneyDebts.id, v.id)).returning();
+      if (!updated) return fail("That Debt no longer exists.");
+      debt = updated;
+    } else {
+      let openingMovementId: string | null = null;
+      if (v.record) {
+        const [movement] = await tx
+          .insert(s.moneyMovements)
+          .values({
+            kind: openingKind(v.side),
+            amount: v.amount,
+            accountId: v.record.accountId,
+            categoryId: v.record.categoryId,
+            date: v.record.date,
+            note: v.who,
+          })
+          .returning({ id: s.moneyMovements.id });
+        openingMovementId = movement.id;
+      }
+      [debt] = await tx
+        .insert(s.moneyDebts)
+        .values({ ...fields, side: v.side, openingMovementId })
+        .returning();
+    }
+
+    // Its reminder (Q6): one open Secondary Task, on the day chosen.
+    const left = v.amount - (v.id ? await paidSoFar(tx, debt.id) : 0);
+    const title = reminderTitle(v.side, v.who, left);
+    const [reminder] = debt.reminderId
+      ? await tx.select().from(s.secondaryTasks).where(eq(s.secondaryTasks.id, debt.reminderId))
+      : [];
+    const open = reminder && reminder.doneAt === null ? reminder : null;
+    if (open && v.remindOn === null) {
+      await tx.delete(s.secondaryTasks).where(eq(s.secondaryTasks.id, open.id));
+      return { result: null, synced: { kind: "deleted" as const } };
+    }
+    if (open && v.remindOn) {
+      await tx.insert(s.dailyNotes).values({ date: v.remindOn }).onConflictDoNothing();
+      await tx.update(s.secondaryTasks).set({ title, day: v.remindOn }).where(eq(s.secondaryTasks.id, open.id));
+      return { result: null, synced: { kind: "work" as const, id: open.id } };
+    }
+    if (!open && v.remindOn && (!reminder || reminder.day !== v.remindOn)) {
+      await tx.insert(s.dailyNotes).values({ date: v.remindOn }).onConflictDoNothing();
+      const [task] = await tx
+        .insert(s.secondaryTasks)
+        .values({ title, day: v.remindOn })
+        .returning({ id: s.secondaryTasks.id });
+      await tx.update(s.moneyDebts).set({ reminderId: task.id }).where(eq(s.moneyDebts.id, debt.id));
+    }
+    return { result: null, synced: null };
+  });
+  if (result) return result;
+  if (synced?.kind === "work") await syncWork("secondary", [synced.id]);
+  if (synced?.kind === "deleted") await syncDeletions();
+  await done();
+  return null;
+}
+
+/** Its open reminder is done once the Debt is (Q6); otherwise it says what is left now. */
+async function followReminder(tx: Tx, debtId: string): Promise<string | null> {
+  const [debt] = await tx.select().from(s.moneyDebts).where(eq(s.moneyDebts.id, debtId));
+  if (!debt?.reminderId) return null;
+  const left = debt.amount - (await paidSoFar(tx, debtId));
+  const finished = left <= 0 || debt.closedAt !== null;
+  const [task] = await tx
+    .update(s.secondaryTasks)
+    .set(finished ? { doneAt: new Date() } : { title: reminderTitle(debt.side, debt.who, left) })
+    .where(and(eq(s.secondaryTasks.id, debt.reminderId), isNull(s.secondaryTasks.doneAt)))
+    .returning({ id: s.secondaryTasks.id });
+  return task?.id ?? null;
+}
+
+const paymentInput = z.object({
+  debtId: z.uuid(),
+  amount: units,
+  date: isoDate,
+  /** Null: no Account moves, only the Debt goes down (Q11). */
+  accountId: z.uuid().nullable(),
+});
+
+/** Pays (I owe) or collects (Owed to me) part or all of what is left. */
+export async function payDebt(input: z.input<typeof paymentInput>): Promise<MoneyResult> {
+  await requireIvan();
+  const v = paymentInput.parse(input);
+  if (v.accountId && !(await pesoAccount(v.accountId))) return { error: "Pick a peso Account." };
+  let reminder: string | null = null;
+  const result = await db.transaction(async (tx): Promise<MoneyResult> => {
+    const [debt] = await tx.select().from(s.moneyDebts).where(eq(s.moneyDebts.id, v.debtId)).for("update");
+    if (!debt) return { error: "That Debt no longer exists." };
+    const problem = paymentProblem(v.amount, debt.amount - (await paidSoFar(tx, debt.id)));
+    if (problem) return { error: problem };
+    let movementId: string | null = null;
+    if (v.accountId) {
+      const [movement] = await tx
+        .insert(s.moneyMovements)
+        .values({
+          kind: paymentKind(debt.side),
+          amount: v.amount,
+          accountId: v.accountId,
+          categoryId: debt.categoryId,
+          date: v.date,
+          note: debt.who,
+        })
+        .returning({ id: s.moneyMovements.id });
+      movementId = movement.id;
+    }
+    await tx.insert(s.moneyDebtPayments).values({ debtId: debt.id, amount: v.amount, date: v.date, movementId });
+    reminder = await followReminder(tx, debt.id);
+    return null;
+  });
+  if (result) return result;
+  if (reminder) await syncWork("secondary", [reminder]);
+  await done();
+  return null;
+}
+
+/** A payment undone: what it paid is owed again. One that moved an Account takes its movement with it. */
+export async function deleteDebtPayment(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  const [payment] = await db.select().from(s.moneyDebtPayments).where(eq(s.moneyDebtPayments.id, id));
+  if (!payment) return;
+  if (payment.movementId) await db.delete(s.moneyMovements).where(eq(s.moneyMovements.id, payment.movementId));
+  else await db.delete(s.moneyDebtPayments).where(eq(s.moneyDebtPayments.id, id));
+  await done();
+}
+
+/** Closed by hand (forgiven, or it won't be paid): what is left stays unpaid. */
+export async function closeDebt(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  const reminder = await db.transaction(async (tx) => {
+    await tx.update(s.moneyDebts).set({ closedAt: new Date() }).where(eq(s.moneyDebts.id, id));
+    return followReminder(tx, id);
+  });
+  if (reminder) await syncWork("secondary", [reminder]);
+  await done();
+}
+
+export async function reopenDebt(input: { id: string }) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse(input);
+  await db.update(s.moneyDebts).set({ closedAt: null }).where(eq(s.moneyDebts.id, id));
+  await done();
+}
+
+/** It goes with its open reminder; what it moved stays as plain movements. */
+export async function deleteDebt(fd: FormData) {
+  await requireIvan();
+  const { id } = z.object({ id: z.uuid() }).parse({ id: fd.get("id") });
+  await db.transaction(async (tx) => {
+    const [debt] = await tx.delete(s.moneyDebts).where(eq(s.moneyDebts.id, id)).returning();
+    if (debt?.reminderId) {
+      await tx
+        .delete(s.secondaryTasks)
+        .where(and(eq(s.secondaryTasks.id, debt.reminderId), isNull(s.secondaryTasks.doneAt)));
+    }
+  });
+  await syncDeletions();
   await done();
 }
