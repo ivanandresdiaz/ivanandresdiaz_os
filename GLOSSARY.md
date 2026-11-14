@@ -218,3 +218,32 @@ _Evitar_: OTP, PIN, contraseña.
 _Evitar_: agente, asistente, bot.
 
 **Insights**: lo que la IA sacó de una Interview: sus Needs y Proposals, cada una con las palabras literales del Stakeholder y de dónde salió (sus propias palabras, una opción elegida o una reacción a una idea de la IA). Cada Need y cada Proposal tiene una fuerza (Strong, Medium o Weak) según cuánto la respalda lo que el Stakeholder contó; lo Weak es una hipótesis, no un voto. Siempre dicen quién lo dijo; no mezclan a varias personas, y no nombran a terceros: una queja sobre un colega se vuelve una Need del proceso. Salen de Ivan OS solo cuando los copio.
+
+## Dinero
+
+**Account** (Cuenta): un lugar donde tengo dinero (p. ej. el efectivo, Nequi, Bancolombia, la cuenta de ahorro, ZuluTrade). Tiene su saldo en una sola moneda, pesos o dólares. Las creo yo, a medida que las necesito.
+_Evitar_: Wallet, Bank.
+
+**Expense** (Gasto): dinero que sale de una de mis Accounts y deja de ser mío. Siempre tiene su Category.
+_Evitar_: Transaction, Payment, Spending.
+
+**Income** (Ingreso): dinero que llega a una de mis Accounts: el pago de cada quincena o un ingreso extra.
+_Evitar_: Salary, Earning.
+
+**Transfer** (Transferencia): dinero que muevo entre dos de mis Accounts (p. ej. el 1M que paso a la cuenta de ahorro). No es Expense ni Income: sigue siendo mío.
+_Evitar_: Saving, Movement.
+
+**Category** (Categoría): la clase de un Expense, que creo y nombro yo (p. ej. Food, Home, Moto). No existe una Category "Other": si un Expense no encaja, creo la que falta. Una Category con Expenses no se borra; se une a otra.
+_Evitar_: Tag, Type, Other.
+
+**Recurring** (Recurrente): un Expense, un Income o una Transfer que se repite en un día del mes (o cada tantos meses), con su monto (p. ej. el pago de la quincena, el 1M a la cuenta de ahorro). En su día aparece pendiente y lo confirmo con un toque, cambiando el monto si fue distinto, o lo salto ese mes; nunca se registra solo y queda pendiente hasta que haga una de las dos cosas.
+_Evitar_: Automatic, Scheduled.
+
+**Bill** (Gasto fijo): un Recurring que es Expense (p. ej. Internet, el plan del celular, la luz, Home).
+_Evitar_: Subscription, Recurring expense, Fixed cost.
+
+**Savings Account** (Cuenta de ahorro): una Account que marco como ahorro. Lo que le llega por Transfer cuenta como ahorrado en el mes, y lo que saco de ella resta.
+_Evitar_: Stock, Reserve.
+
+**Adjustment** (Ajuste): poner el saldo real de una Account cuando no coincide (p. ej. ZuluTrade bajó por el mercado, o conté el efectivo y falta). Queda la diferencia; no es Expense ni Income y no cuenta en ninguna Category.
+_Evitar_: Correction, Gain, Loss.
