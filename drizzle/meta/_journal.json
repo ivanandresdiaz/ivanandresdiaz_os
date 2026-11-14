@@ -183,6 +183,13 @@
       "when": 1794580108121,
       "tag": "0025_handoff_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794677842374,
+      "tag": "0026_money",
+      "breakpoints": true
     }
   ]
 }

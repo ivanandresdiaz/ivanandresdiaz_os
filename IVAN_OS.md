@@ -851,6 +851,39 @@ Origen: en Vision, Ivan AI improvisaba "imagina un 10" y la gente no entendía q
 **Construido y subido (2026-11-13)**, commit 99986c2. Migración 0025 (`handoff_codes`, `handoff_misses`) aplicada en local y en Neon. Probado en el navegador del lado del Stakeholder: "Tengo un código de Ivan", código incorrecto, código correcto (entra sin correo), el mismo código por segunda vez (no sirve) y el tope de intentos. Sin probar en el navegador: el botón "Code" del editor (pide el login de Google) y la experiencia 10 en una Interview real.
 
 
+## Ronda 59 — Money: dónde se me va el dinero (2026-11-14)
+
+Origen: Ivan planeaba sus finanzas en la nota de Obsidian "Planeación financiera" (Dataview) y registraba el día a día en PennyWallet, que le gusta pero no deja crear Categories propias. Quiere sus finanzas 100 % en Ivan OS, empezando por saber dónde se le va el dinero, y que el sistema crezca con su propio uso. Sus números de junio: 1,81M de gastos fijos + 1M de ahorro por quincena sobre ~2,9M de ingreso.
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q1 | Dónde vive | ✅ 100 % en Ivan OS; la nota de Obsidian se deja. Ivan OS reemplaza a PennyWallet. |
+| Q2 | Primero | ✅ Lo gastado de verdad en el mes. Inversiones (vacas, ZuluTrade como stock), lista de compras, deudas y quién me debe quedan para después. |
+| Q3 | Captura | ✅ En el celular y en el computador, optimizada para el celular: un botón "+" a un toque desde cualquier pantalla. Monto y Category obligatorios, Account recuerda la última, nota opcional, fecha por defecto ahora. |
+| Q4 | Movimientos | ✅ Tres: Expense, Income y Transfer. Sacar del cajero es una Transfer. Sin tarjeta de crédito. |
+| Q5 | Home de ensayo | ✅ Ivan vive con sus padres y planea irse. Home (600k) cuenta como Expense real, como si le pagara a un arrendador. Acepta que el saldo de esa Account en Ivan OS quede por debajo del banco. |
+| Q6 | Sin Budgets | ✅ No hay límites por Category; el mes solo muestra cuánto fue a cada una. |
+| Q7 | Categories | ✅ Las crea Ivan, también desde el "+". No hay "Other" ni lista inicial. Se renombran cuando sea; una con Expenses no se borra, se une a otra. |
+| Q8 | Accounts | ✅ Las crea Ivan a medida que las necesita, con su saldo inicial. Cada una tiene una sola moneda: COP o USD. Una puede marcarse como Savings Account. |
+| Q9 | Monedas | ✅ Una Transfer entre monedas guarda los dos montos; la tasa es la que pasó. El mes suma COP y USD por separado, sin convertir. |
+| Q10 | Recurring | ✅ Expense, Income o Transfer que se repite en un día del mes (o cada N meses). En su día aparece pendiente; se confirma con un toque (cambiando el monto si fue distinto) o se salta ese mes. Nunca se registra solo. Bill es el Recurring que es Expense. La quincena y el 1M al ahorro son Recurrings. |
+| Q11 | Adjustment | ✅ Poner el saldo real de una Account; queda la diferencia, que no es Expense ni Income ni cuenta en una Category. Así se lleva ZuluTrade. |
+| Q12 | El mes | ✅ Arriba Income, Expenses y Saved (con su % del Income, por la regla del 30 %); debajo las Categories de más a menos dinero, y al tocar una, sus Expenses; luego los Recurrings pendientes, los vencidos primero. Mes calendario. |
+| Q13 | Dónde se ve | ✅ Una sección nueva, Money, junto a Week, Month y Plan. No va en el Check-in. La Weekly Review y el costo de los Upkeeps quedan para después. |
+| Q14 | Seguridad | ✅ Sin cifrar, como el resto de Ivan OS. |
+| Q15 | Empezar | ✅ De cero el 30 de noviembre (próxima quincena), sin importar PennyWallet. |
+| Q16 | Rebanadas | ✅ Primera: Accounts, Categories, el "+" (Expense, Income, Transfer) y el mes. Segunda: Recurring y Adjustment. Las dos listas antes del 30 de noviembre. |
+
+
+## Money, rebanada 1 — construida en local (2026-11-14)
+
+Sección Money (`/os/money/<mes>`) en la barra, entre Plan y Learning. Arriba Income, Expenses y Saved (con su % del Income) por moneda; luego "Where it went" (Categories de más a menos, con barra; al tocar una, sus Expenses), Movements del mes (tocar uno lo edita o lo borra), Accounts con su saldo de hoy y Categories (renombrar, unir a otra, borrar si está vacía). En el celular, un "+" redondo flota sobre la barra de abajo en todas las pantallas de Ivan OS; abre el diálogo con el monto enfocado, Categories y Accounts como fichas de un toque, y "+ New" para crear una Category ahí mismo. Recuerda la última Account usada (y el último destino de una Transfer); con una sola Account destino, la elige sola. Una Transfer entre monedas pide lo que llegó.
+
+Migración 0026 (`money_accounts`, `money_categories`, `money_movements`, enums `currency` y `movement_kind`) aplicada en local; pendiente en Neon. Montos en la unidad mínima (pesos, o centavos de dólar). Probado en el navegador en tamaño celular: crear Accounts (COP, Savings, USD con saldo inicial decimal), Expense con Category nueva, Income, Transfer a ahorro (Saved 69 %), Transfer COP → USD, unir una Category; los saldos cuadran. Los datos de prueba se borraron de la base local.
+
+Falta (rebanada 2): Recurring (pendiente → confirmar o saltar) y Adjustment.
+
+
 ## Discoveries — construido en local (2026-11-09)
 
 Rondas 53–54 construidas, sin commit. Migración 0024 aplicada en local; pendiente en Neon.

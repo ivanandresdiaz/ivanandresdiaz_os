@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   date,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -13,6 +15,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -895,3 +898,72 @@ export const interviewFiles = pgTable("interview_files", {
   summary: text("summary").notNull().default(""),
   createdAt: createdAt(),
 });
+
+// ─── Money ───────────────────────────────────────────────────────────────────
+
+export const currency = pgEnum("currency", ["COP", "USD"]);
+export const movementKind = pgEnum("movement_kind", ["expense", "income", "transfer"]);
+
+/** Amounts are whole numbers in the currency's smallest unit: pesos, or cents of a dollar. */
+const money = (name: string) => bigint(name, { mode: "number" });
+
+/** A place where Ivan has money, in one currency. Transfers into a Savings Account count as saved. */
+export const moneyAccounts = pgTable(
+  "money_accounts",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    currency: currency("currency").notNull(),
+    savings: boolean("savings").notNull().default(false),
+    /** What it held when Ivan started counting it here. */
+    openingBalance: money("opening_balance").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("money_accounts_name").on(sql`lower(${t.name})`)],
+);
+
+/** The class of an Expense, named by Ivan. There is no "Other". */
+export const moneyCategories = pgTable(
+  "money_categories",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("money_categories_name").on(sql`lower(${t.name})`)],
+);
+
+/**
+ * An Expense, an Income or a Transfer. `accountId` is where the money leaves
+ * (Expense, Transfer) or arrives (Income); a Transfer also says where it
+ * arrived and how much, in that Account's currency. Accounts and Categories
+ * with movements can't be deleted: a Category is merged into another instead.
+ */
+export const moneyMovements = pgTable(
+  "money_movements",
+  {
+    id: id(),
+    kind: movementKind("kind").notNull(),
+    date: isoDate("date").notNull(),
+    amount: money("amount").notNull(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => moneyAccounts.id, { onDelete: "restrict" }),
+    toAccountId: uuid("to_account_id").references(() => moneyAccounts.id, { onDelete: "restrict" }),
+    toAmount: money("to_amount"),
+    categoryId: uuid("category_id").references(() => moneyCategories.id, { onDelete: "restrict" }),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("money_movements_date").on(t.date),
+    check("money_movement_amount", sql`${t.amount} > 0`),
+    check(
+      "money_movement_shape",
+      sql`(${t.kind} = 'expense' and ${t.categoryId} is not null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'income' and ${t.categoryId} is null and ${t.toAccountId} is null and ${t.toAmount} is null)
+        or (${t.kind} = 'transfer' and ${t.categoryId} is null and ${t.toAccountId} is not null
+            and ${t.toAccountId} <> ${t.accountId} and ${t.toAmount} > 0)`,
+    ),
+  ],
+);

@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { auth, isAllowedEmail } from "@/auth";
 import { CycleBadge } from "@/components/cycle-badge";
+import { MoneyFab } from "@/components/money-add";
 import { OsNav } from "@/components/os-nav";
 import { PwaSetup } from "@/components/pwa";
 import { getActiveCycle } from "@/server/queries";
@@ -35,10 +36,11 @@ export default function OsLayout({ children }: LayoutProps<"/os">) {
           Profile
         </Link>
       </header>
-      {/* On a phone the bottom bar covers the last 3.5rem; leave room to scroll past it. */}
-      <main className="flex flex-1 flex-col gap-4 p-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-4">
+      {/* On a phone the bottom bar and the Money "+" above it cover the last 7.25rem; leave room to scroll past them. */}
+      <main className="flex flex-1 flex-col gap-4 p-4 pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-4">
         <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>{children}</Suspense>
       </main>
+      <MoneyFab />
       <OsNav placement="bottom" />
     </div>
   );

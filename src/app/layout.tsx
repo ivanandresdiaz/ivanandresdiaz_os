@@ -38,7 +38,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // On a phone, what scrolls into view (a focused field, a button) stops above the OS bottom bar and its "+".
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased max-md:scroll-pb-[calc(8rem+env(safe-area-inset-bottom))]`}
     >
       <body className="min-h-full flex flex-col font-sans">
         {children}
