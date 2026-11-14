@@ -64,7 +64,7 @@ _Evitar_: Capa.
 **Season Goal** (Objetivo de Temporada): un objetivo estratégico que dura lo que dura la Season (p. ej. "make 30,000"). De él salen las Campaigns.
 _Evitar_: Meta.
 
-**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). El Goal es un resultado, no un tema: "deploy Mi Tierra on GCP", no "learn GCP". Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS. Ivan ordena las Campaigns de cada Quarter por prioridad, y su trabajo aparece en ese orden. La prioridad no sigue el orden de los Season Goals. Las candidatas del Backlog también tienen prioridad. Una candidata es solo una idea para un Quarter futuro: no toca la semana, y sus Moves se eligen para una semana solo cuando se activa.
+**Campaign** (Campaña): un objetivo de 3 meses dentro de un Quarter, que sirve a un Season Goal. Se escribe en formato GPS: Goal (qué), Why y Anti-goal (lo que se evita y las restricciones). El Goal es un resultado, no un tema: "deploy Mi Tierra on GCP", no "learn GCP". Declara en qué tipo de Container Block se juega. Ejemplo: build Ivan OS. Ivan ordena las Campaigns de cada Quarter por prioridad, y su trabajo aparece en ese orden. La prioridad no sigue el orden de los Season Goals. Las candidatas del Backlog también tienen prioridad. Una candidata es solo una idea para un Quarter futuro: no toca la semana, y sus Moves se eligen para una semana solo cuando se activa. Lo que gasto o recibo por ella se ve en su página, como registro, no como presupuesto.
 _Evitar_: Movimiento, Meta, Rank.
 
 **Move** (Jugada): un paso concreto de una Campaign que cabe en una semana (p. ej. SSO login). Se elige en la Weekly Review. Si no tiene Tasks, se arrastra directo al calendario. Ivan ordena los Moves de cada Campaign por prioridad, y su trabajo aparece en ese orden.
@@ -224,16 +224,16 @@ _Evitar_: agente, asistente, bot.
 **Account** (Cuenta): un lugar donde tengo dinero (p. ej. el efectivo, Nequi, Bancolombia, la cuenta de ahorro, ZuluTrade). Tiene su saldo en una sola moneda, pesos o dólares. Las creo yo, a medida que las necesito.
 _Evitar_: Wallet, Bank.
 
-**Expense** (Gasto): dinero que sale de una de mis Accounts y deja de ser mío. Siempre tiene su Category.
+**Expense** (Gasto): dinero que sale de una de mis Accounts y deja de ser mío. Siempre tiene su Category. Puede servir a una o varias Campaigns, o a ninguna.
 _Evitar_: Transaction, Payment, Spending.
 
-**Income** (Ingreso): dinero que llega a una de mis Accounts: el pago de cada quincena o un ingreso extra.
+**Income** (Ingreso): dinero que llega a una de mis Accounts: el pago de cada quincena o un ingreso extra. Tiene su Category de Income. Puede servir a una o varias Campaigns, o a ninguna.
 _Evitar_: Salary, Earning.
 
 **Transfer** (Transferencia): dinero que muevo entre dos de mis Accounts (p. ej. el 1M que paso a la cuenta de ahorro). No es Expense ni Income: sigue siendo mío.
 _Evitar_: Saving, Movement.
 
-**Category** (Categoría): la clase de un Expense, que creo y nombro yo (p. ej. Food, Home, Moto). No existe una Category "Other": si un Expense no encaja, creo la que falta. Una Category con Expenses no se borra; se une a otra.
+**Category** (Categoría): la clase de un Expense o de un Income, que creo y nombro yo (p. ej. Food, Home, Moto; Salary, Freelance). Las de Expense y las de Income son aparte: una Category es de una sola clase y solo se une a otra de la misma. No existe una Category "Other": si algo no encaja, creo la que falta. Una Category con movimientos no se borra; se une a otra.
 _Evitar_: Tag, Type, Other.
 
 **Recurring** (Recurrente): un Expense, un Income o una Transfer que se repite en un día del mes (o cada tantos meses), con su monto (p. ej. el pago de la quincena, el 1M a la cuenta de ahorro). En su día aparece pendiente y lo confirmo con un toque, cambiando el monto si fue distinto, o lo salto ese mes; nunca se registra solo y queda pendiente hasta que haga una de las dos cosas.

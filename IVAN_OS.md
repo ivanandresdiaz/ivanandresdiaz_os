@@ -902,6 +902,35 @@ Migración 0027 (`money_recurrings`, `money_recurring_occurrences`, `money_adjus
 | Q2 | Montos | ✅ Los campos de dinero no aceptan texto: solo dígitos, punto y coma; los saldos (inicial y real) además un menos al inicio. |
 | Q3 | Receipts | ✅ Fotos o PDFs que respaldan un movimiento (factura, comprobante). Varios por movimiento (hasta 10), en cualquier movimiento, no solo Expenses. Se adjuntan desde el mismo diálogo del "+", antes de guardar o después al abrir el movimiento; confirmar un Recurring con un toque no adjunta. Sin comprimir, hasta 10 MB cada uno. 📎 en la lista. Borrar el movimiento borra sus Receipts. Privados en R2 (links firmados), sin cifrar. |
 
+## Ronda 61 — Money: pestañas, torta y Campaigns (2026-11-14)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q1 | Pestañas | ✅ Bajo el resumen del mes: Movements, Recurrings, Accounts, Categories. Abre en Movements; la pestaña queda en la URL. |
+| Q2 | Recurrings pendientes | ✅ Los pendientes siguen arriba de las pestañas; la pestaña Recurrings muestra cuántos hay pendientes. |
+| Q3 | Torta | ✅ "Where it went" pasa a ser una dona con su lista (color, total, cuántos), entre el resumen y las pestañas. Tocar una tajada o una fila abre sus Expenses. |
+| Q4 | Dólares | ✅ La dona es solo en pesos; no hay dona de dólares. Los Expenses en dólares siguen en Movements y la línea de dólares del resumen se queda como está. |
+| Q5 | Tajadas | ✅ Cada Category es su tajada; no hay "Rest". |
+| Q6 | Campaigns, no Tags | ✅ Un Expense o un Income sirve a una o varias Campaigns, o a ninguna. No hay Tags libres. |
+| Q7 | Qué movimientos | ✅ Expense e Income; una Transfer no. Un Recurring lleva sus Campaigns y cada ocurrencia confirmada las hereda (se pueden cambiar al confirmar). |
+| Q8 | Cuáles Campaigns | ✅ Solo las activas al elegir. Si una Campaign pasa a Done o Dropped, sus movimientos conservan el vínculo. |
+| Q9 | Para qué | ✅ Ver lo que he hecho por la Campaign y alinear gastos e inversiones. Registro, no lógica dura: sin presupuesto ni ROI. |
+| Q11 | Página de la Campaign | ✅ Sección Money con sus Expenses e Incomes de todos los meses, el más reciente primero, y dos totales en pesos: Spent y Came in. Si no hay nada, la sección no aparece. |
+| Q12 | Elegirlas | ✅ Campo opcional "Campaigns" bajo Category: chips de las Campaigns activas en su orden de prioridad, varias a la vez. También al crear o editar un Recurring y al confirmar una ocurrencia. |
+| Q13 | En Money | ✅ Cada fila de Movements muestra sus Campaigns en texto pequeño junto a la Category. Sin filtro por Campaign por ahora. |
+| Q14 | Borrar | ✅ Borrar una Campaign quita sus vínculos y los movimientos quedan. Borrar un movimiento quita solo sus vínculos. |
+| Q16 | Torta de Income | ✅ El Income tiene sus propias Categories (Salary, Freelance…), aparte de las de Expense, y es obligatoria al crear o editar. La dona cambia entre Expenses e Income ("Where it came from"), en pesos. El Income que ya existía sin Category sale en gris como "No Category" hasta ponérsela; no se adivina por él. La pestaña Categories muestra las dos listas; unir solo dentro de la misma clase. |
+
+## Money, pestañas, torta y Campaigns — construido en local (2026-11-14)
+
+Ronda 61 construida, sin commit. Migraciones 0029 (`money_movement_campaigns`, `money_recurring_campaigns`, solo tablas nuevas) y 0030 (`money_categories.kind`, nombre único por clase, y el Income puede llevar Category; solo afloja reglas) aplicadas en local; pendientes en Neon. En Neon hay 1 Income y 2 Recurrings de Income sin Category: saldrán como "No Category" hasta que Ivan les ponga una.
+
+- **Money**: bajo el resumen, los Recurrings pendientes ("To confirm · N"), luego "Where it went" como dona en pesos (una tajada por Category, colores validados para daltonismo en claro y oscuro, gris desde la novena) con su lista; tocar una tajada o una fila atenúa las demás, pone su total al centro y abre sus Expenses. Después, las pestañas Movements, Recurrings (con cuántos hay pendientes), Accounts y Categories; la pestaña queda en la URL (`?tab=`) y las flechas de mes la conservan.
+- **Campaigns**: campo "Campaigns · optional" en el diálogo para Expense e Income (no Transfer), con las Campaigns activas por prioridad (el Quarter más nuevo primero) y las ya vinculadas aunque estén Done o Dropped. También al crear o editar un Recurring; confirmar con un toque copia las del Recurring. En Movements, los nombres van junto a la Category.
+- **Página de la Campaign** (el drawer del Plan): sección Money con Spent y Came in en pesos y sus movimientos de todos los meses; cada fila abre su mes en Money. No aparece si nada la sirve.
+- **Income Categories** (Q16): el diálogo muestra las Categories de la clase elegida y "+ New" crea una de esa clase. La dona tiene un selector Expenses / Income. Probado: Income con Category nueva, el viejo sin Category pide una al guardarlo, la dona de Income con su gris, y las dos listas en Categories.
+- **Probado en el navegador** (ancho de teléfono, claro y oscuro, contra el 3200): dona y lista, tocar tajada, pestañas y URL, Expense con dos Campaigns, Recurring con Campaign confirmado con un toque (heredó la Campaign), Income con Campaign, drawer de "Build Ivan OS" con sus totales. Los datos de prueba se borraron; "Personal" y el Expense "1 · FF" de Ivan quedaron.
+
 ## Money, Receipts — Subida (2026-11-14), commit f9dbfd5, 0028 en Neon
 
 "Receipts" en el diálogo del movimiento (no en el de un Recurring): "Attach photo or PDF" abre la cámara, las fotos o un PDF en el celular. Cada archivo sube a R2 al elegirlo ("Uploading…" → "✓ Attaches on save") y queda en el movimiento al guardar; Save espera a que terminen. Los ya adjuntos muestran miniatura (JPEG, PNG, WebP) y se abren en otra pestaña; "Remove" los tacha y se quitan al guardar ("Keep" lo deshace). Cerrar sin guardar borra de R2 lo recién subido. En Movements, un clip junto al movimiento (con el número si son varios).
