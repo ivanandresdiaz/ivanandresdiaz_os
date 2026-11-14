@@ -65,12 +65,15 @@ export function AddMovementButton() {
 function Opener({
   target,
   draft,
+  startKind,
   children,
   className,
   title,
 }: {
   target: Target;
   draft?: Draft;
+  /** For a new one: the kind it opens on. */
+  startKind?: MovementKind;
   children: React.ReactNode;
   className?: string;
   title?: string;
@@ -81,7 +84,7 @@ function Opener({
       <button type="button" className={className} onClick={() => setOpen(true)} title={title}>
         {children}
       </button>
-      {open && <MovementDialog target={target} initial={draft} onClose={() => setOpen(false)} />}
+      {open && <MovementDialog target={target} initial={draft} startKind={startKind} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -111,9 +114,21 @@ export function ConfirmWithChanges({ occurrence, children, className }: { occurr
 }
 
 /** Creates a Recurring, or opens one to change or stop it. */
-export function RecurringButton({ recurring, children, className }: { recurring?: RecurringView; children: React.ReactNode; className?: string }) {
+export function RecurringButton({
+  recurring,
+  kind,
+  children,
+  className,
+}: {
+  recurring?: RecurringView;
+  /** For a new one: the kind it opens on. */
+  kind?: MovementKind;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <Opener
+      startKind={kind}
       target={{ type: "recurring", id: recurring?.id, name: recurring?.name }}
       draft={recurring && { ...recurring, note: recurring.name, date: recurring.firstDate }}
       className={className}
@@ -174,10 +189,12 @@ function Chip({ selected, onClick, children }: { selected: boolean; onClick: () 
 function MovementDialog({
   target = { type: "movement" },
   initial,
+  startKind = "expense",
   onClose,
 }: {
   target?: Target;
   initial?: Draft;
+  startKind?: MovementKind;
   onClose: () => void;
 }) {
   const isRule = target.type === "recurring";
@@ -188,7 +205,7 @@ function MovementDialog({
   const [lastAccount, setLastAccount] = useRemembered("money:account");
   const [lastToAccount, setLastToAccount] = useRemembered("money:to-account");
 
-  const [kind, setKind] = useState<MovementKind>(initial?.kind ?? "expense");
+  const [kind, setKind] = useState<MovementKind>(initial?.kind ?? startKind);
   const [amount, setAmount] = useState(initial ? amountInput(initial.amount, initial.currency) : "");
   const [accountId, setAccountId] = useState<string | null>(initial?.accountId ?? null);
   const [toAccountId, setToAccountId] = useState<string | null>(initial?.toAccountId ?? null);

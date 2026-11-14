@@ -244,6 +244,37 @@ function arc(start: number, end: number): string {
   ].join(" ");
 }
 
+/** A small switch between a few options, like Expense / Income in the "+". */
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: { value: T; label: React.ReactNode }[];
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg bg-background p-0.5" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex min-h-8 items-center gap-1 rounded-md px-2.5 text-xs whitespace-nowrap ${
+            value === o.value ? "bg-surface font-medium shadow-sm" : "text-muted hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const sliceKey = (c: CategoryMonthView) => c.categoryId ?? "none";
 
 /**
@@ -272,24 +303,18 @@ function WhereItWent({
     <Section
       title={side === "expense" ? "Where it went" : "Where it came from"}
       aside={
-        <div className="flex items-center gap-0.5 rounded-lg bg-background p-0.5" role="group" aria-label="Show">
-          {(["expense", "income"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={side === s}
-              onClick={() => {
-                setSide(s);
-                setOpen(null);
-              }}
-              className={`min-h-8 rounded-md px-2.5 text-xs ${
-                side === s ? "bg-surface font-medium shadow-sm" : "text-muted hover:text-foreground"
-              }`}
-            >
-              {s === "expense" ? "Expenses" : "Income"}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Show"
+          value={side}
+          options={[
+            { value: "expense", label: "Expenses" },
+            { value: "income", label: "Income" },
+          ]}
+          onChange={(s) => {
+            setSide(s);
+            setOpen(null);
+          }}
+        />
       }
     >
       {pesos.length === 0 ? (
@@ -495,9 +520,16 @@ function flowLine(f: Pick<RecurringView, "kind" | "accountName" | "toAccountName
   return `${f.accountName} → ${f.toAccountName ?? "?"}`;
 }
 
+const KIND_PLURAL: Record<MovementView["kind"], string> = {
+  expense: "Expenses",
+  income: "Income",
+  transfer: "Transfers",
+};
+
 /**
  * The Recurrings tab (Q2): what is coming this month and what was confirmed or
- * skipped, then every Recurring to change or stop. What is pending asks above the tabs.
+ * skipped, then every Recurring to change or stop, one kind at a time. What is
+ * pending asks above the tabs.
  */
 function Recurrings({
   occurrences,
@@ -508,51 +540,84 @@ function Recurrings({
   recurrings: RecurringView[];
   today: IsoDate;
 }) {
-  const settled = occurrences.filter((o) => o.state !== "pending");
+  const [kind, setKind] = useState<MovementView["kind"]>("expense");
+  const ofKind = recurrings.filter((r) => r.kind === kind);
+  const settled = occurrences.filter((o) => o.state !== "pending" && o.recurring.kind === kind);
+  const waiting = occurrences.filter((o) => o.state === "pending" && o.recurring.kind === kind).length;
+  const word = KIND_PLURAL[kind].toLowerCase();
+
   return (
     <>
-      <Section title="This month" aside={<RecurringButton className="btn">+ Recurring</RecurringButton>}>
-        {recurrings.length === 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Segmented
+          label="Kind"
+          value={kind}
+          options={(["expense", "income", "transfer"] as const).map((k) => {
+            const n = recurrings.filter((r) => r.kind === k).length;
+            return {
+              value: k,
+              label: (
+                <>
+                  {KIND_PLURAL[k]}
+                  {n > 0 && <span className="text-muted tabular-nums">{n}</span>}
+                </>
+              ),
+            };
+          })}
+          onChange={setKind}
+        />
+        <RecurringButton kind={kind} className="btn">
+          + Recurring
+        </RecurringButton>
+      </div>
+
+      {recurrings.length === 0 ? (
+        <Section title="Recurrings">
           <p className="text-sm text-muted">
             Your pay, the transfer to savings, your Bills: add each once. On its day it asks; you confirm or skip.
           </p>
-        )}
-        {recurrings.length > 0 && occurrences.length === 0 && <p className="text-sm text-muted">Nothing due this month.</p>}
-        {occurrences.length > 0 && settled.length === 0 && (
-          <p className="text-sm text-muted">Only what is waiting above, to confirm.</p>
-        )}
-        <ul className="flex flex-col gap-1">
-          {settled.map((o) => (
-            <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
-          ))}
-        </ul>
-      </Section>
-      {recurrings.length > 0 && (
-        <Section title={`All Recurrings · ${recurrings.length}`}>
-          <ul className="flex flex-col">
-            {recurrings.map((r) => (
-              <li key={r.id}>
-                <RecurringButton
-                  recurring={r}
-                  className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{r.name}</span>
-                    <span className="block truncate text-xs text-muted">
-                      {r.schedule} · {flowLine(r)}
-                      {r.campaigns.length > 0 && ` · ${r.campaigns.map((c) => c.title).join(", ")}`}
-                      {r.next && ` · next ${shortDate(r.next.due, today)}`}
-                    </span>
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {flowSign(r.kind)}
-                    {formatAmount(r.amount, r.currency)}
-                  </span>
-                </RecurringButton>
-              </li>
-            ))}
-          </ul>
         </Section>
+      ) : (
+        <>
+          <Section title="This month">
+            {settled.length === 0 && (
+              <p className="text-sm text-muted">
+                {waiting > 0 ? "Only what is waiting above, to confirm." : `No ${word} due this month.`}
+              </p>
+            )}
+            <ul className="flex flex-col gap-1">
+              {settled.map((o) => (
+                <OccurrenceRow key={`${o.recurring.id}:${o.month}`} occurrence={o} today={today} />
+              ))}
+            </ul>
+          </Section>
+          <Section title={`All Recurrings · ${ofKind.length}`}>
+            {ofKind.length === 0 && <p className="text-sm text-muted">No recurring {word} yet.</p>}
+            <ul className="flex flex-col">
+              {ofKind.map((r) => (
+                <li key={r.id}>
+                  <RecurringButton
+                    recurring={r}
+                    className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-background"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{r.name}</span>
+                      <span className="block truncate text-xs text-muted">
+                        {r.schedule} · {flowLine(r)}
+                        {r.campaigns.length > 0 && ` · ${r.campaigns.map((c) => c.title).join(", ")}`}
+                        {r.next && ` · next ${shortDate(r.next.due, today)}`}
+                      </span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {flowSign(r.kind)}
+                      {formatAmount(r.amount, r.currency)}
+                    </span>
+                  </RecurringButton>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </>
       )}
     </>
   );
