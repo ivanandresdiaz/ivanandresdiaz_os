@@ -20,6 +20,7 @@ import {
   type OccurrenceState,
   type Resolutions,
 } from "@/domain/recurring";
+import { presignView } from "@/lib/r2";
 
 export type AccountView = AccountRef & {
   name: string;
@@ -45,7 +46,8 @@ type Flow = {
   categoryId: string | null;
   categoryName: string | null;
 };
-export type MovementView = Flow & { id: string; date: IsoDate; note: string | null };
+export type ReceiptView = { id: string; name: string; contentType: string; url: string };
+export type MovementView = Flow & { id: string; date: IsoDate; note: string | null; receipts: ReceiptView[] };
 export type RecurringView = Flow & {
   id: string;
   name: string;
@@ -204,6 +206,7 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     id: m.id,
     date: m.date,
     note: m.note,
+    receipts: [],
   });
   const movements = monthRows.map(movementView);
 
@@ -240,6 +243,8 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     const rows = await db.select().from(s.moneyMovements).where(inArray(s.moneyMovements.id, missing));
     for (const row of rows) confirmed.set(row.id, movementView(row));
   }
+  await addReceipts([...confirmed.values()]);
+
   const occurrences: OccurrenceView[] = occurrenceList.map((o) => ({
     recurring: recurringMap.get(o.recurringId)!,
     month: o.month,
@@ -268,6 +273,21 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
     recurrings,
     occurrences,
   };
+}
+
+/** Fills in each movement's Receipts, with a link to open each one. */
+async function addReceipts(movements: MovementView[]) {
+  if (movements.length === 0) return;
+  const byId = new Map(movements.map((m) => [m.id, m]));
+  const rows = await db
+    .select()
+    .from(s.moneyReceipts)
+    .where(inArray(s.moneyReceipts.movementId, [...byId.keys()]))
+    .orderBy(asc(s.moneyReceipts.createdAt));
+  const links = await Promise.all(rows.map((r) => presignView(r.key)));
+  rows.forEach((r, i) => {
+    byId.get(r.movementId)!.receipts.push({ id: r.id, name: r.name, contentType: r.contentType, url: links[i] });
+  });
 }
 
 /** One Account's balance right now, for an Adjustment. */

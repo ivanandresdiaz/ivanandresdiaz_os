@@ -1038,3 +1038,20 @@ export const moneyAdjustments = pgTable(
   },
   (t) => [index("money_adjustments_date").on(t.date), check("money_adjustment_delta", sql`${t.delta} <> 0`)],
 );
+
+/** A photo or PDF that backs a movement (an invoice, a payment proof), stored in R2. */
+export const moneyReceipts = pgTable(
+  "money_receipts",
+  {
+    id: id(),
+    movementId: uuid("movement_id")
+      .notNull()
+      .references(() => moneyMovements.id, { onDelete: "cascade" }),
+    key: text("key").notNull().unique(),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("money_receipts_movement").on(t.movementId)],
+);

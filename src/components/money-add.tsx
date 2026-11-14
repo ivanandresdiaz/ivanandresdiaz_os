@@ -21,8 +21,9 @@ import {
   saveMovement,
   saveRecurring,
 } from "@/server/money-actions";
-import type { MoneyChoices, MovementView, OccurrenceView, RecurringView } from "@/server/money";
+import type { MoneyChoices, MovementView, OccurrenceView, ReceiptView, RecurringView } from "@/server/money";
 import { ConfirmDelete, keepEvents } from "./confirm-delete";
+import { ReceiptsField, useReceipts } from "./money-receipts";
 import { useRemembered } from "./use-remembered";
 
 const KIND_LABEL: Record<MovementKind, string> = { expense: "Expense", income: "Income", transfer: "Transfer" };
@@ -143,6 +144,7 @@ type Draft = {
   note: string | null;
   date: string;
   everyMonths?: number;
+  receipts?: ReceiptView[];
 };
 
 type Choices = MoneyChoices & { today: string };
@@ -201,6 +203,7 @@ function MovementDialog({
   const [newCategory, setNewCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const receipts = useReceipts(initial?.receipts);
 
   useEffect(() => {
     if (!dialog.current?.open) dialog.current?.showModal();
@@ -260,6 +263,7 @@ function MovementDialog({
     if (crossCurrency && toUnits === null) return setError(`Say how much arrived, in ${to!.currency}.`);
     if (isRule && !note.trim()) return setError("Give it a name, e.g. Internet.");
     if (isRule && !isValidEvery(Number(every))) return setError(`Repeat every 1 to ${MAX_EVERY_MONTHS} months.`);
+    if (!isRule && receipts.uploading) return setError("Wait for the files to finish uploading.");
     const flow = {
       kind,
       amount: units,
@@ -279,8 +283,10 @@ function MovementDialog({
               note,
               occurrence:
                 target.type === "occurrence" ? { recurringId: target.recurringId, month: target.month } : undefined,
+              receipts: receipts.payload(),
             });
       if (result) return setError(result.error);
+      receipts.markSaved();
       if (target.type === "movement" && !target.id) {
         setLastAccount(from.id);
         if (kind === "transfer" && to) setLastToAccount(to.id);
@@ -305,7 +311,10 @@ function MovementDialog({
       <dialog
         ref={dialog}
         aria-label={title}
-        onClose={onClose}
+        onClose={() => {
+          receipts.discardUnsaved();
+          onClose();
+        }}
         onClick={(event) => event.target === event.currentTarget && dialog.current?.close()}
         className="m-auto max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-line bg-surface p-0 text-foreground shadow-xl backdrop:bg-black/40"
       >
@@ -489,6 +498,8 @@ function MovementDialog({
             </label>
           )}
 
+          {!isRule && <ReceiptsField receipts={receipts} />}
+
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex items-center gap-2">
@@ -525,7 +536,10 @@ function MovementDialog({
             <button type="button" className="btn" onClick={() => dialog.current?.close()}>
               Cancel
             </button>
-            <button className="btn-primary min-h-9 px-4" disabled={pending || !choices || accounts.length === 0 || !date}>
+            <button
+              className="btn-primary min-h-9 px-4"
+              disabled={pending || !choices || accounts.length === 0 || !date || (!isRule && receipts.uploading)}
+            >
               {pending ? "Saving…" : target.type === "occurrence" ? "Confirm" : "Save"}
             </button>
           </div>

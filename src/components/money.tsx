@@ -38,6 +38,7 @@ import type {
 } from "@/server/money";
 import { ConfirmDelete } from "./confirm-delete";
 import { ConfirmWithChanges, EditMovement, RecurringButton } from "./money-add";
+import { ClipIcon } from "./money-receipts";
 import { shortDate } from "./upkeeps";
 
 function Section({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
@@ -173,7 +174,18 @@ function MovementRow({ movement: m, today, hideCategory }: { movement: MovementV
       >
         <span className="w-20 shrink-0 text-xs text-muted">{shortDate(m.date, today)}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate">{describe(m, hideCategory)}</span>
+          <span className="flex items-center gap-1">
+            <span className="truncate">{describe(m, hideCategory)}</span>
+            {m.receipts.length > 0 && (
+              <span
+                className="flex shrink-0 items-center gap-0.5 text-xs text-muted"
+                title={`${m.receipts.length} ${m.receipts.length === 1 ? "Receipt" : "Receipts"}`}
+              >
+                <ClipIcon className="size-3.5" />
+                {m.receipts.length > 1 && m.receipts.length}
+              </span>
+            )}
+          </span>
           {m.note && <span className="block truncate text-xs text-muted">{m.note}</span>}
         </span>
         <span className={`shrink-0 tabular-nums ${m.kind === "income" ? "text-green-700 dark:text-green-500" : ""}`}>

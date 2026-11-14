@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -15,7 +15,15 @@ import {
   movementProblem,
   type MovementKind,
 } from "@/domain/money";
+import {
+  isReceiptKey,
+  MAX_RECEIPT_NAME,
+  MAX_RECEIPTS,
+  receiptKey,
+  receiptProblem,
+} from "@/domain/receipts";
 import { dueDateIn, MAX_EVERY_MONTHS } from "@/domain/recurring";
+import { deleteObject, objectSize, presignUpload } from "@/lib/r2";
 import { requireIvan } from "@/lib/session";
 import { today } from "@/lib/today";
 import { getAccountBalance, getMoneyChoices, type MoneyChoices } from "./money";
@@ -284,6 +292,8 @@ export async function deleteCategory(fd: FormData) {
 
 // ─── Movements ───────────────────────────────────────────────────────────────
 
+const receiptKeyInput = z.string().refine(isReceiptKey, "Not a Receipt");
+
 const movementInput = z.object({
   id: z.uuid().optional(),
   ...flowInput,
@@ -291,7 +301,67 @@ const movementInput = z.object({
   note,
   /** Confirming a Recurring with what really happened: it settles that month's occurrence. */
   occurrence: z.object({ recurringId: z.uuid(), month: isoMonth }).optional(),
+  /** Receipts already uploaded to attach, and attached ones to take off. */
+  receipts: z
+    .object({
+      add: z
+        .array(z.object({ key: receiptKeyInput, name: z.string().trim().min(1).max(MAX_RECEIPT_NAME), contentType: z.string() }))
+        .max(MAX_RECEIPTS),
+      remove: z.array(z.uuid()).max(MAX_RECEIPTS),
+    })
+    .optional(),
 });
+
+type ReceiptRow = Omit<typeof s.moneyReceipts.$inferInsert, "movementId">;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** A signed link to upload one Receipt straight from the browser; it is attached when the movement is saved. */
+export async function createReceiptUpload(input: {
+  contentType: string;
+  size: number;
+}): Promise<{ error: string } | { key: string; uploadUrl: string }> {
+  await requireIvan();
+  const v = z.object({ contentType: z.string(), size: z.number().int() }).parse(input);
+  const problem = receiptProblem(v);
+  if (problem) return { error: problem };
+  const key = receiptKey(crypto.randomUUID(), v.contentType);
+  return { key, uploadUrl: await presignUpload(key) };
+}
+
+/** Uploads Ivan let go of before saving: deleted, unless a movement already holds them. */
+export async function discardReceiptUploads(input: { keys: string[] }) {
+  await requireIvan();
+  const { keys } = z.object({ keys: z.array(receiptKeyInput).max(MAX_RECEIPTS) }).parse(input);
+  if (keys.length === 0) return;
+  const held = await db
+    .select({ key: s.moneyReceipts.key })
+    .from(s.moneyReceipts)
+    .where(inArray(s.moneyReceipts.key, keys));
+  const kept = new Set(held.map((r) => r.key));
+  await Promise.all(keys.filter((k) => !kept.has(k)).map((k) => deleteObject(k)));
+}
+
+/** Each uploaded file is really there and is a photo or PDF of the right size. */
+async function checkUploads(
+  add: { key: string; name: string; contentType: string }[],
+): Promise<{ error: string } | { rows: ReceiptRow[] }> {
+  const rows: ReceiptRow[] = [];
+  for (const file of add) {
+    const size = await objectSize(file.key);
+    if (size === null) return { error: `${file.name} didn't finish uploading. Attach it again.` };
+    const problem = receiptProblem({ contentType: file.contentType, size });
+    if (problem) {
+      await deleteObject(file.key);
+      return { error: `${file.name}: ${problem}` };
+    }
+    rows.push({ key: file.key, name: file.name, contentType: file.contentType, sizeBytes: size });
+  }
+  return { rows };
+}
+
+async function attach(tx: Tx, movementId: string, rows: ReceiptRow[]) {
+  if (rows.length > 0) await tx.insert(s.moneyReceipts).values(rows.map((r) => ({ ...r, movementId })));
+}
 
 /** Adds a movement, or changes it when it has an `id`. Only what its kind uses is kept. */
 export async function saveMovement(input: z.input<typeof movementInput>): Promise<MoneyResult> {
@@ -300,15 +370,41 @@ export async function saveMovement(input: z.input<typeof movementInput>): Promis
   const checked = await checkFlow(v);
   if ("error" in checked) return checked;
   const row = { ...checked.flow, date: v.date, note: v.note };
+  const add = v.receipts?.add ?? [];
+  const remove = v.receipts?.remove ?? [];
 
+  if (add.length > 0) {
+    const [held] = v.id
+      ? await db.select({ n: count() }).from(s.moneyReceipts).where(eq(s.moneyReceipts.movementId, v.id))
+      : [{ n: 0 }];
+    if (held.n - remove.length + add.length > MAX_RECEIPTS) return { error: `Up to ${MAX_RECEIPTS} Receipts each.` };
+  }
+  const uploads = await checkUploads(add);
+  if ("error" in uploads) return uploads;
+
+  let removed: { key: string }[] = [];
   if (v.id) {
-    await db.update(s.moneyMovements).set(row).where(eq(s.moneyMovements.id, v.id));
+    const id = v.id;
+    await db.transaction(async (tx) => {
+      await tx.update(s.moneyMovements).set(row).where(eq(s.moneyMovements.id, id));
+      await attach(tx, id, uploads.rows);
+      if (remove.length > 0) {
+        removed = await tx
+          .delete(s.moneyReceipts)
+          .where(and(eq(s.moneyReceipts.movementId, id), inArray(s.moneyReceipts.id, remove)))
+          .returning({ key: s.moneyReceipts.key });
+      }
+    });
   } else if (v.occurrence) {
-    const settled = await settle(v.occurrence.recurringId, v.occurrence.month, row);
+    const settled = await settle(v.occurrence.recurringId, v.occurrence.month, row, uploads.rows);
     if (settled) return settled;
   } else {
-    await db.insert(s.moneyMovements).values(row);
+    await db.transaction(async (tx) => {
+      const [movement] = await tx.insert(s.moneyMovements).values(row).returning({ id: s.moneyMovements.id });
+      await attach(tx, movement.id, uploads.rows);
+    });
   }
+  await Promise.all(removed.map((r) => deleteObject(r.key)));
   await done();
   return null;
 }
@@ -318,11 +414,13 @@ async function settle(
   recurringId: string,
   month: string,
   row: typeof s.moneyMovements.$inferInsert,
+  receipts: ReceiptRow[] = [],
 ): Promise<MoneyResult> {
   try {
     await db.transaction(async (tx) => {
       const [movement] = await tx.insert(s.moneyMovements).values(row).returning({ id: s.moneyMovements.id });
       await tx.insert(s.moneyRecurringOccurrences).values({ recurringId, month, movementId: movement.id });
+      await attach(tx, movement.id, receipts);
     });
   } catch (error) {
     if (isUniqueClash(error)) return { error: "That one is already settled." };
@@ -331,11 +429,16 @@ async function settle(
   return null;
 }
 
-/** Deleting what a Recurring recorded makes that occurrence pending again. */
+/** Deleting what a Recurring recorded makes that occurrence pending again. Its Receipts go too. */
 export async function deleteMovement(fd: FormData) {
   await requireIvan();
   const { id } = z.object({ id: z.uuid() }).parse({ id: fd.get("id") });
+  const receipts = await db
+    .select({ key: s.moneyReceipts.key })
+    .from(s.moneyReceipts)
+    .where(eq(s.moneyReceipts.movementId, id));
   await db.delete(s.moneyMovements).where(eq(s.moneyMovements.id, id));
+  await Promise.all(receipts.map((r) => deleteObject(r.key)));
   await done();
 }
 
