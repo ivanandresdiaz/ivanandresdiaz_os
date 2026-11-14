@@ -247,3 +247,6 @@ _Evitar_: Stock, Reserve.
 
 **Adjustment** (Ajuste): poner el saldo real de una Account cuando no coincide (p. ej. ZuluTrade bajó por el mercado, o conté el efectivo y falta). Queda la diferencia; no es Expense ni Income y no cuenta en ninguna Category.
 _Evitar_: Correction, Gain, Loss.
+
+**Receipt** (Soporte): una foto o un PDF que respalda un movimiento (p. ej. la factura de la luz, el comprobante de una Transfer). Un movimiento puede tener varios, y se van con él.
+_Evitar_: Attachment, Voucher, File.

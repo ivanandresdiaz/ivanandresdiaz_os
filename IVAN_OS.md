@@ -894,6 +894,21 @@ Una Account o una Category usadas por un Recurring o un Adjustment tampoco se bo
 Migración 0027 (`money_recurrings`, `money_recurring_occurrences`, `money_adjustments`) aplicada en local; pendiente en Neon. Probado en el navegador en tamaño celular: Recurring creado desde la UI, ocurrencias de octubre y noviembre vencidas, confirmar, saltar, confirmar con otro monto, borrar lo confirmado (vuelve a pedir), Adjustment en USD, editar un Recurring desde la lista. Los datos de prueba se borraron de la base local; la Account "Personal" no es de la prueba y quedó.
 
 
+## Ronda 60 — Money: quincena, montos y Receipts (2026-11-14)
+
+| # | Decisión | Estado |
+|---|---|---|
+| Q1 | Quincena | ✅ Dos Recurrings mensuales de medio salario: "Salary · 15th" y "Salary · 30th" (en febrero toca el último día). Sin horario "dos veces al mes" mientras dos filas no molesten. |
+| Q2 | Montos | ✅ Los campos de dinero no aceptan texto: solo dígitos, punto y coma; los saldos (inicial y real) además un menos al inicio. |
+| Q3 | Receipts | ✅ Fotos o PDFs que respaldan un movimiento (factura, comprobante). Varios por movimiento (hasta 10), en cualquier movimiento, no solo Expenses. Se adjuntan desde el mismo diálogo del "+", antes de guardar o después al abrir el movimiento; confirmar un Recurring con un toque no adjunta. Sin comprimir, hasta 10 MB cada uno. 📎 en la lista. Borrar el movimiento borra sus Receipts. Privados en R2 (links firmados), sin cifrar. |
+
+## Money, Receipts — construido en local (2026-11-14)
+
+"Receipts" en el diálogo del movimiento (no en el de un Recurring): "Attach photo or PDF" abre la cámara, las fotos o un PDF en el celular. Cada archivo sube a R2 al elegirlo ("Uploading…" → "✓ Attaches on save") y queda en el movimiento al guardar; Save espera a que terminen. Los ya adjuntos muestran miniatura (JPEG, PNG, WebP) y se abren en otra pestaña; "Remove" los tacha y se quitan al guardar ("Keep" lo deshace). Cerrar sin guardar borra de R2 lo recién subido. En Movements, un clip junto al movimiento (con el número si son varios).
+
+Migración 0028 (`money_receipts`) aplicada en local; pendiente en Neon. Probado en el navegador en tamaño celular: Expense nuevo con una foto y un PDF, abrir ambos (llegan idénticos y con su tipo), quitar el PDF (se borra de R2), adjuntar y cancelar (se borra de R2), borrar el Expense (su foto se borra de R2). Los datos de prueba se borraron; "Personal" quedó.
+
+
 ## Discoveries — construido en local (2026-11-09)
 
 Rondas 53–54 construidas, sin commit. Migración 0024 aplicada en local; pendiente en Neon.
