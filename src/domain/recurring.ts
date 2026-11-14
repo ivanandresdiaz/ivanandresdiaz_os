@@ -111,3 +111,34 @@ export function nextOccurrence(rule: RecurringRule, resolutions: Resolutions): {
   }
   return null;
 }
+
+export type MonthTotal = { currency: string; confirmed: number; due: number };
+
+/**
+ * How much of a month's Recurrings is already confirmed, out of all that is
+ * due that month, per currency (Ronda 61, Q18). A skipped one isn't due; a
+ * confirmed one counts what was really recorded. Occurrences of other months
+ * (overdue ones) belong to their own month.
+ */
+export function monthTotals(
+  month: IsoMonth,
+  occurrences: { month: IsoMonth; state: OccurrenceState; amount: number; currency: string; recorded: { amount: number; currency: string } | null }[],
+): MonthTotal[] {
+  const totals = new Map<string, MonthTotal>();
+  const line = (currency: string) => {
+    const found = totals.get(currency) ?? { currency, confirmed: 0, due: 0 };
+    totals.set(currency, found);
+    return found;
+  };
+  for (const o of occurrences) {
+    if (o.month !== month || o.state === "skipped") continue;
+    if (o.state === "confirmed" && o.recorded) {
+      const l = line(o.recorded.currency);
+      l.confirmed += o.recorded.amount;
+      l.due += o.recorded.amount;
+    } else {
+      line(o.currency).due += o.amount;
+    }
+  }
+  return [...totals.values()].sort((a, b) => (a.currency === "COP" ? -1 : b.currency === "COP" ? 1 : 0));
+}

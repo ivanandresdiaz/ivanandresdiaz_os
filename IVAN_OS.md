@@ -921,6 +921,7 @@ Migración 0027 (`money_recurrings`, `money_recurring_occurrences`, `money_adjus
 | Q14 | Borrar | ✅ Borrar una Campaign quita sus vínculos y los movimientos quedan. Borrar un movimiento quita solo sus vínculos. |
 | Q16 | Torta de Income | ✅ El Income tiene sus propias Categories (Salary, Freelance…), aparte de las de Expense, y es obligatoria al crear o editar. La dona cambia entre Expenses e Income ("Where it came from"), en pesos. El Income que ya existía sin Category sale en gris como "No Category" hasta ponérsela; no se adivina por él. La pestaña Categories muestra las dos listas; unir solo dentro de la misma clase. |
 | Q17 | Recurrings por clase | ✅ La pestaña Recurrings tiene un control segmentado Expenses / Income / Transfers (con cuántos hay de cada uno) que filtra "This month" y "All Recurrings". Transfers va también, para que el 1M al ahorro no se pierda. "+ Recurring" abre en la clase elegida. |
+| Q18 | Total del mes en Recurrings | ✅ "This month" muestra "Confirmed $X / $Y" con una barra, para la clase elegida y por moneda. $Y es todo lo que vence en el mes menos lo saltado; lo confirmado cuenta con el monto que se registró de verdad. Lo vencido de meses anteriores cuenta en su mes, no en este. |
 
 ## Money, pestañas, tortas y Campaigns — Subida (2026-11-14), commit a2931f7, 0029 y 0030 en Neon
 

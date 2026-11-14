@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import type { IsoDate } from "@/domain/dates";
+import type { IsoDate, IsoMonth } from "@/domain/dates";
+import { monthTotals } from "@/domain/recurring";
 import {
   amountInput,
   amountTyping,
@@ -122,7 +123,7 @@ export function MoneyMonth({ view, today, tab: initialTab }: { view: MoneyMonthV
         <div role="tabpanel" id={`money-panel-${tab}`} aria-labelledby={`money-tab-${tab}`} className="flex flex-col gap-4">
           {tab === "movements" && <Movements movements={view.movements} adjustments={view.adjustments} today={today} />}
           {tab === "recurrings" && (
-            <Recurrings occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
+            <Recurrings month={view.month} occurrences={view.occurrences} recurrings={view.recurrings} today={today} />
           )}
           {tab === "accounts" && <Accounts accounts={view.accounts} />}
           {tab === "categories" && (
@@ -532,10 +533,12 @@ const KIND_PLURAL: Record<MovementView["kind"], string> = {
  * pending asks above the tabs.
  */
 function Recurrings({
+  month,
   occurrences,
   recurrings,
   today,
 }: {
+  month: IsoMonth;
   occurrences: OccurrenceView[];
   recurrings: RecurringView[];
   today: IsoDate;
@@ -545,6 +548,18 @@ function Recurrings({
   const settled = occurrences.filter((o) => o.state !== "pending" && o.recurring.kind === kind);
   const waiting = occurrences.filter((o) => o.state === "pending" && o.recurring.kind === kind).length;
   const word = KIND_PLURAL[kind].toLowerCase();
+  const totals = monthTotals(
+    month,
+    occurrences
+      .filter((o) => o.recurring.kind === kind)
+      .map((o) => ({
+        month: o.month,
+        state: o.state,
+        amount: o.recurring.amount,
+        currency: o.recurring.currency,
+        recorded: o.movement && { amount: o.movement.amount, currency: o.movement.currency },
+      })),
+  );
 
   return (
     <>
@@ -580,6 +595,30 @@ function Recurrings({
       ) : (
         <>
           <Section title="This month">
+            {totals.map((l) => (
+              <div key={l.currency} className="flex flex-col gap-1">
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="text-muted">Confirmed</span>
+                  <span className="tabular-nums">
+                    <span className="font-semibold">{formatAmount(l.confirmed, l.currency as Currency)}</span>
+                    <span className="text-muted"> / {formatAmount(l.due, l.currency as Currency)}</span>
+                  </span>
+                </div>
+                <span
+                  className="h-1.5 overflow-hidden rounded-full bg-line"
+                  role="meter"
+                  aria-label={`Confirmed of what is due, ${l.currency}`}
+                  aria-valuemin={0}
+                  aria-valuemax={l.due}
+                  aria-valuenow={l.confirmed}
+                >
+                  <span
+                    className="block h-full rounded-full bg-accent"
+                    style={{ width: `${l.due > 0 ? Math.min(100, (l.confirmed / l.due) * 100) : 0}%` }}
+                  />
+                </span>
+              </div>
+            ))}
             {settled.length === 0 && (
               <p className="text-sm text-muted">
                 {waiting > 0 ? "Only what is waiting above, to confirm." : `No ${word} due this month.`}

@@ -3,6 +3,7 @@ import {
   dueDateIn,
   isValidEvery,
   monthsBetween,
+  monthTotals,
   nextOccurrence,
   occurrencesFor,
   resolutionKey,
@@ -97,5 +98,30 @@ describe("Occurrences of a month", () => {
     const settled: Resolutions = new Map([[resolutionKey("internet", "2026-11"), "m"]]);
     expect(nextOccurrence(internet, settled)).toEqual({ month: "2026-12", due: "2026-12-05" });
     expect(nextOccurrence(soat, none)).toEqual({ month: "2027-03", due: "2027-03-10" });
+  });
+});
+
+describe("The month's total", () => {
+  const o = (
+    state: "pending" | "upcoming" | "confirmed" | "skipped",
+    amount: number,
+    recorded: number | null = null,
+    month = "2026-11",
+    currency = "COP",
+  ) => ({ month, state, amount, currency, recorded: recorded === null ? null : { amount: recorded, currency } });
+
+  it("is what was confirmed, as recorded, out of all that is due", () => {
+    expect(
+      monthTotals("2026-11", [o("confirmed", 50_000, 52_000), o("pending", 30_000), o("upcoming", 20_000), o("skipped", 90_000)]),
+    ).toEqual([{ currency: "COP", confirmed: 52_000, due: 102_000 }]);
+  });
+
+  it("leaves overdue ones of other months to their month, and keeps dollars apart", () => {
+    expect(
+      monthTotals("2026-11", [o("pending", 1_450_000, null, "2026-10"), o("upcoming", 2_000, null, "2026-11", "USD"), o("upcoming", 10)]),
+    ).toEqual([
+      { currency: "COP", confirmed: 0, due: 10 },
+      { currency: "USD", confirmed: 0, due: 2_000 },
+    ]);
   });
 });

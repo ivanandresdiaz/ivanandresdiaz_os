@@ -95,6 +95,7 @@ export type CategoryMonthView = {
   expenses: MovementView[];
 };
 export type MoneyMonthView = {
+  month: IsoMonth;
   accounts: AccountView[];
   categories: CategoryView[];
   summary: CurrencySummary[];
@@ -294,6 +295,7 @@ export async function getMoneyMonth(month: IsoMonth, today: IsoDate): Promise<Mo
   }));
 
   return {
+    month,
     accounts,
     categories,
     summary: monthSummary(accountRows, monthRows),
