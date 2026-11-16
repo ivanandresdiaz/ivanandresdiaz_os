@@ -15,6 +15,7 @@ import {
   sameName,
   servesCampaigns,
   shareLabel,
+  totalBalances,
   type AccountRef,
   type MovementRef,
 } from "./money";
@@ -132,6 +133,22 @@ describe("Balances", () => {
     ]);
     expect(result.get("zulu")).toBe(9_200);
     expect(result.get("cash")).toBe(-20_000);
+  });
+});
+
+describe("Balance today", () => {
+  it("adds every Account per currency, says how much is in Savings, and puts pesos first", () => {
+    expect(
+      totalBalances([
+        { currency: "USD", savings: false, balance: 10_000 },
+        { currency: "COP", savings: false, balance: 1_000_000 },
+        { currency: "COP", savings: true, balance: 3_000_000 },
+        { currency: "COP", savings: false, balance: -20_000 },
+      ]),
+    ).toEqual([
+      { currency: "COP", total: 3_980_000, inSavings: 3_000_000 },
+      { currency: "USD", total: 10_000, inSavings: 0 },
+    ]);
   });
 });
 

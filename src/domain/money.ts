@@ -123,6 +123,21 @@ export function balances(
   return result;
 }
 
+/** What I have today in one currency, across every Account, and how much of it sits in Savings Accounts. */
+export type CurrencyBalance = { currency: Currency; total: number; inSavings: number };
+
+/** Every Account's balance added up, one line per currency, never converted (Q9), pesos first. */
+export function totalBalances(accounts: { currency: Currency; savings: boolean; balance: number }[]): CurrencyBalance[] {
+  const lines = new Map<Currency, CurrencyBalance>();
+  for (const a of accounts) {
+    const line = lines.get(a.currency) ?? { currency: a.currency, total: 0, inSavings: 0 };
+    line.total += a.balance;
+    if (a.savings) line.inSavings += a.balance;
+    lines.set(a.currency, line);
+  }
+  return [...lines.values()].sort((a, b) => CURRENCIES.indexOf(a.currency) - CURRENCIES.indexOf(b.currency));
+}
+
 export type CurrencySummary = {
   currency: Currency;
   income: number;

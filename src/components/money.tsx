@@ -15,6 +15,7 @@ import {
   parseBalance,
   pieSlices,
   shareLabel,
+  totalBalances,
   type Currency,
   type MoneyTab,
 } from "@/domain/money";
@@ -93,6 +94,8 @@ export function MoneyMonth({ view, today, tab: initialTab }: { view: MoneyMonthV
 
   return (
     <>
+      <BalanceToday accounts={view.accounts} onOpen={() => choose("accounts")} />
+
       <div className="grid gap-3 sm:grid-cols-2">
         {view.summary.map((line) => (
           <section key={line.currency} className="card grid grid-cols-3 gap-2">
@@ -189,6 +192,36 @@ function MoneyTabs({ tab, onChoose, pending }: { tab: MoneyTab; onChoose: (tab: 
         );
       })}
     </div>
+  );
+}
+
+/** What I have right now across every Account, whatever month is shown; never converted between currencies. */
+function BalanceToday({ accounts, onOpen }: { accounts: AccountView[]; onOpen: () => void }) {
+  const lines = totalBalances(accounts);
+  return (
+    <section className="card flex flex-wrap items-end gap-x-8 gap-y-3">
+      {lines.map((line) => (
+        <div key={line.currency} className="flex min-w-0 flex-col">
+          <span className="label">Balance today{lines.length > 1 ? ` · ${line.currency}` : ""}</span>
+          <span
+            className={`truncate text-2xl font-semibold tabular-nums ${line.total < 0 ? "text-red-600" : ""}`}
+            title={formatAmount(line.total, line.currency)}
+          >
+            {formatAmount(line.total, line.currency)}
+          </span>
+          {line.inSavings !== 0 && (
+            <span className="text-xs text-muted">
+              {formatAmount(line.total - line.inSavings, line.currency)} to use ·{" "}
+              {formatAmount(line.inSavings, line.currency)} in Savings
+            </span>
+          )}
+        </div>
+      ))}
+      <div className="flex-1" />
+      <button type="button" className="text-xs text-muted hover:underline" onClick={onOpen}>
+        {accounts.length} {accounts.length === 1 ? "Account" : "Accounts"} →
+      </button>
+    </section>
   );
 }
 
