@@ -950,6 +950,10 @@ Ronda 62 subida (commit f0bee6a). Migración 0031 (`money_debts`, `money_debt_pa
 - Las pestañas se ajustan en el celular para que quepan las cinco. Una Category usada por una Debt no se borra, y al unirla sus Debts se van con ella.
 - **Probado en el navegador** (ancho de teléfono, contra el 3200): derecho a grado sin dinero ahora con fecha y recordatorio; préstamo de Carlos como Income; pago de 200.000 (Expense en la dona, recordatorio a 300.000), intento de pagar de más, pago del resto (pagada, recordatorio hecho); préstamo a Pedro como Expense, cobro de 40.000 sin Account y cierre a mano; borrar el movimiento de un pago la reabrió. Los datos de prueba se borraron.
 
+## Money, Balance today — construido en local (2026-11-16), sin migración
+
+- **Balance today**, arriba de Income / Expenses / Saved: la suma de los saldos de hoy de todas las Accounts, una línea por moneda sin convertir (Q9), en rojo si queda bajo 0. Debajo, cuánto es para usar y cuánto está en Savings Accounts (solo si hay algo en Savings). Es el saldo de hoy aunque se mire otro mes. "N Accounts →" abre la pestaña Accounts con el detalle. No resta las Debts.
+
 ## Money, pestañas, tortas y Campaigns — Subida (2026-11-14), commit a2931f7, 0029 y 0030 en Neon
 
 Ronda 61 subida (commit a2931f7). Migraciones 0029 (`money_movement_campaigns`, `money_recurring_campaigns`, solo tablas nuevas) y 0030 (`money_categories.kind`, nombre único por clase, y el Income puede llevar Category; solo afloja reglas) aplicadas en local y en Neon (31 migraciones). En Neon hay 1 Income y 2 Recurrings de Income sin Category: saldrán como "No Category" hasta que Ivan les ponga una.
